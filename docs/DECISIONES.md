@@ -55,6 +55,13 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
   - Sudowoodo: Avalancha y Tumba Rocas.
   - Onix: Avalancha, Excavar (bajo tierra no se le puede golpear) y Tormenta Arena.
   - En la última fase se enfurecen.
+- **Obstáculos** (`src/data/layouts.ts`, `src/game/obstacles.ts`):
+  - **Rocas:** bloquean el paso y paran todos los proyectiles; Rebote Muro rebota en ellas.
+  - **Agua:** bloquea el paso, pero los proyectiles la cruzan. Los voladores y fantasmas (y tu Pokémon, si tiene Levitación) pasan por encima.
+  - Hay 7 diseños que salen según la sala (con espejo al azar). La sala 1 y la primera de cada tramo (11, 21…) son abiertas, y las de jefe casi.
+  - Los enemigos rodean los obstáculos con una cuadrícula de navegación. Los que disparan, si una roca les tapa, se recolocan.
+  - Apuntas primero a los enemigos que ves.
+  - Los tests comprueban que no hay zonas cerradas, que siempre hay camino a la salida y que nadie aparece dentro de un obstáculo.
 - **Rendimiento:** como mucho hay 360 proyectiles a la vez; si se pasa, desaparecen antes los tuyos más viejos (`balance.perf`).
 
 ## Provisional (pendiente de decisión de diseño)
@@ -67,7 +74,7 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
 | Tramos de enemigos | Uno cada 10 salas, con la vida y el daño base de PokéSurvivor; dentro de cada tramo, +10 % de vida y +3 % de daño por sala | `data/enemies.ts`, `balance.difficulty` |
 | Jefes | Vida ×24 (miniboss) y ×60 (jefe) sobre el tramo de su sala; fases al 66 % y al 33 % | `balance.bosses`, `data/enemies.ts` |
 | Habilidades y sinergias | Magnitudes, rarezas (pesos 7/4/2/1) y peso de carta 9 | `data/abilities.ts`, `balance.upgrades.weights.ability` |
-| Obstáculos en las salas | Sin obstáculos (pendiente de decidir) | — |
+| Obstáculos en las salas | 7 diseños de Brock; la sala en la que empieza a salir cada uno | `data/layouts.ts` |
 | Curva de experiencia | 5 + 2·L + L^1,35 por nivel, con un máximo de nivel 36 | `balance.experience` |
 | Evoluciones de especie | Nivel oficial. Las de piedra o intercambio no evolucionan en partida (pendiente). | `data/pokemon.ts` |
 | Movimiento inicial | Según el tipo principal (tabla de PokéSurvivor) | `data/moves.ts` |

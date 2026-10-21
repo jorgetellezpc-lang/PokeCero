@@ -9,10 +9,7 @@ import { brock } from './helpers';
 export function bot(w: World) {
   const p = w.player;
   if (w.exitOpen && w.pickups.length === 0) {
-    const dx = w.exit.x - p.x;
-    const dy = w.exit.y - p.y;
-    const d = Math.hypot(dx, dy) || 1;
-    return { x: dx / d, y: dy / d };
+    return w.nav.dirTo(p, w.exit.x, w.exit.y, p.r, p.mods.levitate);
   }
   let fx = 0;
   let fy = 0;

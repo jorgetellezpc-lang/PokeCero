@@ -45,6 +45,7 @@ export class Renderer {
     ctx.drawImage(this.background(w), 0, 0, w.W, w.H);
 
     this.drawExit(w);
+    this.drawWater(w);
     this.drawGroundFields(w);
     this.drawHazards(w);
     this.drawMarkers(w);
@@ -56,6 +57,7 @@ export class Renderer {
     for (const c of w.corpses) list.push({ y: c.y - 1, fn: () => { c.anim.draw(ctx, c.x, c.y, { alpha: Math.min(1, c.fade * 1.6) }); } });
     for (const e of w.enemies) list.push({ y: e.y, fn: () => this.drawEnemy(w, e) });
     list.push({ y: w.player.y, fn: () => this.drawPlayer(w) });
+    for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => this.drawRock(o) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.fn();
 
@@ -68,6 +70,45 @@ export class Renderer {
     this.drawParticles(w);
     this.drawEnemyBars(w);
     if (this.showDamageNumbers) this.drawTexts(w);
+  }
+
+  /** Agua: charcas con borde claro y ondas que se mueven. */
+  private drawWater(w: World): void {
+    const ctx = this.ctx;
+    for (const o of w.obstacles) {
+      if (o.kind !== 'water') continue;
+      ctx.fillStyle = '#2f6fb0';
+      ctx.fillRect(o.x - 2, o.y - 2, o.w + 4, o.h + 4);
+      ctx.fillStyle = '#3f8fd8';
+      ctx.fillRect(o.x, o.y, o.w, o.h);
+      ctx.fillStyle = '#2a64a0';
+      ctx.fillRect(o.x, o.y, o.w, 4);
+      ctx.fillStyle = 'rgba(200, 235, 255, 0.55)';
+      for (let yy = o.y + 10; yy < o.y + o.h - 4; yy += 14) {
+        const off = ((w.time * 14 + yy * 3) % 24) - 12;
+        for (let xx = o.x + 8 + off; xx < o.x + o.w - 10; xx += 24) {
+          if (xx > o.x + 2) ctx.fillRect(Math.round(xx), Math.round(yy), 8, 2);
+        }
+      }
+    }
+  }
+
+  /** Roca: bloque pixel art con cara superior clara y sombra. */
+  private drawRock(o: { x: number; y: number; w: number; h: number }): void {
+    const ctx = this.ctx;
+    const top = 8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillRect(o.x + 3, o.y + o.h - 2, o.w, 6);
+    ctx.fillStyle = '#3d342c';
+    ctx.fillRect(o.x - 2, o.y - top - 2, o.w + 4, o.h + top + 4);
+    ctx.fillStyle = '#7a6e62';
+    ctx.fillRect(o.x, o.y - top, o.w, o.h + top);
+    ctx.fillStyle = '#a59784';
+    ctx.fillRect(o.x, o.y - top, o.w, Math.min(o.h, 14));
+    ctx.fillStyle = '#c4b6a0';
+    ctx.fillRect(o.x + 3, o.y - top + 2, Math.max(4, o.w * 0.3), 3);
+    ctx.fillStyle = '#5e5348';
+    for (let xx = o.x + 10; xx < o.x + o.w - 6; xx += 22) ctx.fillRect(xx, o.y - top + 18, 3, Math.max(4, o.h - 20));
   }
 
   private drawExit(w: World): void {

@@ -103,6 +103,9 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await shot(page, '08-salida');
   await world(page, 'w.player.x = w.exit.x; w.player.y = w.exit.y + 12;');
   await expect(page.getByTestId('room')).toHaveText('Sala 4/50');
+  expect(await world(page, 'return w.obstacles.length;')).toBeGreaterThan(0);
+  await page.waitForTimeout(1800);
+  await shot(page, '08b-obstaculos');
 
   // Ir al miniboss (sala 20) y comprobar barra de jefe
   await world(page, 'w.startRoom(3);');

@@ -4,6 +4,7 @@ import { TYPE_COLORS } from '../data/typeColors';
 import type { AnimName } from '../render/animator';
 import type { Enemy, Field, OwnedMove, Projectile } from './entities';
 import { dist } from './math';
+import { rockAt } from './obstacles';
 import type { World } from './world';
 
 // ============================================================================
@@ -490,6 +491,24 @@ export function updateProjectiles(w: World, dt: number): void {
       else if ((pr.y < mg && pr.vy < 0) || (pr.y > w.H - mg && pr.vy > 0)) { pr.vy = -pr.vy; pr.wallBounce--; pr.hits.clear(); pr.t = Math.max(0, pr.t - 0.4); }
     }
     let alive = pr.t < pr.life && pr.x > -30 && pr.x < w.W + 30 && pr.y > -30 && pr.y < w.H + 30;
+    // Las rocas paran los proyectiles (los tuyos rebotan con Rebote Muro). El agua no.
+    const rock = alive && w.obstacles.length ? rockAt(pr.x, pr.y, w.obstacles) : null;
+    if (rock) {
+      const px = pr.x - pr.vx * dt;
+      const py = pr.y - pr.vy * dt;
+      if (pr.friendly && pr.wallBounce > 0) {
+        if (px <= rock.x || px >= rock.x + rock.w) pr.vx = -pr.vx;
+        else pr.vy = -pr.vy;
+        pr.x = px;
+        pr.y = py;
+        pr.wallBounce--;
+        pr.hits.clear();
+        pr.t = Math.max(0, pr.t - 0.4);
+      } else {
+        w.burst(px, py, pr.friendly ? pr.color : '#c8b8a0', 4);
+        alive = false;
+      }
+    }
     if (alive && !pr.friendly && blockedByGuardian(w, pr)) {
       w.burst(pr.x, pr.y, '#bfe8ff', 6);
       alive = false;

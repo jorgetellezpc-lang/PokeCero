@@ -4,6 +4,7 @@ import { TYPE_COLORS } from '../data/typeColors';
 import { dirFromAngle } from '../render/animator';
 import type { Enemy } from './entities';
 import { clamp, dist } from './math';
+import { segmentBlocked } from './obstacles';
 import type { World } from './world';
 
 // ============================================================================
@@ -81,6 +82,9 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
   dx /= d;
   dy /= d;
 
+  // Camino rodeando obstáculos (recto si no hay ninguno en medio).
+  let { x: nx, y: ny } = w.steer(e, p.x, p.y);
+
   // Corredor: va a donde VAS a estar.
   if (e.behavior === 'runner' && p.moving) {
     const lead = clamp(d / Math.max(60, speed), 0, 1.4);
@@ -90,6 +94,7 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
     const l = Math.hypot(tx - e.x, ty - e.y) || 1;
     dx = (tx - e.x) / l;
     dy = (ty - e.y) / l;
+    ({ x: nx, y: ny } = w.steer(e, tx, ty));
   }
 
   // Kamikaze: mecha y explosión.
@@ -130,8 +135,8 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
     }
   }
 
-  let vx = dx * speed;
-  let vy = dy * speed;
+  let vx = nx * speed;
+  let vy = ny * speed;
   let animBase: 'Walk' | 'Idle' = 'Walk';
 
   if (e.behavior === 'charger') {
@@ -165,7 +170,11 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
   } else if (isRangedBehavior(e.behavior)) {
     const range = e.def.range ?? 190 * sp();
     const keep = range * 0.82;
-    if (d < keep * 0.75) {
+    // Sin línea de tiro (roca en medio): se recoloca rodeándola en vez de esperar.
+    const covered = w.obstacles.length > 0 && segmentBlocked(e.x, e.y - e.bodyH * 0.4, p.x, p.y - 10, w.obstacles, true, 3);
+    if (covered) {
+      // vx/vy ya siguen el camino hacia ti.
+    } else if (d < keep * 0.75) {
       vx = -dx * speed * 0.8;
       vy = -dy * speed * 0.8;
     } else if (d < keep) {

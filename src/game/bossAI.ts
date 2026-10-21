@@ -113,8 +113,9 @@ function move(w: World, e: Enemy, ai: BossBrain, dt: number): [number, number, '
   const dx = (p.x - e.x) / d;
   const dy = (p.y - e.y) / d;
   const speed = e.speed * (1 - e.slow) * k;
-  let vx = dx * speed * 1.1;
-  let vy = dy * speed * 1.1;
+  const nav = w.steer(e, p.x, p.y);
+  let vx = nav.x * speed * 1.1;
+  let vy = nav.y * speed * 1.1;
   if (ai.mode === 'far') {
     if (d < 170 * sp()) {
       vx = -dx * speed;

@@ -2,6 +2,7 @@ import { BALANCE } from '../config/balance';
 import { ABILITIES, BASE_MODS } from '../data/abilities';
 import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '../data/enemies';
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
+import { layoutFor, type Obstacle } from '../data/layouts';
 import { evolutionOf, getMove, maxLevelOf, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
 import { DEX, getSpecies } from '../data/pokemon';
 import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
@@ -16,6 +17,7 @@ import type {
   Beam, Corpse, Enemy, Field, FloatText, Hazard, OwnedMove, Particle, Pickup, Player, Projectile, Ring, Slash, Vec,
 } from './entities';
 import { clamp, dist } from './math';
+import { isFree, levitates, NavGrid, pushOut, segmentBlocked } from './obstacles';
 import { xpToNext } from './progression';
 import { Rng } from './rng';
 import { planRoom, scalingFor, tierForRoom, type RoomPlan, type RoomScaling } from './rooms';
@@ -98,6 +100,10 @@ export class World {
   enemies: Enemy[] = [];
   corpses: Corpse[] = [];
   projectiles: Projectile[] = [];
+  /** Obstáculos de la sala actual y su cuadrícula de navegación. */
+  obstacles: Obstacle[] = [];
+  nav: NavGrid = new NavGrid(360, 600, []);
+  private layoutSeed: number;
   /** Ráfaga: disparos repetidos pendientes. */
   volleys: { t: number; move: OwnedMove }[] = [];
   fields: Field[] = [];
@@ -134,6 +140,8 @@ export class World {
 
   constructor(opts: WorldOptions) {
     this.rng = new Rng(opts.seed ?? (Date.now() & 0xffffffff));
+    // Los diseños de sala usan su propio generador para no alterar el resto del azar.
+    this.layoutSeed = (opts.seed ?? this.rng.next() * 0xffffffff) >>> 0;
     this.gym = opts.gym;
     this.rooms = opts.rooms;
     this.xpMult = opts.xpMult ?? 1;
@@ -181,6 +189,11 @@ export class World {
     return this.roomIndex === this.rooms.length - 1;
   }
 
+  /** Dirección para que un enemigo vaya hacia (tx, ty) rodeando obstáculos. */
+  steer(e: Enemy, tx: number, ty: number): Vec {
+    return this.nav.dirTo(e, tx, ty, e.r, levitates(e.types));
+  }
+
   newId(): number {
     return this.nextId++;
   }
@@ -202,6 +215,9 @@ export class World {
     const effective = Math.max(1, Math.round(room * this.scalingFactor));
     this.plan = planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
     this.scaling = scalingFor(effective);
+    const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
+    this.obstacles = layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W);
+    this.nav = new NavGrid(this.W, this.H, this.obstacles);
     this.enemies = [];
     this.corpses = [];
     this.projectiles = [];
@@ -256,7 +272,7 @@ export class World {
       }
       x = clamp(x, m, this.W - m);
       y = clamp(y, m, this.H - m);
-      if (dist({ x, y }, this.player) >= (near ? 50 : BALANCE.rooms.minSpawnDistance)) break;
+      if (dist({ x, y }, this.player) >= (near ? 50 : BALANCE.rooms.minSpawnDistance) && isFree(x, y, 20, this.obstacles)) break;
     }
     this.markers.push({ x, y, t: BALANCE.rooms.spawnTelegraph * (summoned ? 0.6 : 1), def, boss: false, summoned });
   }
@@ -348,6 +364,7 @@ export class World {
       else updateEnemy(this, e, dt);
     }
     this.separateEnemies();
+    for (const e of this.enemies) if (!e.jump && !e.hidden) pushOut(e, e.r * 0.9, this.obstacles, levitates(e.types));
     updateProjectiles(this, dt);
     updateFields(this, dt);
     this.updateHazards(dt);
@@ -393,6 +410,7 @@ export class World {
       p.y += (move.y / len) * mag * speed * dt;
       p.moveAngle = Math.atan2(move.y, move.x);
     }
+    pushOut(p, p.r, this.obstacles, p.mods.levitate);
     const m = BALANCE.arena.margin;
     p.x = clamp(p.x, m + p.r, this.W - m - p.r);
     p.y = clamp(p.y, m + p.r, this.H - m - p.r);
@@ -427,7 +445,9 @@ export class World {
     let bd = Infinity;
     for (const e of this.enemies) {
       if (e.hidden) continue;
-      const d = dist(e, p);
+      // Los que están detrás de una roca cuentan como más lejos: primero, los que ves.
+      const hidden = this.obstacles.length && segmentBlocked(p.x, p.y - 10, e.x, e.y - e.bodyH * 0.4, this.obstacles, true, 2);
+      const d = dist(e, p) + (hidden ? 1000 : 0);
       if (d < bd) { bd = d; best = e; }
     }
     if (this.boss && this.boss.hp > 0 && !this.boss.hidden && dist(this.boss, p) < 300 && bd > 60) best = this.boss;
