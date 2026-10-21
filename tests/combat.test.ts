@@ -114,6 +114,50 @@ describe('combate', () => {
     }
   });
 
+  it('estilo Archero: solo se ataca estando quieto (orbes, auras y rastros siempre)', () => {
+    const w = makeWorld();
+    emptyRoom(w);
+    const p = w.player;
+    const e = spawnAt(w, 143, 'tank', p.x, p.y - 120);
+    e.hp = e.maxHp = 1e6;
+    e.speed = 0;
+    // Moviéndose de lado a lado: Ascuas no se lanza.
+    for (let i = 0; i < 120; i++) w.update(1 / 60, { x: i % 40 < 20 ? 1 : -1, y: 0 });
+    expect(w.projectiles.filter((x) => x.friendly)).toHaveLength(0);
+    expect(e.hp).toBe(1e6);
+    // Al pararse, el primer ataque sale al momento.
+    w.update(1 / 60, { x: 0, y: 0 });
+    expect(w.projectiles.some((x) => x.friendly)).toBe(true);
+
+    // Un orbe sí golpea mientras te mueves.
+    const w2 = makeWorld();
+    emptyRoom(w2);
+    w2.player.moves = [];
+    w2.addMove('fire-spin');
+    const e2 = spawnAt(w2, 143, 'tank', w2.player.x + 40, w2.player.y - 10);
+    e2.hp = e2.maxHp = 1e6;
+    e2.speed = 0;
+    for (let i = 0; i < 180; i++) w2.update(1 / 60, { x: 0, y: i % 20 < 10 ? 0.15 : -0.15 });
+    expect(e2.hp).toBeLessThan(1e6);
+  });
+
+  it('moverse cancela un ataque cargado', () => {
+    const w = makeWorld();
+    emptyRoom(w);
+    const p = w.player;
+    p.moves = [];
+    w.addMove('hyper-beam');
+    const e = spawnAt(w, 143, 'tank', p.x, p.y - 100);
+    e.hp = e.maxHp = 1e6;
+    e.speed = 0;
+    run(w, 0.35);
+    expect(w.fields.some((f) => f.kind === 'charge')).toBe(true);
+    w.update(1 / 60, { x: 1, y: 0 });
+    expect(w.fields.some((f) => f.kind === 'charge')).toBe(false);
+    for (let i = 0; i < 60; i++) w.update(1 / 60, { x: i % 2 ? 1 : -1, y: 0 });
+    expect(e.hp).toBe(1e6);
+  });
+
   it('el jugador muere y la partida termina en derrota', () => {
     const w = makeWorld();
     w.player.hp = 1;

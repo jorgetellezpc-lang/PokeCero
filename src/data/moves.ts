@@ -218,6 +218,8 @@ const RAW: MoveDef[] = [
   M('substitute', 'Sustituto', 'normal', 'turret', 'Un muñeco que se queda disparando por ti.', { cd: 4, dmg: 14, rate: 0.4, dur: 6, count: 1, range: 280, speed: 320, size: 6 }),
   M('hyper-beam', 'Hiperrayo', 'normal', 'charge', 'Se carga un momento y suelta un rayo enorme que lo atraviesa todo.', { cd: 2.2, charge: 0.75, dmg: 58, radius: 300, width: 44 }),
   M('rapid-spin', 'Giro Rápido', 'normal', 'spin', 'Giras sobre ti mismo golpeando todo lo que te rodea varias veces.', { cd: 1, dmg: 9, count: 3, radius: 62 }),
+  // Propio de Pokécero: ataque a distancia de tipo Normal para empezar (estilo Archero).
+  M('swift', 'Rapidez', 'normal', 'homing', 'Estrellas que persiguen al enemigo y nunca fallan.', { cd: 0.55, dmg: 13, speed: 330, life: 1.8, size: 7, homing: 5 }),
   // Fuego
   M('ember', 'Ascuas', 'fire', 'projectile', 'Bola de fuego al enemigo más cercano.', { cd: 0.52, dmg: 18, speed: 310, count: 1, spread: 0.12, pierce: 0, life: 1.6, size: 7, burn: 1 }),
   M('flamethrower', 'Lanzallamas', 'fire', 'cone', 'Chorro de llamas en abanico corto que quema.', { cd: 0.7, dmg: 7, count: 7, arc: 0.9, speed: 380, life: 0.42, size: 6, pierce: 1, burn: 1 }),
@@ -375,11 +377,13 @@ export function poolFor(types: ElementType[]): string[] {
   return [...ids];
 }
 
+// Todos empiezan con un ataque A DISTANCIA (estilo Archero: hay que pararse
+// para atacar, y un golpe cuerpo a cuerpo obligaría a pararse pegado al enemigo).
 const START: Partial<Record<ElementType, string>> = {
-  fire: 'ember', water: 'water-gun', grass: 'vine-whip', electric: 'thunder-shock', psychic: 'confusion',
-  poison: 'sludge', ground: 'mud-shot', flying: 'gust', bug: 'bug-bite', rock: 'rock-throw', ice: 'ice-beam',
-  fighting: 'karate-chop', ghost: 'shadow-ball', dragon: 'dragon-rage', fairy: 'fairy-wind', steel: 'metal-claw',
-  dark: 'bite', normal: 'tackle',
+  fire: 'ember', water: 'water-gun', grass: 'razor-leaf', electric: 'thunder-shock', psychic: 'confusion',
+  poison: 'sludge', ground: 'bonemerang', flying: 'air-slash', bug: 'signal-beam', rock: 'rock-throw', ice: 'ice-shard',
+  fighting: 'aura-sphere', ghost: 'shadow-ball', dragon: 'dragon-rage', fairy: 'draining-kiss', steel: 'mirror-shot',
+  dark: 'sucker-punch', normal: 'swift',
 };
 
 /** Movimiento inicial según el tipo principal. PROVISIONAL. */
@@ -429,7 +433,7 @@ const EVO: Record<string, [string, NeedStat]> = {
   'psycho-cut': ['Psicocolmillo', 'cd'], 'spikes': ['Fisura', 'atk'], 'toxic-spikes': ['Lanza Mugre', 'rgn'],
   'hail': ['Alud', 'cd'], 'meteor-mash': ['Bomba Imán', 'atk'], 'will-o-wisp': ['Infierno', 'cd'],
   'substitute': ['Doble Equipo', 'def'], 'aerial-ace': ['Acróbata', 'spd'], 'flame-wheel': ['Envite Ígneo', 'spd'],
-  'bubble-beam': ['Acua Cola', 'atk'], 'hex': ['Poltergeist', 'mag'], 'hyper-beam': ['Rayo Prisma', 'atk'],
+  'bubble-beam': ['Acua Cola', 'atk'], 'hex': ['Poltergeist', 'mag'], 'hyper-beam': ['Rayo Prisma', 'atk'], 'swift': ['Meteoro', 'cd'],
   'rapid-spin': ['Triataque', 'spd'], 'flame-charge': ['Golpe Calor', 'spd'], 'whirlpool': ['Salmuera', 'rgn'],
   'seed-bomb': ['Mazazo', 'atk'], 'energy-ball': ['Gigadrenado', 'rgn'], 'solar-beam': ['Cuchilla Solar', 'cd'],
   'thunder-wave': ['Voltio Cruel', 'atk'], 'electro-ball': ['Chispa', 'spd'], 'extrasensory': ['Psicoonda', 'def'],

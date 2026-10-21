@@ -74,6 +74,15 @@ function hit(w: World, m: OwnedMove, e: Enemy, dmg: number, dx: number, dy: numb
 
 const power = (w: World, m: OwnedMove) => (m.s.dmg ?? 0) * w.atkFor(categoryOf(m.def));
 
+/**
+ * Movimientos que actúan aunque te muevas (orbes, auras y rastros, como los
+ * elementos giratorios de Archero). El resto solo se lanza estando QUIETO:
+ * moverte es esquivar y pararte es atacar.
+ */
+export const ALWAYS_ON = new Set(['orbit', 'aura', 'trail']);
+
+export const firesWhileMoving = (m: OwnedMove) => ALWAYS_ON.has(m.def.kind);
+
 export function updateCombat(w: World, dt: number): void {
   const p = w.player;
   const cdItem = p.item === 'quickclaw' ? 0.8 : 1;
@@ -84,6 +93,11 @@ export function updateCombat(w: World, dt: number): void {
     }
     m.t -= dt;
     if (m.t > 0) continue;
+    // La recarga sigue corriendo al moverse: al pararte, el primer ataque sale al instante.
+    if (p.moving && !firesWhileMoving(m)) {
+      m.t = 0;
+      continue;
+    }
     if (TARGETED.has(m.def.kind) && !(w.target && dist(w.target, p) <= reach(m))) {
       m.t = 0.05;
       continue;
@@ -532,6 +546,11 @@ export function updateFields(w: World, dt: number): void {
         case 'charge':
           f.x = p.x;
           f.y = p.y;
+          // Moverse cancela la carga (hay que estar quieto para atacar).
+          if (p.moving) {
+            remove = true;
+            break;
+          }
           if (f.t >= (f.at ?? 0.75)) {
             beamHit(w, m, m.s.radius!, m.s.width ?? 40);
             w.shake = Math.max(w.shake, 0.25);

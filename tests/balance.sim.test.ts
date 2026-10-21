@@ -16,13 +16,19 @@ function bot(w: World) {
   }
   let fx = 0;
   let fy = 0;
+  // Estilo Archero: quieto para atacar; solo se mueve si hay peligro cerca.
+  let danger = false;
   for (const e of w.enemies) {
     const dx = p.x - e.x;
     const dy = p.y - e.y;
     const d = Math.hypot(dx, dy) || 1;
     const k = e.boss ? 3 : 1;
+    if (d < (e.boss ? 110 : 65)) danger = true;
     if (d < 150) { fx += (dx / d / d) * 100 * k; fy += (dy / d / d) * 100 * k; }
   }
+  for (const pr of w.projectiles) if (!pr.friendly && Math.hypot(pr.x - p.x, pr.y - p.y) < 60) danger = true;
+  for (const h of w.hazards) if (h.kind === 'beam' || Math.hypot(h.x - p.x, h.y - p.y) < h.r + 20) danger = true;
+  if (!danger && w.pickups.every((g) => Math.hypot(g.x - p.x, g.y - p.y) > 80 || w.enemies.length > 2)) return { x: 0, y: 0 };
   for (const pr of w.projectiles) {
     if (pr.friendly) continue;
     const dx = p.x - pr.x;
