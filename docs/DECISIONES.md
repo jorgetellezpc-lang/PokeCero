@@ -1,47 +1,72 @@
 # Decisiones y parámetros provisionales
 
-Este documento recoge qué está **acordado** y qué es **provisional**: valores elegidos solo para que el prototipo se pueda jugar. Los valores provisionales están centralizados en `src/config/balance.ts` y en `src/data/`.
+Este documento recoge qué está **acordado** y qué es **provisional**, es decir, valores elegidos solo para que el prototipo se pueda jugar. Los valores provisionales están centralizados en `src/config/balance.ts` y en `src/data/`.
 
 ## Acordado
 
 | Tema | Decisión |
 |---|---|
-| Tecnología | Vite + TypeScript, combate en Canvas 2D propio y menús en HTML/CSS. Se usa Canvas propio en lugar de Phaser (como se propuso al principio) para que la lógica del combate sea independiente de la pantalla y se pueda probar en Node. |
-| Estilo de ataque | Automático y continuo mientras te mueves (estilo PokéSurvivor). |
-| Completar una sala | Derrotar a todos los enemigos (incluidas las sub-oleadas) y cruzar la salida superior (estilo Archero). |
-| Pokémon de prueba | Charmander → Charmeleon. Squirtle, Bulbasaur y Pikachu existen como datos y se consiguen en el gachapón. |
-| Estructura del gimnasio | 50 salas: minibosses en las salas 20 y 40, jefe en la 50. |
-| Modo prueba | En Ajustes; recorre las salas 1, 4, 8, 20, 24, 40, 44 y 50. **Está activado por defecto** en el prototipo para poder probar el ciclo completo en unos 3 minutos. |
-| Siguiente región | Requiere las 8 medallas de Kanto (Johto aparece bloqueada). |
-| Tickets y oro | Monedas separadas: los tickets solo sirven para el gachapón y el oro solo para las mejoras permanentes. |
+| Base | Pokécero integra PokéSurvivor (sistemas, datos, sprites, efectos y música) adaptado a salas verticales estilo Archero. Por eso el proyecto es **no comercial** para siempre: lo exigen las licencias PolyForm Noncommercial y CC BY-NC (ver `THIRD_PARTY_NOTICES.md`). |
+| Tecnología | Vite + TypeScript. El combate se dibuja en Canvas 2D y los menús son HTML/CSS. La lógica de la partida no depende del navegador y se prueba en Node. |
+| Estilo de ataque | Automático y continuo (PokéSurvivor). **Diferencia con PokéSurvivor:** allí solo se lanza el movimiento activo; en Pokécero se lanzan todos a la vez (máximo 4), para poder jugar con una mano. |
+| Sprites | Sprites animados de Mundo Misterioso (SpriteCollab) de los 151 de Kanto, más Sudowoodo. Tienen 8 direcciones y 7 animaciones. |
+| Completar una sala | Derrotar a todos los enemigos y cruzar la salida superior (Archero). |
+| Estructura del gimnasio | 50 salas, con minibosses en las salas 20 y 40 y jefe en la 50. |
+| Modo prueba | En Ajustes. Recorre 8 salas (1, 4, 8, 20, 24, 40, 44 y 50) y está activado por defecto en el prototipo. |
+| Siguiente región | Requiere las 8 medallas de Kanto. |
+| Monedas | Los tickets solo sirven para el gachapón y el oro solo para las mejoras. |
+
+## Integrado de PokéSurvivor
+
+- **Movimientos.** Hay ~100, con 23 comportamientos: proyectil, cuerpo a cuerpo, rayo, orbe, onda, aura, potenciador, bumerán, cadena, mina, meteoro, torreta, embestida, rastro, cono, teledirigido, rebote, carga, giro, terremoto, remolino, empujón y aturdimiento.
+  - Cada uno tiene 5 niveles, y los que hacen daño pueden evolucionar con una carta dorada.
+  - Los movimientos que puede aprender cada Pokémon salen de sus tipos más los de tipo Normal.
+  - Los ataques son físicos o especiales, según el Ataque o el Ataque Especial del Pokémon.
+- **Tabla de tipos** completa de 18 tipos, suavizada: ×1,6 si es eficaz, ×0,6 si es poco eficaz y ×0,3 en vez de inmunidad.
+- **Estados alterados:** quemadura, veneno, ralentización, aturdimiento, empujón y escudo.
+- **Enemigos:**
+  - Puede salir cualquier Pokémon de Kanto que no sea legendario.
+  - Se agrupan en 5 tramos por fuerza (total de estadísticas base) y cada partida sortea un elenco de 7 Pokémon por tramo.
+  - Hay 13 personalidades: perseguidor, embestida, distancia, tanque, corredor, curandero, escudo, invocador, kamikaze, rayo con aviso, zonas, abanico y salto.
+- **Jefes.** Cada uno tiene 4 ataques con aviso en el suelo (pisotón, embestida o salto, y dos de distancia según su tipo), alterna entre pelear de cerca y de lejos, y se enfurece al 50 % de vida.
+- **Cartas de nivel:**
+  - Tipos: movimiento nuevo, mejora de movimiento, estadística y evolución de movimiento.
+  - Estadísticas: Vigor, Potencia, Carrera, Reflejos, Coraza, Síntesis, Imán, Aprendizaje y Baya Zidra.
+  - Como mucho se ofrecen 2 potenciadores.
+- **Objetos equipables** (uno por partida): los sueltan los jefes y, al encontrar otro, eliges con cuál quedarte.
+- **Mejoras permanentes por Pokémon:** Vitalidad, Fuerza, Zancada, Reflejos, Coraza, Síntesis, Imán, Sabiduría, Fortuna y Golpe Crítico.
+- **Gachapón:**
+  - Rarezas 1★–5★ y tiradas ×1 y ×10, a un ticket por tirada.
+  - La ×10 garantiza una Épica y hay garantía de Legendaria a las 70 tiradas.
+  - Los repetidos se convierten en oro.
+- **Recogibles:** experiencia, oro, bayas, tickets y objetos.
+- **Sonido:** sintetizador Web Audio con los temas de aldea (menú), bosque, cueva y volcán (según la sala) y jefe, más efectos de sonido.
 
 ## Provisional (pendiente de decisión de diseño)
 
 | Tema | Valor actual | Dónde |
 |---|---|---|
-| Minibosses y jefe de Brock | Geodude (20), Sudowoodo (40), Onix (50), el ejemplo del blueprint | `data/regions.ts`, `data/enemies.ts` |
-| Patrones de los jefes | Geodude: embestida y lanzamiento de rocas. Sudowoodo: anillo de rocas, desprendimiento e invocación. Onix: los cuatro patrones y una fase 2 al 50 % de vida | `data/enemies.ts` |
-| Enemigos por sala | 3 en la sala 1 y hasta 12 en la sala 50, repartidos en 1–3 sub-oleadas, con un máximo de 10 vivos a la vez | `balance.difficulty`, `balance.rooms` |
-| Curva de dificultad | d = 1 (sala 1) a 10 (sala 50). Vida +9 % por sala, daño +3 % por sala, velocidad +0,4 % por sala | `balance.difficulty` |
-| Proporción de enemigos a distancia | Del 15 % al 45 %; garantizado al menos uno desde la sala 2 | `balance.difficulty` |
-| Curva de experiencia | XP del nivel L al L+1: 5 + 2·L + L^1,35. La XP de los enemigos crece un 6 % por sala. Nivel máximo: 36 | `balance.experience` |
-| Evoluciones | Nivel oficial de la especie (Charmander, Squirtle y Bulbasaur en el 16). La tercera forma, al nivel 36, queda fuera. Pikachu no evoluciona en partida | `data/pokemon.ts` |
-| Ataques iniciales y aprendibles | 4–5 ataques por línea evolutiva | `data/pokemon.ts`, `data/attacks.ts` |
-| Ataques simultáneos | Máximo 4 | `balance.upgrades.maxAttacks` |
-| Familias de cartas | Pesos: nuevo ataque 3, mejora de ataque 4, estadística 3. Las tres cartas son siempre distintas. Si no hay suficientes opciones válidas, se completan con curación u oro | `balance.upgrades` |
-| Valores de las mejoras | Niveles de ataque 1–5; estadísticas con un número máximo de mejoras propio para cada una | `data/attacks.ts`, `data/runUpgrades.ts` |
-| Tabla de tipos | Subconjunto simplificado: ×1,25 si es eficaz y ×0,8 si es poco eficaz | `data/typeChart.ts` |
-| Curación entre salas | 8 % al superar una sala y 30 % tras un jefe | `balance.rooms` |
-| Mejoras permanentes | Vitalidad, Fuerza, Resistencia y Agilidad: 10 niveles, coste 50–70 × (n+1)^1,45. Se aplican a todos los Pokémon | `balance.ts` (`PERMANENT_UPGRADES`) |
-| Oro | Se gana por enemigo, por sala y por jefe. Se conserva al ganar, perder o abandonar | `meta/rewards.ts` |
-| Tickets | 5 en la sala 20, 5 en la 40 y 10 en la 50, una sola vez por gimnasio. 10 tickets de bienvenida para probar el gachapón | `balance.rewards` |
-| Gachapón | 10 tickets por tirada; 75 % común y 25 % raro; un repetido da 150 de oro | `balance.gacha` |
-| Modo prueba | La experiencia se multiplica por 2,5 y la sala N escala como la sala N/2 | `balance.rooms` |
+| Minibosses y jefe de Brock | Geodude (20), Sudowoodo (40) y Onix (50), con la IA de jefe de PokéSurvivor | `data/regions.ts`, `data/enemies.ts` |
+| Escala de PokéSurvivor a la arena | Sprites ×1,4; alcances ×0,7; proyectiles ×0,8; daño de movimientos ×0,5 | `balance.ps` |
+| Enemigos por sala | De 4 a 14, en 1–3 sub-oleadas, con un máximo de 12 vivos | `balance.difficulty`, `balance.rooms` |
+| Tramos de enemigos | Uno cada 10 salas, con la vida y el daño base de PokéSurvivor; dentro de cada tramo, +10 % de vida y +3 % de daño por sala | `data/enemies.ts`, `balance.difficulty` |
+| Jefes | Vida ×24 (miniboss) y ×60 (jefe) sobre el tramo de su sala | `balance.bosses` |
+| Curva de experiencia | 5 + 2·L + L^1,35 por nivel, con un máximo de nivel 36 | `balance.experience` |
+| Evoluciones de especie | Nivel oficial. Las de piedra o intercambio no evolucionan en partida (pendiente). | `data/pokemon.ts` |
+| Movimiento inicial | Según el tipo principal (tabla de PokéSurvivor) | `data/moves.ts` |
+| Ataques simultáneos | Máximo 4 | `balance.upgrades` |
+| Tickets | 5 + 5 + 10 por gimnasio, una sola vez; 1/200 por enemigo; 10 de bienvenida | `balance.rewards`, `balance.enemies` |
+| Oro de bienvenida | 500 (como en PokéSurvivor) | `balance.rewards` |
+| Gachapón | 45 / 30 / 17 / 6,5 / 1,5 %; garantía a las 70 tiradas | `balance.gacha` |
 
-## Sin implementar todavía
+## Equilibrio observado (bot sencillo, `npm run sim`)
 
-- Habilidades especiales al alcanzar ciertos hitos (sus hitos y reglas están pendientes).
-- Gimnasios 2 a 8: aparecen en el mapa pero no tienen contenido.
-- Arquetipos de enemigo adicionales (rápido, tanque, embestida, área, apoyo). La arquitectura está preparada: basta con añadir un `archetype` en `enemyAI.ts`.
-- Sonido y música.
-- Arte definitivo: todos los sprites son provisionales y se generan por código.
+- El tipo importa contra Brock, que es de Roca/Tierra: Squirtle y Bulbasaur lo superan con facilidad; Charmander y, sobre todo, Pikachu sufren contra los minibosses, porque lo eléctrico hace ×0,3 a Geodude.
+- Una partida de 50 salas dura unos 8–15 minutos y una en modo prueba, unos 2 minutos.
+
+## Sin integrar todavía (de PokéSurvivor)
+
+- Shinies: faltan sus sprites, que son otros ~8 MB.
+- Mundo abierto, terreno, biomas, climas y grietas con legendarios: no encajan directamente con las salas.
+- Cuentas, cooperativo, ranking, misiones, logros, test de personalidad e idiomas.
+- Iconos pixel art propios de cada movimiento: las cartas usan el color del tipo.

@@ -22,9 +22,10 @@ export const KANTO: RegionDef = {
     {
       id: 'brock', order: 1, city: 'Ciudad Plateada', leader: 'Brock', type: 'rock', badge: 'Medalla Roca',
       playable: true,
-      enemyPool: ['rattata', 'pidgey', 'caterpie', 'weedle', 'oddish', 'spearow', 'ekans', 'zubat', 'sandshrew', 'koffing'],
+      // Las oleadas normales sortean Pokémon de toda Kanto (data/enemies.ts).
+      enemyPool: [],
       // PROVISIONAL — ejemplo del blueprint, pendiente de decisión de diseño.
-      bosses: { 20: 'geodude_boss', 40: 'sudowoodo_boss', 50: 'onix_boss' },
+      bosses: { 20: 'geodude-boss', 40: 'sudowoodo-boss', 50: 'onix-boss' },
       mapPos: { x: 0.24, y: 0.2 },
       theme: theme('#6aa850', '#4c8838', '#c8a870', '#8c8478'),
     },

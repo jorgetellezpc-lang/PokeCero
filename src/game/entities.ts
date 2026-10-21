@@ -1,109 +1,210 @@
+import type { BossDef, EnemyDef, Behavior } from '../data/enemies';
+import type { ItemId } from '../data/items';
+import type { BuffStat, MoveCategory, MoveDef, MoveNums } from '../data/moves';
+import type { PokemonSpecies } from '../data/pokemon';
 import type { RunStatId } from '../data/runUpgrades';
-import type { AttackDef, BossDef, BossPatternId, ElementType, EnemyDef, PokemonSpecies } from '../data/types';
+import type { ElementType } from '../data/types';
+import type { Animator } from '../render/animator';
 
-// Estado de las entidades de combate. Sin dependencias de DOM: la partida
-// puede simularse en Node (tests) y dibujarse aparte (render/).
+// Estado de las entidades de combate. Sin dependencias de DOM: la partida se
+// puede simular en Node (tests) y dibujarse aparte (render/).
+// (x, y) son siempre los PIES / la sombra.
 
 export interface Vec { x: number; y: number }
 
-export interface OwnedAttack {
-  def: AttackDef;
+export interface OwnedMove {
+  def: MoveDef;
   level: number;
-  timer: number;
+  evolved: boolean;
+  /** Nombre visible (cambia al evolucionar). */
+  name: string;
+  /** Recarga restante. */
+  t: number;
+  /** Ángulo de los orbes. */
   angle: number;
+  /** Estadísticas efectivas (se recalculan al mejorar). */
+  s: MoveNums;
+  dealt: number;
 }
+
+export interface Buff { n: number; t: number; amount: number; max: number }
 
 export interface Player extends Vec {
   r: number;
   species: PokemonSpecies;
+  anim: Animator;
   hp: number;
   maxHp: number;
-  speed: number;
-  power: number;
-  defense: number;
-  haste: number;
+  baseSpeed: number;
+  /** Multiplicadores de la partida (cartas, objeto y mejoras permanentes). */
+  atkMul: number;
+  spdMul: number;
+  cdMul: number;
+  dmgReduce: number;
+  regenFlat: number;
   magnet: number;
-  regen: number;
+  xpMul: number;
+  coinMul: number;
+  crit: number;
+  buffs: Record<BuffStat, Buff>;
   invuln: number;
   level: number;
   xp: number;
-  attacks: OwnedAttack[];
-  statStacks: Partial<Record<RunStatId, number>>;
-  facing: number;
+  moves: OwnedMove[];
+  /** Veces que se ha cogido cada carta de estadística. */
+  statsTaken: Partial<Record<RunStatId, number>>;
+  item: ItemId | null;
+  focusCd: number;
+  /** Hacia dónde apunta (rad). */
+  aim: number;
+  moveAngle: number;
   moving: boolean;
-  animTime: number;
   hitFlash: number;
+  lastPatch: Vec | null;
 }
 
-export type EnemyState = 'move' | 'windup' | 'strike' | 'recover';
+export type EnemyPhase = 'walk' | 'aim' | 'dash' | 'fuse' | 'cast';
+
+export interface BossCast {
+  id: 'slam' | 'dash' | 'leap' | 'rain' | 'beam' | 'volley' | 'nova';
+  t: number;
+  wind: number;
+  after: number;
+  ang: number;
+  len?: number;
+  dur?: number;
+  go?: boolean;
+  fired?: boolean;
+}
+
+export interface BossBrain {
+  melee: BossCast['id'][];
+  ranged: BossCast['id'][];
+  farLike: number;
+  mode: 'far' | 'close';
+  modeT: number;
+  cd: number;
+  cast: BossCast | null;
+  fury: boolean;
+  side: number;
+}
+
+export interface Jump { sx: number; sy: number; tx: number; ty: number; t: number; dur: number }
 
 export interface Enemy extends Vec {
   id: number;
   def: EnemyDef | BossDef;
   boss: BossDef | null;
+  behavior: Behavior;
+  types: ElementType[];
+  cat: 'physical' | 'special';
+  anim: Animator;
+  scale: number;
   r: number;
+  bodyH: number;
   hp: number;
   maxHp: number;
   damage: number;
+  shotDmg: number;
   speed: number;
-  state: EnemyState;
-  stateTime: number;
-  attackTimer: number;
-  aim: Vec;
-  /** Ya golpeó durante la embestida actual. */
-  struck: boolean;
-  strafe: number;
-  knock: Vec;
-  hitFlash: number;
-  /** Enfriamientos por ataque de orbe (id de ataque → s). */
+  flash: number;
+  // Estados
+  slow: number; slowT: number;
+  burn: number; burnT: number; burnTick: number;
+  poison: number; poisonT: number; poisonTick: number;
+  stunT: number;
+  shield: number; shieldT: number;
+  kx: number; ky: number;
+  touchCd: number;
+  // Comportamiento
+  phase: EnemyPhase;
+  pt: number;
+  dx: number; dy: number;
+  shotCd: number;
+  skillCd: number;
+  jump: Jump | null;
+  side: number;
+  ai: BossBrain | null;
+  summoned: boolean;
+  /** Orbes: enfriamiento por movimiento (id → s). */
   orbitCd: Record<string, number>;
-  facing: number;
-  animTime: number;
-  // Jefes
-  pattern: BossPatternId | null;
-  patternIndex: number;
-  phase2: boolean;
-  contact: number;
-  contactCd: number;
 }
+
+/** Enemigo derrotado: se queda en el suelo con la animación de caer y se desvanece. */
+export interface Corpse extends Vec { anim: Animator; fade: number; boss: boolean }
 
 export interface Projectile extends Vec {
   id: number;
-  vx: number;
-  vy: number;
+  vx: number; vy: number;
   r: number;
-  damage: number;
-  owner: 'player' | 'enemy';
+  dmg: number;
+  friendly: boolean;
   element: ElementType;
+  cat: MoveCategory;
   pierce: number;
   life: number;
+  t: number;
   color: string;
-  hit: Set<number>;
+  hits: Set<number>;
+  homing: number;
+  /** Bumerán: segundos hasta darse la vuelta. */
+  boom: number;
+  back: boolean;
+  bounce: number;
+  burn: number; poison: number; slow: number; knock: number; drain: number;
+  /** Movimiento de origen (para estadísticas y evolución). */
+  move: OwnedMove | null;
+  shape: string;
 }
 
-/** Área de efecto: con `delay` > 0 se muestra como aviso antes de activarse. */
-export interface Zone extends Vec {
-  r: number;
-  owner: 'player' | 'enemy';
-  element: ElementType;
-  damage: number;
-  delay: number;
+export type FieldKind = 'mine' | 'meteor' | 'turret' | 'patch' | 'charge' | 'spin' | 'quake' | 'vortex' | 'stunzone';
+
+/** Lo que un movimiento deja en el mapa un rato (minas, meteoros, torretas, charcos…). */
+export interface Field extends Vec {
+  kind: FieldKind;
+  move: OwnedMove;
+  color: string;
+  t: number;
   life: number;
-  tick: number;
-  tickEvery: number;
-  color: string;
-  /** Si es true golpea una sola vez al activarse. */
-  burst: boolean;
-  fired: boolean;
+  r: number;
+  dmg: number;
+  arm?: number;
+  fall?: number;
+  shotT?: number;
+  tick?: number;
+  at?: number;
+  n?: number;
+  i?: number;
+  next?: number;
+  a?: number;
+  ca?: number;
+  sa?: number;
+  pull?: number;
+  delay?: number;
+  gone?: boolean;
 }
 
-export interface Gem extends Vec { value: number; pulled: boolean }
+/** Ataque enemigo con aviso en el suelo: zona circular o franja (rayo / embestida). */
+export interface Hazard extends Vec {
+  kind: 'zone' | 'beam';
+  r: number;
+  angle: number;
+  len: number;
+  w: number;
+  delay: number;
+  t: number;
+  dmg: number;
+  element: ElementType;
+  cat: 'physical' | 'special';
+  color: string;
+}
 
-export interface SpawnMarker extends Vec { t: number; enemyId: string; boss: boolean }
+export type PickupKind = 'xp' | 'xpBig' | 'coin' | 'heal' | 'ticket' | 'item';
+
+export interface Pickup extends Vec { kind: PickupKind; value: number; item?: ItemId; pulled: boolean; t: number }
 
 export interface FloatText extends Vec { text: string; color: string; life: number; size: number }
-
 export interface Particle extends Vec { vx: number; vy: number; life: number; maxLife: number; color: string; size: number }
-
-/** Efecto visual de onda (nova). */
-export interface Ring extends Vec { r: number; maxR: number; life: number; color: string }
+export interface Ring extends Vec { r: number; maxR: number; life: number; maxLife: number; color: string; width: number }
+export interface Slash extends Vec { angle: number; radius: number; arc: number; life: number; color: string }
+export interface Beam extends Vec { angle: number; len: number; w: number; life: number; color: string }

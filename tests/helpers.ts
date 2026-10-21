@@ -1,3 +1,5 @@
+import { enemyFor, type Behavior } from '../src/data/enemies';
+import { DEX } from '../src/data/pokemon';
 import { KANTO } from '../src/data/regions';
 import type { Enemy } from '../src/game/entities';
 import { World, type WorldOptions } from '../src/game/world';
@@ -14,12 +16,14 @@ export function emptyRoom(w: World): void {
   w.markers = [];
   w.pendingWaves = [];
   w.projectiles = [];
+  w.hazards = [];
   w.player.invuln = 0;
 }
 
-/** Aparece un enemigo en una posición concreta. */
-export function spawnAt(w: World, id: string, x: number, y: number): Enemy {
-  w.queueSpawn(id);
+/** Aparece un Pokémon (por nº de Pokédex) con una personalidad concreta. */
+export function spawnAt(w: World, dex: number, behavior: Behavior, x: number, y: number, tier = 0): Enemy {
+  const def = enemyFor(DEX.find((d) => d.dex === dex)!, tier, behavior);
+  w.queueSpawn(def);
   const mk = w.markers[w.markers.length - 1];
   mk.x = x;
   mk.y = y;

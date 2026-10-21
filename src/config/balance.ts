@@ -2,33 +2,55 @@
 // PARÁMETROS DE BALANCE — TODOS PROVISIONALES
 // ----------------------------------------------------------------------------
 // Este archivo centraliza los números que el blueprint deja pendientes
-// (sección 21). Son valores de prototipo para que el juego sea jugable, NO
-// decisiones de diseño definitivas. Ajusta aquí sin tocar la lógica.
+// (sección 21). Muchos vienen de PokéSurvivor y se han adaptado a la arena
+// vertical por salas de Pokécero. NO son decisiones de diseño definitivas.
 // ============================================================================
 
 export const BALANCE = {
+  /**
+   * Adaptación de los números de PokéSurvivor (mundo abierto, horizontal) a la
+   * arena vertical de Pokécero.
+   */
+  ps: {
+    /** Unidades de mundo por píxel de arte de los sprites. */
+    spritePx: 1.4,
+    /** Escala de radios, alcances y tamaños de los movimientos. */
+    space: 0.7,
+    /** Escala de la velocidad de los proyectiles. */
+    projectileSpeed: 0.8,
+    /** Escala del daño de los movimientos (aquí todos los ataques actúan a la vez). */
+    damage: 0.5,
+    /** Escala de la velocidad de los enemigos. */
+    enemySpeed: 0.8,
+    /** Escala de la velocidad del jugador (velocidad de juego de la especie × esto). */
+    playerSpeed: 1,
+  },
+
   /** Tamaño lógico de la arena (unidades de mundo). La pantalla escala esto. */
   arena: { width: 360, height: 600, margin: 14 },
 
   player: {
-    radius: 11,
+    /** Radio de colisión máximo (los Pokémon grandes chocan como uno normal). */
+    maxRadius: 13,
     /** Invulnerabilidad tras recibir daño (s). */
     invulnerability: 0.6,
-    /** Radio base de atracción de gemas de experiencia. */
-    magnet: 46,
+    /** Radio base de atracción de experiencia. */
+    magnet: 55,
     /** Reducción de daño máxima total. */
-    maxDefense: 0.6,
+    maxDefense: 0.7,
+    /** Multiplicador de daño de un golpe crítico. */
+    critMult: 1.5,
   },
 
   experience: {
     /** Nivel temporal máximo de una partida (blueprint: 36). Configurable. */
     maxLevel: 36,
-    /** XP necesaria para pasar del nivel L al L+1: base + linear*L + L^power. PROVISIONAL. */
+    /** XP del nivel L al L+1: base + linear*L + L^power. PROVISIONAL. */
     base: 5,
     linear: 2,
     power: 1.35,
     /** La XP de cada enemigo crece con la sala: xp * (1 + xpPerRoom * (sala-1)). */
-    xpPerRoom: 0.06,
+    xpPerRoom: 0.02,
   },
 
   rooms: {
@@ -49,44 +71,58 @@ export const BALANCE = {
     /** Distancia mínima al jugador para que aparezca un enemigo. */
     minSpawnDistance: 120,
     /** Máximo de enemigos vivos a la vez (para no saturar la pantalla móvil). */
-    maxAlive: 10,
+    maxAlive: 12,
   },
 
   /**
-   * Curva de dificultad PROVISIONAL. `d` va de 1 (sala 1) a 10 (sala 50).
-   * Todos los escalados se derivan de aquí.
+   * Curva de dificultad. `d` va de 1 (sala 1) a 10 (sala 50). Los enemigos
+   * cambian de tramo (más vida, daño y Pokémon más fuertes) cada
+   * `enemies.roomsPerTier` salas; esto es la rampa dentro del tramo.
    */
   difficulty: {
-    countBase: 3,
-    countPerLevel: 1.0,
-    hpPerRoom: 0.09,
+    countBase: 4,
+    countPerLevel: 1.1,
+    hpPerRoom: 0.1,
     damagePerRoom: 0.03,
-    speedPerRoom: 0.004,
-    rangedShareBase: 0.15,
-    rangedSharePerLevel: 0.035,
-    rangedShareMax: 0.45,
+    speedPerRoom: 0.003,
     /** Sub-oleadas por sala según dificultad: d < 3 → 1, d < 7 → 2, resto → 3. */
     subWaveThresholds: [3, 7],
-    /** Primera sala que garantiza al menos un enemigo a distancia. */
+    /** Primera sala que garantiza al menos un enemigo que ataca a distancia. */
     guaranteedRangedFrom: 2,
-    /** Escalado extra de vida de jefes respecto a enemigos normales de la misma sala. */
-    bossHpPerRoom: 0.05,
+  },
+
+  /** Vida y daño de los jefes como múltiplo de los del tramo de la sala. */
+  bosses: {
+    miniboss: { hp: 24, damage: 1.8 },
+    boss: { hp: 60, damage: 2.3 },
+  },
+
+  enemies: {
+    /** Pokémon distintos por tramo en cada partida (el "elenco"). */
+    castSize: 7,
+    /** Salas por tramo de enemigos (tramo 0: salas 1-10, tramo 1: 11-20…). */
+    roomsPerTier: 10,
+    /** Probabilidad de que un enemigo suelte un ticket del gachapón. */
+    ticketDrop: 1 / 200,
+    /** Probabilidad de que un enemigo suelte una baya (cura). */
+    berryDrop: 0.03,
+    /** Probabilidad de que un enemigo salga shiny (los sprites shiny aún no están incluidos). */
+    shinyRate: 0,
   },
 
   upgrades: {
     /** Cartas por subida de nivel (blueprint: exactamente 3). */
     choices: 3,
-    /** Máximo de ataques simultáneos. PENDIENTE de diseño. */
+    /** Máximo de movimientos simultáneos. PENDIENTE de diseño (PokéSurvivor: 4). */
     maxAttacks: 4,
-    /** Peso relativo de cada familia al generar cartas. PENDIENTE de diseño. */
-    familyWeights: { newAttack: 3, attackUpgrade: 4, stat: 3 },
+    /** Máximo de potenciadores (no hacen daño) que se ofrecen. */
+    maxBuffs: 2,
+    /** Pesos de cada tipo de carta (PokéSurvivor). */
+    weights: { newMove: 10, evolution: 40, moveUpgrade: 8, stat: 4, statFull: 7, statForEvolution: 14 },
     /** Curación de la carta de reserva (solo si no hay suficientes opciones). */
     fallbackHeal: 0.35,
     fallbackGold: 25,
   },
-
-  /** Tipos: multiplicadores simplificados (no la tabla oficial completa). */
-  typeChart: { strong: 1.25, weak: 0.8 },
 
   rewards: {
     /** Tickets por hito del gimnasio. Se cobran UNA sola vez por hito. */
@@ -95,36 +131,43 @@ export const BALANCE = {
     goldBossBonus: { miniboss: 40, boss: 120 },
     /** Tickets de bienvenida para poder probar el gachapón. */
     starterTickets: 10,
+    /** Oro de bienvenida (PokéSurvivor da 500 a una cuenta nueva). */
+    starterGold: 500,
   },
 
+  /** Gachapón (PokéSurvivor): 1 ticket por tirada, ×10 garantiza una Épica o mejor. */
   gacha: {
-    cost: 10,
-    rarityWeights: { common: 75, rare: 25 },
-    /** Oro que se recibe si sale un Pokémon ya obtenido. */
-    duplicateGold: 150,
+    rates: [[1, 45], [2, 30], [3, 17], [4, 6.5], [5, 1.5]] as [number, number][],
+    /** A las N tiradas sin Legendaria, la siguiente lo es. */
+    pity: 70,
+    /** Oro que devuelve un repetido según rareza. */
+    refund: { 1: 15, 2: 30, 3: 60, 4: 120, 5: 300 } as Record<number, number>,
   },
 } as const;
 
-/** Mejoras permanentes compradas con oro (sección Pokémon). PROVISIONAL: globales. */
+/** Mejoras permanentes compradas con oro, por Pokémon (PokéSurvivor). PROVISIONAL. */
 export interface PermanentUpgradeDef {
-  id: 'hp' | 'power' | 'defense' | 'speed';
+  id: 'hp' | 'atk' | 'spd' | 'cd' | 'def' | 'regen' | 'magnet' | 'xp' | 'coins' | 'crit';
   name: string;
   description: string;
-  /** Bonificación por nivel (fracción). */
-  perLevel: number;
   maxLevel: number;
-  /** Coste del nivel n (0-indexado): base * (n+1)^growth. */
   costBase: number;
   costGrowth: number;
 }
 
 export const PERMANENT_UPGRADES: PermanentUpgradeDef[] = [
-  { id: 'hp', name: 'Vitalidad', description: '+6% de vida máxima', perLevel: 0.06, maxLevel: 10, costBase: 60, costGrowth: 1.45 },
-  { id: 'power', name: 'Fuerza', description: '+5% de daño de todos los ataques', perLevel: 0.05, maxLevel: 10, costBase: 70, costGrowth: 1.45 },
-  { id: 'defense', name: 'Resistencia', description: '+2% de reducción de daño', perLevel: 0.02, maxLevel: 10, costBase: 60, costGrowth: 1.45 },
-  { id: 'speed', name: 'Agilidad', description: '+3% de velocidad de movimiento', perLevel: 0.03, maxLevel: 10, costBase: 50, costGrowth: 1.45 },
+  { id: 'hp', name: 'Vitalidad', description: '+8 de vida', maxLevel: 10, costBase: 60, costGrowth: 1.35 },
+  { id: 'atk', name: 'Fuerza', description: '+4% de daño', maxLevel: 10, costBase: 80, costGrowth: 1.38 },
+  { id: 'spd', name: 'Zancada', description: '+3% de velocidad', maxLevel: 8, costBase: 70, costGrowth: 1.4 },
+  { id: 'cd', name: 'Reflejos', description: '-3% de recarga', maxLevel: 8, costBase: 90, costGrowth: 1.42 },
+  { id: 'def', name: 'Coraza', description: '+2% de defensa', maxLevel: 8, costBase: 80, costGrowth: 1.4 },
+  { id: 'regen', name: 'Síntesis', description: '+0,2 de vida por segundo', maxLevel: 5, costBase: 120, costGrowth: 1.5 },
+  { id: 'magnet', name: 'Imán', description: '+12% de radio de recogida', maxLevel: 6, costBase: 50, costGrowth: 1.4 },
+  { id: 'xp', name: 'Sabiduría', description: '+5% de experiencia', maxLevel: 8, costBase: 100, costGrowth: 1.42 },
+  { id: 'coins', name: 'Fortuna', description: '+8% de oro', maxLevel: 8, costBase: 120, costGrowth: 1.45 },
+  { id: 'crit', name: 'Golpe Crítico', description: '+3% de críticos (×1,5 de daño)', maxLevel: 10, costBase: 90, costGrowth: 1.4 },
 ];
 
 export function permanentUpgradeCost(def: PermanentUpgradeDef, currentLevel: number): number {
-  return Math.round(def.costBase * Math.pow(currentLevel + 1, def.costGrowth));
+  return Math.round((def.costBase * Math.pow(def.costGrowth, currentLevel)) / 10) * 10;
 }

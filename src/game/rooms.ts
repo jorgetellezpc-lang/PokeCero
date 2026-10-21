@@ -1,10 +1,10 @@
 import { BALANCE } from '../config/balance';
-import { ENEMIES } from '../data/enemies';
-import type { EnemyDef, GymDef } from '../data/types';
+import { ENEMY_TIERS, isRangedBehavior, type EnemyDef } from '../data/enemies';
+import type { GymDef } from '../data/types';
 import type { Rng } from './rng';
 
-// Oleadas y dificultad: composición de cada sala a partir de la curva
-// PROVISIONAL de config/balance.ts.
+// Oleadas y dificultad: composición de cada sala a partir del elenco de la
+// partida y de la curva PROVISIONAL de config/balance.ts.
 
 export type RoomKind = 'normal' | 'miniboss' | 'boss';
 
@@ -19,8 +19,8 @@ export interface RoomPlan {
   room: number;
   kind: RoomKind;
   scaling: RoomScaling;
-  /** Sub-oleadas de enemigos normales (ids). */
-  waves: string[][];
+  /** Sub-oleadas de enemigos normales. */
+  waves: EnemyDef[][];
   bossId?: string;
 }
 
@@ -36,14 +36,19 @@ export function difficultyFor(room: number): number {
   return 1 + (9 * (Math.min(room, n) - 1)) / (n - 1);
 }
 
+/** Tramo de enemigos (0..4) de una sala. */
+export function tierForRoom(room: number): number {
+  return Math.min(ENEMY_TIERS.length - 1, Math.floor((room - 1) / BALANCE.enemies.roomsPerTier));
+}
+
 export function scalingFor(room: number): RoomScaling {
   const D = BALANCE.difficulty;
-  const r = room - 1;
+  const r = (room - 1) % BALANCE.enemies.roomsPerTier;
   return {
     difficulty: difficultyFor(room),
     hpMult: 1 + D.hpPerRoom * r,
     damageMult: 1 + D.damagePerRoom * r,
-    speedMult: 1 + D.speedPerRoom * r,
+    speedMult: 1 + D.speedPerRoom * (room - 1),
   };
 }
 
@@ -52,42 +57,28 @@ export function enemyCountFor(room: number): number {
   return Math.round(D.countBase + D.countPerLevel * (difficultyFor(room) - 1));
 }
 
-export function rangedShareFor(room: number): number {
-  const D = BALANCE.difficulty;
-  return Math.min(D.rangedShareMax, D.rangedShareBase + D.rangedSharePerLevel * (difficultyFor(room) - 1));
-}
-
-export function planRoom(gym: GymDef, room: number, rng: Rng): RoomPlan {
+export function planRoom(gym: GymDef, room: number, cast: EnemyDef[], rng: Rng): RoomPlan {
   const kind = roomKind(room);
   const scaling = scalingFor(room);
-  if (kind !== 'normal') {
-    return { room, kind, scaling, waves: [], bossId: gym.bosses[room] };
-  }
-  const pool: EnemyDef[] = gym.enemyPool.map((id) => ENEMIES[id]).filter((e) => e && e.minRoom <= room && e.weight > 0);
-  const melee = pool.filter((e) => e.archetype === 'melee');
-  const ranged = pool.filter((e) => e.archetype === 'ranged');
+  if (kind !== 'normal') return { room, kind, scaling, waves: [], bossId: gym.bosses[room] };
 
   const count = enemyCountFor(room);
-  let rangedCount = ranged.length ? Math.round(count * rangedShareFor(room)) : 0;
-  if (ranged.length && room >= BALANCE.difficulty.guaranteedRangedFrom) rangedCount = Math.max(1, rangedCount);
-  if (!melee.length) rangedCount = count;
-
-  const ids: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const list = i < rangedCount ? ranged : melee;
-    ids.push(rng.weighted(list, (e) => e.weight).id);
+  const defs: EnemyDef[] = [];
+  for (let i = 0; i < count; i++) defs.push(cast[Math.floor(rng.next() * cast.length)]);
+  // Desde la sala 2 siempre hay alguien que ataca de lejos (si el elenco lo tiene).
+  if (room >= BALANCE.difficulty.guaranteedRangedFrom && !defs.some((d) => isRangedBehavior(d.behavior))) {
+    const ranged = cast.filter((d) => isRangedBehavior(d.behavior));
+    if (ranged.length) defs[0] = ranged[Math.floor(rng.next() * ranged.length)];
   }
-  // Mezclar para que melee y distancia aparezcan combinados.
-  for (let i = ids.length - 1; i > 0; i--) {
+  for (let i = defs.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
-    [ids[i], ids[j]] = [ids[j], ids[i]];
+    [defs[i], defs[j]] = [defs[j], defs[i]];
   }
-
   const [t1, t2] = BALANCE.difficulty.subWaveThresholds;
   const d = scaling.difficulty;
   const nWaves = d < t1 ? 1 : d < t2 ? 2 : 3;
-  const waves: string[][] = Array.from({ length: nWaves }, () => []);
-  ids.forEach((id, i) => waves[i % nWaves].push(id));
+  const waves: EnemyDef[][] = Array.from({ length: nWaves }, () => []);
+  defs.forEach((def, i) => waves[i % nWaves].push(def));
   return { room, kind, scaling, waves };
 }
 

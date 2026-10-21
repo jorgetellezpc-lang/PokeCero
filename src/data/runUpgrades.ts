@@ -1,26 +1,31 @@
-// Mejoras de estadística TEMPORALES (familia C), solo durante una partida.
+// Mejoras de estadística TEMPORALES (cartas de subida de nivel), solo durante
+// una partida. Las de PokéSurvivor (js/systems/levelup.js). Required Notice:
+// Copyright 2026 JPTER78 (https://github.com/JPTER78/pokesurvivor)
 // Distintas de las mejoras permanentes compradas con oro. Valores PROVISIONALES.
 
-export type RunStatId = 'hp' | 'power' | 'speed' | 'defense' | 'haste' | 'magnet' | 'regen';
+import type { NeedStat } from './moves';
+
+export type RunStatId = NeedStat | 'heal';
 
 export interface RunStatUpgrade {
   id: RunStatId;
   name: string;
-  /** Texto del efecto; {v} se sustituye por el valor. */
-  effect: string;
-  amount: number;
-  maxStacks: number;
-  format: (v: number) => string;
+  description: string;
+  /** Veces que se puede coger en una partida (sin tope si no se indica). */
+  max?: number;
+  icon: string;
 }
 
-const pct = (v: number) => `${Math.round(v * 100)}%`;
-
 export const RUN_STAT_UPGRADES: Record<RunStatId, RunStatUpgrade> = {
-  hp: { id: 'hp', name: 'Baya Zidra', effect: '+{v} vida máxima y cura esa cantidad', amount: 0.15, maxStacks: 6, format: pct },
-  power: { id: 'power', name: 'Proteína', effect: '+{v} daño de todos los ataques', amount: 0.12, maxStacks: 6, format: pct },
-  speed: { id: 'speed', name: 'Carburante', effect: '+{v} velocidad de movimiento', amount: 0.08, maxStacks: 4, format: pct },
-  defense: { id: 'defense', name: 'Hierro', effect: '+{v} reducción de daño', amount: 0.05, maxStacks: 5, format: pct },
-  haste: { id: 'haste', name: 'Garra Rápida', effect: '+{v} velocidad de ataque', amount: 0.12, maxStacks: 5, format: pct },
-  magnet: { id: 'magnet', name: 'Amuleto', effect: '+{v} radio de recogida de experiencia', amount: 0.4, maxStacks: 3, format: pct },
-  regen: { id: 'regen', name: 'Restos', effect: '+{v} vida por segundo', amount: 0.6, maxStacks: 3, format: (v) => v.toFixed(1) },
+  hp: { id: 'hp', name: 'Vigor', description: '+20 de vida máxima (y la recupera).', icon: '♥' },
+  atk: { id: 'atk', name: 'Potencia', description: '+10% de daño con todos los movimientos.', max: 40, icon: '✊' },
+  spd: { id: 'spd', name: 'Carrera', description: '+7% de velocidad de movimiento.', max: 8, icon: '➤' },
+  cd: { id: 'cd', name: 'Reflejos', description: '-8% de recarga en todos los movimientos.', max: 10, icon: '◷' },
+  def: { id: 'def', name: 'Coraza', description: '+6% de reducción de daño recibido.', max: 12, icon: '⛨' },
+  rgn: { id: 'rgn', name: 'Síntesis', description: '+0,9 de vida regenerada por segundo.', icon: '❦' },
+  mag: { id: 'mag', name: 'Imán', description: '+30% de radio de recogida de experiencia.', max: 6, icon: '∪' },
+  xp: { id: 'xp', name: 'Aprendizaje', description: '+12% de experiencia ganada.', max: 8, icon: '✎' },
+  heal: { id: 'heal', name: 'Baya Zidra', description: 'Recupera el 45% de tu vida ahora mismo.', icon: '●' },
 };
+
+export const STAT_IDS = Object.keys(RUN_STAT_UPGRADES) as RunStatId[];

@@ -1,75 +1,123 @@
-import type { PokemonSpecies } from './types';
+import dexRaw from './ps/pokedex.json';
+import { poolFor, startFor } from './moves';
+import type { ElementType } from './types';
 
-// Pokémon jugables del prototipo (conjunto reducido; objetivo final: 151).
-// Estadísticas, ataques iniciales y niveles de evolución son PROVISIONALES.
-// Las evoluciones usan el nivel oficial de cada especie como valor inicial.
+// Pokémon de Kanto (los 151) + Sudowoodo (miniboss provisional de Brock).
+// Tipos, stats base y nombres vienen de PokeAPI a través de PokéSurvivor
+// (js/data/pokedex.js). Los stats de juego (hp, spd, pa, sa) son los que
+// PokéSurvivor deriva de los base; df/sd son Defensa y Defensa Especial base.
 
-export const POKEMON: Record<string, PokemonSpecies> = {
-  charmander: {
-    id: 'charmander', name: 'Charmander', types: ['fire'], line: 'charmander',
-    stats: { hp: 90, power: 1.1, defense: 0, speed: 112 },
-    startingAttack: 'ascuas',
-    learnset: ['ascuas', 'aranazo', 'giro_fuego', 'ataque_rapido'],
-    evolution: { to: 'charmeleon', level: 16 },
-    sprite: { shape: 'biped', main: '#f08030', belly: '#f8d070', accent: '#ffd020' },
-    obtainable: true, rarity: 'common',
-  },
-  charmeleon: {
-    id: 'charmeleon', name: 'Charmeleon', types: ['fire'], line: 'charmander',
-    stats: { hp: 125, power: 1.3, defense: 0.05, speed: 120 },
-    startingAttack: 'ascuas',
-    learnset: ['ascuas', 'aranazo', 'giro_fuego', 'ataque_rapido', 'lanzallamas'],
-    // Charizard (nivel 36) queda fuera del prototipo: la relación nivel 36 /
-    // evoluciones está pendiente de diseño.
-    sprite: { shape: 'biped', main: '#e0402a', belly: '#f8c888', accent: '#ffd020' },
-    obtainable: false, rarity: 'common',
-  },
-  squirtle: {
-    id: 'squirtle', name: 'Squirtle', types: ['water'], line: 'squirtle',
-    stats: { hp: 105, power: 1.0, defense: 0.08, speed: 104 },
-    startingAttack: 'pistola_agua',
-    learnset: ['pistola_agua', 'placaje', 'burbuja', 'ataque_rapido'],
-    evolution: { to: 'wartortle', level: 16 },
-    sprite: { shape: 'turtle', main: '#68b0e8', belly: '#f0d890', accent: '#a06030' },
-    obtainable: true, rarity: 'common',
-  },
-  wartortle: {
-    id: 'wartortle', name: 'Wartortle', types: ['water'], line: 'squirtle',
-    stats: { hp: 140, power: 1.2, defense: 0.12, speed: 110 },
-    startingAttack: 'pistola_agua',
-    learnset: ['pistola_agua', 'placaje', 'burbuja', 'ataque_rapido', 'hidrobomba'],
-    sprite: { shape: 'turtle', main: '#5880d0', belly: '#f0d890', accent: '#e8e8f8' },
-    obtainable: false, rarity: 'common',
-  },
-  bulbasaur: {
-    id: 'bulbasaur', name: 'Bulbasaur', types: ['grass', 'poison'], line: 'bulbasaur',
-    stats: { hp: 100, power: 1.05, defense: 0.05, speed: 104 },
-    startingAttack: 'hoja_afilada',
-    learnset: ['hoja_afilada', 'placaje', 'latigo_cepa', 'polvo_veneno'],
-    evolution: { to: 'ivysaur', level: 16 },
-    sprite: { shape: 'quad', main: '#70c8a0', belly: '#a8e0c0', accent: '#48a048' },
-    obtainable: true, rarity: 'common',
-  },
-  ivysaur: {
-    id: 'ivysaur', name: 'Ivysaur', types: ['grass', 'poison'], line: 'bulbasaur',
-    stats: { hp: 135, power: 1.25, defense: 0.1, speed: 110 },
-    startingAttack: 'hoja_afilada',
-    learnset: ['hoja_afilada', 'placaje', 'latigo_cepa', 'polvo_veneno'],
-    sprite: { shape: 'quad', main: '#60a8a0', belly: '#98d0b8', accent: '#e05878' },
-    obtainable: false, rarity: 'common',
-  },
-  pikachu: {
-    id: 'pikachu', name: 'Pikachu', types: ['electric'], line: 'pikachu',
-    stats: { hp: 80, power: 1.1, defense: 0, speed: 132 },
-    startingAttack: 'impactrueno',
-    learnset: ['impactrueno', 'ataque_rapido', 'chispa', 'rayo'],
-    // Sin evolución por nivel (Raichu evoluciona con piedra): no se fuerza.
-    sprite: { shape: 'mouse', main: '#f8d030', belly: '#f8e070', accent: '#e83020' },
-    obtainable: true, rarity: 'rare',
-  },
+export interface DexEntry {
+  dex: number;
+  name: string;
+  types: ElementType[];
+  /** Vida de juego. */
+  hp: number;
+  /** Velocidad de juego (unidades/s). */
+  spd: number;
+  /** Multiplicador de daño con ataques físicos / especiales. */
+  pa: number;
+  sa: number;
+  /** Defensa y Defensa Especial base. */
+  df: number;
+  sd: number;
+  /** 1 común … 5 legendario (gachapón). */
+  rarity: number;
+  bst: number;
+  leg: boolean;
+}
+
+export interface PokemonStats {
+  hp: number;
+  speed: number;
+  pa: number;
+  sa: number;
+  df: number;
+  sd: number;
+}
+
+export interface PokemonSpecies {
+  id: string;
+  dex: number;
+  name: string;
+  types: ElementType[];
+  stats: PokemonStats;
+  /** Forma base de su línea evolutiva. */
+  line: string;
+  startingAttack: string;
+  learnset: string[];
+  evolution?: { to: string; level: number };
+  rarity: number;
+  legendary: boolean;
+  bst: number;
+}
+
+export const DEX: DexEntry[] = dexRaw as DexEntry[];
+
+export const slug = (name: string) =>
+  name.toLowerCase()
+    .replace('♀', '-f').replace('♂', '-m')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '');
+
+/**
+ * Evoluciones por NIVEL de la 1.ª generación (nivel oficial). Las que en los
+ * juegos son por piedra o intercambio quedan sin evolución en partida hasta
+ * que se decida su regla (decisión pendiente del blueprint).
+ */
+const LEVEL_EVOLUTIONS: [number, number, number][] = [
+  [1, 2, 16], [2, 3, 32], [4, 5, 16], [5, 6, 36], [7, 8, 16], [8, 9, 36],
+  [10, 11, 7], [11, 12, 10], [13, 14, 7], [14, 15, 10], [16, 17, 18], [17, 18, 36],
+  [19, 20, 20], [21, 22, 20], [23, 24, 22], [27, 28, 22], [29, 30, 16], [32, 33, 16],
+  [41, 42, 22], [43, 44, 21], [46, 47, 24], [48, 49, 31], [50, 51, 26], [52, 53, 28],
+  [54, 55, 33], [56, 57, 28], [60, 61, 25], [63, 64, 16], [66, 67, 28], [69, 70, 21],
+  [72, 73, 30], [74, 75, 25], [77, 78, 40], [79, 80, 37], [81, 82, 30], [84, 85, 31],
+  [86, 87, 34], [88, 89, 38], [92, 93, 25], [96, 97, 26], [98, 99, 28], [100, 101, 30],
+  [104, 105, 28], [109, 110, 35], [111, 112, 42], [116, 117, 32], [118, 119, 33],
+  [129, 130, 20], [138, 139, 40], [140, 141, 40], [147, 148, 30], [148, 149, 55],
+];
+
+/** Pre-evoluciones (también por piedra/intercambio) para saber la forma base de cada línea. */
+const PREVIOUS: Record<number, number> = {
+  25: 172, 26: 25, 31: 30, 34: 33, 36: 35, 38: 37, 40: 39, 45: 44, 59: 58, 62: 61, 65: 64, 68: 67,
+  71: 70, 76: 75, 91: 90, 94: 93, 103: 102, 121: 120, 134: 133, 135: 133, 136: 133,
 };
 
-/** Pokémon con el que empieza cualquier partida guardada nueva. PROVISIONAL. */
+const byDex = new Map(DEX.map((d) => [d.dex, d]));
+const evoFrom = new Map<number, { to: number; level: number }>();
+const prevOf = new Map<number, number>();
+for (const [from, to, level] of LEVEL_EVOLUTIONS) {
+  evoFrom.set(from, { to, level });
+  prevOf.set(to, from);
+}
+for (const [to, from] of Object.entries(PREVIOUS)) if (byDex.has(from)) prevOf.set(Number(to), from);
+
+function baseOf(dex: number): number {
+  let d = dex;
+  while (prevOf.has(d)) d = prevOf.get(d)!;
+  return d;
+}
+
+export const POKEMON: Record<string, PokemonSpecies> = {};
+for (const d of DEX) {
+  const evo = evoFrom.get(d.dex);
+  POKEMON[slug(d.name)] = {
+    id: slug(d.name),
+    dex: d.dex,
+    name: d.name,
+    types: d.types,
+    stats: { hp: d.hp, speed: d.spd, pa: d.pa, sa: d.sa, df: d.df, sd: d.sd },
+    line: slug(byDex.get(baseOf(d.dex))!.name),
+    startingAttack: startFor(d.types),
+    learnset: poolFor(d.types),
+    evolution: evo ? { to: slug(byDex.get(evo.to)!.name), level: evo.level } : undefined,
+    rarity: d.rarity,
+    legendary: d.leg,
+    bst: d.bst,
+  };
+}
+
+/** Pokémon con el que empieza cualquier partida guardada nueva. */
 export const STARTER_POKEMON = 'charmander';
 
 export function getSpecies(id: string): PokemonSpecies {
@@ -78,6 +126,14 @@ export function getSpecies(id: string): PokemonSpecies {
   return p;
 }
 
-export function obtainablePokemon(): PokemonSpecies[] {
-  return Object.values(POKEMON).filter((p) => p.obtainable);
+export function speciesByDex(dex: number): PokemonSpecies {
+  return getSpecies(slug(byDex.get(dex)!.name));
 }
+
+/** Pokémon que se pueden conseguir en el gachapón: los 151 de Kanto. */
+export function obtainablePokemon(): PokemonSpecies[] {
+  return Object.values(POKEMON).filter((p) => p.dex <= 151);
+}
+
+/** Lado fuerte: físico o especial. */
+export const sideOf = (p: PokemonSpecies) => (p.stats.sa > p.stats.pa ? 'special' : 'physical');

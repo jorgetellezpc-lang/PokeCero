@@ -1,6 +1,8 @@
 # Pokécero
 
-Juego web Pokémon de supervivencia y acción 2D (roguelite), pensado para móvil en vertical. Prototipo jugable v0.1.
+Juego web Pokémon de supervivencia y acción 2D (roguelite), pensado para móvil en vertical. Prototipo jugable v0.2.
+
+Integra **PokéSurvivor** (© 2026 JPTER78, PolyForm Noncommercial) adaptado a salas estilo Archero, con sprites de PMD SpriteCollab (CC BY-NC 4.0). Por eso Pokécero es un proyecto **sin ánimo de lucro**: no se puede vender, cobrar por él ni ponerle anuncios. Detalles en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 La especificación de diseño está en el *Blueprint maestro*. En [`docs/DECISIONES.md`](docs/DECISIONES.md) se recogen las decisiones tomadas y los valores provisionales.
 
@@ -39,22 +41,21 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 ```
 src/
   config/balance.ts     Todos los parámetros de balance (PROVISIONALES)
-  data/                 Pokémon, ataques, enemigos, jefes, gimnasios/regiones, tabla de tipos
+  data/                 Pokédex de Kanto, movimientos, enemigos, objetos, cartas, tipos, gimnasios
+    ps/                 Datos extraídos de PokéSurvivor (Pokédex y geometría de sprites)
   game/                 Lógica de la partida, sin DOM (se prueba en Node)
-    world.ts            Estado de la partida: salas, jugador, daño, XP, subidas de nivel, evolución
-    enemyAI.ts          Arquetipos cuerpo a cuerpo y a distancia
-    bossAI.ts           Patrones de minibosses y jefes
-    weapons.ts          Ataques del jugador (proyectil, orbe, onda, zona)
-    rooms.ts            Oleadas y curva de dificultad
-    upgradeGenerator.ts Generador de las 3 cartas de mejora
-  meta/                 Progreso permanente: guardado, tienda con oro, recompensas, gachapón
-  render/               Dibujo en canvas y sprites pixel art provisionales
+    world.ts            Salas, jugador, daño, recogibles, XP, niveles, evoluciones, objetos
+    combat.ts           Los 23 comportamientos de movimiento, proyectiles y campos
+    enemyAI.ts          13 personalidades de enemigo y estados alterados
+    bossAI.ts           IA de minibosses y jefes
+    rooms.ts            Oleadas, tramos y curva de dificultad
+    upgradeGenerator.ts Las 3 cartas de subida de nivel
+  meta/                 Progreso permanente: guardado, mejoras por Pokémon, recompensas, gachapón
+  render/               Canvas, sprites animados (animator.ts) y efectos pixel art (vfx.ts)
+  audio/                Sintetizador Web Audio y partituras
   input/                Joystick táctil y teclado
   ui/                   Menú principal (4 pestañas) y pantalla de partida
-tests/                  Pruebas unitarias (Vitest)
+public/sprites/         Sprites PMD de los 151 de Kanto (+ Sudowoodo) y créditos de artistas
+tests/                  Pruebas unitarias (Vitest) y simulador de balance
 e2e/                    Prueba de flujo completo (Playwright)
 ```
-
-### Sustituir los gráficos provisionales
-
-Todos los sprites son placeholders generados por código (`src/render/sprites.ts`). Para usar arte definitivo, coloca la imagen en `public/` y añade `image: 'sprites/charmander.png'` al `sprite` de la especie en `src/data/pokemon.ts` o `src/data/enemies.ts`.

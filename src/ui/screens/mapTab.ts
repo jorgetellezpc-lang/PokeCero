@@ -1,5 +1,5 @@
 import { BALANCE } from '../../config/balance';
-import { getEnemy } from '../../data/enemies';
+import { BOSSES } from '../../data/enemies';
 import { REGIONS } from '../../data/regions';
 import type { GymDef, RegionDef } from '../../data/types';
 import { gymStatus, isClaimed, regionUnlocked, type GymStatus } from '../../meta/rewards';
@@ -70,7 +70,7 @@ function renderGymDetail(menu: MenuScreen, region: RegionDef, gym: GymDef): HTML
   const rewards = Object.entries(BALANCE.rewards.ticketsByRoom).map(([room, n]) => {
     const claimed = isClaimed(store, gym.id, Number(room));
     const bossId = gym.bosses[Number(room)];
-    const bossName = bossId ? getEnemy(bossId).name : '';
+    const bossName = bossId ? BOSSES[bossId]?.name ?? '' : '';
     return h('div', { class: `reward ${claimed ? 'claimed' : ''}` },
       h('span', {}, `Sala ${room}${bossName ? ` · ${bossName}` : ''}`),
       h('span', { class: 'price' }, img(iconDataUrl('ticket', 2), 'res-icon'), claimed ? 'Cobrado' : `+${n}`),

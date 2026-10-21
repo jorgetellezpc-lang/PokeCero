@@ -1,6 +1,11 @@
 import './styles.css';
 import { browserStorage, SaveStore } from './meta/save';
+import { setSpriteResolver } from './render/animator';
 import { App } from './ui/app';
+
+// Versión de un solo archivo (npm run build:single): los sprites vienen incrustados.
+const embedded = (window as unknown as { __POKECERO_SPRITES?: Record<string, string> }).__POKECERO_SPRITES;
+if (embedded) setSpriteResolver((dex, anim) => embedded[`${dex}/${anim}`] ?? '');
 
 const store = new SaveStore(browserStorage());
 const app = new App(document.getElementById('app')!, store);
