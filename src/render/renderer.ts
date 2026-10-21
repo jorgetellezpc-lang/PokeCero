@@ -1,7 +1,7 @@
 import type { GymDef } from '../data/types';
 import type { Enemy } from '../game/entities';
 import { jumpHeight } from '../game/enemyAI';
-import { orbitPositions } from '../game/combat';
+import { GUARD_R, guardianPositions, orbitPositions } from '../game/combat';
 import { Rng } from '../game/rng';
 import type { World } from '../game/world';
 import { drawShadow } from './animator';
@@ -332,6 +332,20 @@ export class Renderer {
   }
 
   private drawOrbits(w: World): void {
+    // Pantalla Luz: escudos que paran proyectiles enemigos.
+    const ctx = this.ctx;
+    for (const g of guardianPositions(w)) {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#bfe8ff';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(g.x, g.y, GUARD_R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
     for (const m of w.player.moves) {
       if (m.def.kind !== 'orbit') continue;
       const shape = shapeFor(m.def.id, m.def.type);

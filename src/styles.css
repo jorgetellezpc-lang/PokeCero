@@ -376,6 +376,14 @@ button { font-family: var(--font); color: inherit; }
 
 .card.fam-evo { background: linear-gradient(135deg, #5a4210, #2a3f9c 60%); border-color: #ffd23f; }
 .card.fam-evo .card-cat { color: var(--gold); }
+.card.fam-ability .card-cat { color: var(--accent); }
+.card.rarity-epic { background: linear-gradient(135deg, #3d1f5e, var(--panel) 70%); }
+.card.rarity-legendary { background: linear-gradient(135deg, #5a4210, var(--panel) 70%); border-color: #ffcb3d; }
+.card.has-synergy { box-shadow: inset 0 0 0 2px #c58bff, 0 0 12px #c58bff88; }
+.card.has-synergy .card-detail { color: #d9b3ff; }
+.ability-list { margin: 8px 0; font-size: 8px; }
+.ability-list .result-line .note { max-width: 60%; text-align: right; font-weight: normal; }
+.synergy-line span { color: #d9b3ff; }
 .atk-chip.evolved { background: rgba(255, 210, 63, 0.25); }
 .atk-chip.item-chip { border-color: var(--gold); color: var(--gold); }
 .move-list { margin: 8px 0; }

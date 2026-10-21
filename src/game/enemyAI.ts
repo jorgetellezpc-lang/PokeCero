@@ -28,7 +28,7 @@ export function tickCommon(w: World, e: Enemy, dt: number): boolean {
     e.burnTick -= dt;
     if (e.burnTick <= 0) {
       e.burnTick = 0.5;
-      w.hurtEnemyRaw(e, 1.6 * e.burn * (1 + w.player.level * 0.06) * BALANCE.ps.damage * 1.6, '#ff9a4d');
+      w.hurtEnemyRaw(e, 1.6 * e.burn * (1 + w.player.level * 0.06) * BALANCE.ps.damage * 1.6 * w.player.mods.dotMult, '#ff9a4d');
     }
     if (e.burnT <= 0) e.burn = 0;
   }
@@ -37,7 +37,7 @@ export function tickCommon(w: World, e: Enemy, dt: number): boolean {
     e.poisonTick -= dt;
     if (e.poisonTick <= 0) {
       e.poisonTick = 0.6;
-      w.hurtEnemyRaw(e, e.maxHp * 0.012 * e.poison + 1, '#d47cf0');
+      w.hurtEnemyRaw(e, (e.maxHp * 0.012 * e.poison + 1) * w.player.mods.dotMult, '#d47cf0');
     }
     if (e.poisonT <= 0) e.poison = 0;
   }

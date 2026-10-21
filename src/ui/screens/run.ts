@@ -1,9 +1,11 @@
 import type { SongName } from '../../audio/music';
 import { BALANCE } from '../../config/balance';
+import { ABILITIES, RARITY_INFO, SYNERGIES } from '../../data/abilities';
 import { BOSSES } from '../../data/enemies';
 import { ITEMS } from '../../data/items';
 import { getSpecies } from '../../data/pokemon';
 import { findGym } from '../../data/regions';
+import { passiveOf } from '../../game/abilities';
 import { roomSequence } from '../../game/rooms';
 import type { UpgradeChoice } from '../../game/upgradeGenerator';
 import { World, type WorldEvent } from '../../game/world';
@@ -23,7 +25,7 @@ import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
 const STEP = 1 / 60;
 
 const FAMILY_CLASS: Record<UpgradeChoice['family'], string> = {
-  newMove: 'fam-new', moveUpgrade: 'fam-up', moveEvolution: 'fam-evo', stat: 'fam-stat', fallback: 'fam-fb',
+  newMove: 'fam-new', moveUpgrade: 'fam-up', moveEvolution: 'fam-evo', stat: 'fam-stat', ability: 'fam-ability', fallback: 'fam-fb',
 };
 
 function songForRoom(room: number, kind: string): SongName {
@@ -243,6 +245,10 @@ export class RunScreen implements Screen {
         case 'moveEvolved':
           this.showBanner(`¡${ev.from} ha evolucionado a ${ev.to}!`, 'gold');
           break;
+        case 'synergy':
+          this.showBanner(`¡Sinergia: ${ev.name}!`, 'gold');
+          toast(ev.description);
+          break;
         case 'bossEnraged':
           this.showBanner(`¡${ev.name} se ha enfurecido!`, 'danger');
           break;
@@ -296,9 +302,9 @@ export class RunScreen implements Screen {
     this.app.audio.sfx('level');
     let picked = false;
     const cards = w.choices.map((c, i) => {
-      const color = c.family === 'moveEvolution' ? '#ffd23f' : c.element ? TYPE_COLORS[c.element] : c.family === 'stat' ? '#58a8f8' : '#c8a040';
+      const color = c.family === 'moveEvolution' ? '#ffd23f' : c.rarity ? RARITY_INFO[c.rarity].color : c.element ? TYPE_COLORS[c.element] : c.family === 'stat' ? '#58a8f8' : '#c8a040';
       const btn = h('button', {
-        class: `card ${FAMILY_CLASS[c.family]}`, style: `--accent:${color}`, 'data-testid': `card-${i}`, disabled: true,
+        class: `card ${FAMILY_CLASS[c.family]}${c.rarity ? ` rarity-${c.rarity}` : ''}${c.synergy ? ' has-synergy' : ''}`, style: `--accent:${color}`, 'data-testid': `card-${i}`, disabled: true,
         onclick: () => {
           if (picked) return;
           picked = true;
@@ -394,6 +400,7 @@ export class RunScreen implements Screen {
       h('div', { class: 'move-list' }, ...p.moves.map((m) => h('div', { class: 'result-line' },
         h('span', { style: `color:${TYPE_COLORS[m.def.type]}` }, `${m.name} ${m.evolved ? '★' : `Nv ${m.level}`}`),
         h('b', {}, `${Math.round(m.dealt)} daño`)))),
+      abilityList(p),
       h('button', { class: 'btn btn-play', 'data-testid': 'resume', onclick: () => this.togglePause() }, 'Continuar'),
       h('button', { class: 'btn btn-danger', 'data-testid': 'abandon', onclick: () => this.finish(false, true) }, 'Abandonar partida'),
       h('p', { class: 'note' }, 'Al abandonar pierdes el nivel y las mejoras de esta partida; conservas el oro y los tickets.'),
@@ -449,6 +456,26 @@ function cardGlyph(c: UpgradeChoice): string {
     case 'moveUpgrade': return '▲';
     case 'moveEvolution': return '★';
     case 'stat': return '◆';
+    case 'ability': return ABILITIES[(c.action as { abilityId: string }).abilityId]?.icon ?? '✚';
     default: return '●';
   }
+}
+
+/** Pasiva, habilidades y sinergias de la partida (pantalla de pausa). */
+function abilityList(p: World['player']): HTMLElement {
+  const passive = passiveOf(p.species);
+  const owned = Object.entries(p.abilities).filter(([, n]) => n > 0);
+  return h('div', { class: 'ability-list', 'data-testid': 'ability-list' },
+    h('div', { class: 'result-line' }, h('span', {}, `Pasiva: ${passive.name}`), h('b', { class: 'note' }, passive.description)),
+    ...owned.map(([id, n]) => {
+      const a = ABILITIES[id];
+      return h('div', { class: 'result-line' },
+        h('span', { style: `color:${RARITY_INFO[a.rarity].color}` }, `${a.icon} ${a.name}${a.maxStacks > 1 ? ` ×${n}` : ''}`),
+        h('b', { class: 'note' }, RARITY_INFO[a.rarity].name));
+    }),
+    ...p.synergies.map((id) => {
+      const syn = SYNERGIES.find((x) => x.id === id)!;
+      return h('div', { class: 'result-line synergy-line' }, h('span', {}, `✸ ${syn.name}`), h('b', { class: 'note' }, syn.description));
+    }),
+  );
 }

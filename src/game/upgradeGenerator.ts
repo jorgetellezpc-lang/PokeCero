@@ -1,9 +1,11 @@
 import { BALANCE } from '../config/balance';
+import { ABILITIES, RARITY_INFO, type Rarity } from '../data/abilities';
 import { categoryOf, evolutionOf, getMove, ladderOf, maxLevelOf, type NeedStat } from '../data/moves';
 import { sideOf } from '../data/pokemon';
 import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
 import { TYPE_NAMES } from '../data/typeColors';
 import type { ElementType } from '../data/types';
+import { abilityAvailable, synergiesCompletedBy } from './abilities';
 import type { Player } from './entities';
 import type { Rng } from './rng';
 
@@ -17,13 +19,14 @@ import type { Rng } from './rng';
 // estadística asociada cogida en la partida). Independiente de la interfaz.
 // ============================================================================
 
-export type UpgradeFamily = 'newMove' | 'moveUpgrade' | 'moveEvolution' | 'stat' | 'fallback';
+export type UpgradeFamily = 'newMove' | 'moveUpgrade' | 'moveEvolution' | 'stat' | 'ability' | 'fallback';
 
 export type UpgradeAction =
   | { type: 'newMove'; moveId: string }
   | { type: 'moveUpgrade'; moveId: string }
   | { type: 'moveEvolution'; moveId: string }
   | { type: 'stat'; stat: RunStatId }
+  | { type: 'ability'; abilityId: string }
   | { type: 'heal'; amount: number }
   | { type: 'gold'; amount: number };
 
@@ -36,6 +39,10 @@ export interface UpgradeChoice {
   description: string;
   detail: string;
   element?: ElementType;
+  /** Rareza (solo habilidades). */
+  rarity?: Rarity;
+  /** Sinergia que completaría (solo habilidades). */
+  synergy?: string;
   /** Peso para el sorteo. */
   w: number;
 }
@@ -117,6 +124,20 @@ export function candidateUpgrades(p: Player, rng: Rng): UpgradeChoice[] {
       w: evoFor ? W.statForEvolution : full ? W.statFull : W.stat,
       title: s.name, category: evoFor ? `Evoluciona ${evoFor}` : 'Mejora', description: s.description,
       detail: s.max ? `${p.statsTaken[id] ?? 0} / ${s.max}` : '',
+    });
+  }
+  // --- habilidades (4 candidatas, por rareza; las que completan sinergia pesan el triple) ---
+  const abil = Object.values(ABILITIES).filter((a) => abilityAvailable(p, a));
+  for (let i = 0; i < 4 && abil.length; i++) {
+    const a = rng.weighted(abil, (x) => RARITY_INFO[x.rarity].weight * (synergiesCompletedBy(p, x.id).length ? 3 : 1));
+    abil.splice(abil.indexOf(a), 1);
+    const n = p.abilities[a.id] ?? 0;
+    const syn = synergiesCompletedBy(p, a.id)[0];
+    out.push({
+      key: `ab:${a.id}`, family: 'ability', action: { type: 'ability', abilityId: a.id },
+      w: W.ability * (syn ? 2 : 1), rarity: a.rarity, synergy: syn?.name,
+      title: a.name, category: `Habilidad · ${RARITY_INFO[a.rarity].name}`, description: a.description,
+      detail: syn ? `¡Activa la sinergia ${syn.name}!` : a.maxStacks > 1 ? `${n} / ${a.maxStacks}` : '',
     });
   }
   return out;

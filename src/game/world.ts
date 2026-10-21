@@ -1,4 +1,5 @@
 import { BALANCE } from '../config/balance';
+import { ABILITIES, BASE_MODS } from '../data/abilities';
 import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '../data/enemies';
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
 import { evolutionOf, getMove, maxLevelOf, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
@@ -7,6 +8,7 @@ import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
 import { typeMultiplier } from '../data/typeChart';
 import type { ElementType, GymDef } from '../data/types';
 import { Animator, bodyHeight, bodyRadius, hovers, playerScale } from '../render/animator';
+import { recomputeMods } from './abilities';
 import { updateBoss } from './bossAI';
 import { updateCombat, updateFields, updateProjectiles } from './combat';
 import { updateEnemy } from './enemyAI';
@@ -39,6 +41,7 @@ export type WorldEvent =
   | { type: 'ticket'; amount: number }
   | { type: 'item'; id: ItemId }
   | { type: 'sfx'; name: string; kind?: string; element?: string }
+  | { type: 'synergy'; name: string; description: string }
   | { type: 'victory' }
   | { type: 'defeat' };
 
@@ -94,6 +97,8 @@ export class World {
   enemies: Enemy[] = [];
   corpses: Corpse[] = [];
   projectiles: Projectile[] = [];
+  /** Ráfaga: disparos repetidos pendientes. */
+  volleys: { t: number; move: OwnedMove }[] = [];
   fields: Field[] = [];
   hazards: Hazard[] = [];
   pickups: Pickup[] = [];
@@ -154,10 +159,12 @@ export class World {
       buffs: { patk: buff(), satk: buff(), spd: buff(), def: buff(), regen: buff() },
       invuln: 0, level: 1, xp: 0, moves: [], statsTaken: {}, item: null, focusCd: 0,
       aim: -Math.PI / 2, moveAngle: -Math.PI / 2, moving: false, hitFlash: 0, lastPatch: null,
+      abilities: {}, mods: { ...BASE_MODS }, synergies: [], sturdyLeft: 0, guardAngle: 0,
     };
     this.player.hp = this.player.maxHp;
     this.updatePlayerBody();
     this.addMove(species.startingAttack);
+    recomputeMods(this.player);
     this.startRoom(0);
   }
 
@@ -197,6 +204,7 @@ export class World {
     this.enemies = [];
     this.corpses = [];
     this.projectiles = [];
+    this.volleys = [];
     this.fields = [];
     this.hazards = [];
     this.pickups = [];
@@ -211,6 +219,7 @@ export class World {
     p.y = this.H - 70;
     p.invuln = 1;
     p.lastPatch = null;
+    p.sturdyLeft = p.mods.sturdy;
     this.pendingWaves = this.plan.waves.map((w) => [...w]);
     if (this.plan.bossId) {
       const def = bossDefFor(this.plan.bossId, tierForRoom(effective));
@@ -389,11 +398,12 @@ export class World {
     p.invuln = Math.max(0, p.invuln - dt);
     p.hitFlash = Math.max(0, p.hitFlash - dt);
     p.focusCd = Math.max(0, p.focusCd - dt);
+    p.guardAngle += dt * 3.2;
     // Potenciadores: caducan si no se renuevan.
     for (const b of Object.values(p.buffs)) {
       if (b.n > 0 && (b.t -= dt) <= 0) b.n = 0;
     }
-    const regen = p.regenFlat + p.buffs.regen.n * p.buffs.regen.amount + (p.item === 'leftovers' ? p.maxHp * 0.015 : 0);
+    const regen = p.regenFlat + p.mods.regen + p.buffs.regen.n * p.buffs.regen.amount + (p.item === 'leftovers' ? p.maxHp * 0.015 : 0);
     if (regen > 0) p.hp = Math.min(p.maxHp, p.hp + regen * dt);
     // Mira a su blanco si ataca; si no, hacia donde camina.
     if (this.target) p.aim = Math.atan2(this.target.y - p.y, this.target.x - p.x);
@@ -449,7 +459,8 @@ export class World {
   // --------------------------------------------------------------------------
 
   addHazard(h: Omit<Hazard, 't' | 'r' | 'angle' | 'len' | 'w'> & Partial<Pick<Hazard, 'r' | 'angle' | 'len' | 'w'>>): void {
-    this.hazards.push({ r: 0, angle: 0, len: 0, w: 0, t: 0, ...h });
+    // Previsión: el aviso dura más (más tiempo para apartarse).
+    this.hazards.push({ r: 0, angle: 0, len: 0, w: 0, t: 0, ...h, delay: h.delay * (1 + this.player.mods.foresight) });
   }
 
   private updateHazards(dt: number): void {
@@ -467,7 +478,8 @@ export class World {
         const along = px * ca + py * sa;
         hit = along > -p.r && along < h.len + p.r && Math.abs(-px * sa + py * ca) < h.w / 2 + p.r * 0.5;
       }
-      if (hit) this.hurtPlayer(h.dmg, h.element, h.cat);
+      // Levitación: las zonas del suelo no te afectan.
+      if (hit && !(h.kind === 'zone' && p.mods.levitate)) this.hurtPlayer(h.dmg, h.element, h.cat);
       if (h.kind === 'zone') this.ring(h.x, h.y, h.r * 0.3, h.r, h.color, 0.3, 3);
       this.burst(h.x, h.y, h.color, 6);
       this.shake = Math.max(this.shake, 0.12);
@@ -483,13 +495,30 @@ export class World {
   hurtPlayer(amount: number, element: ElementType, cat: 'physical' | 'special', attacker?: Enemy): void {
     const p = this.player;
     if (p.invuln > 0 || this.phase !== 'playing' || this.roomCleared) return;
+    const M = p.mods;
+    // Efectos de contacto (Electricidad Estática, Punto Tóxico…) aunque esquives.
+    if (attacker && attacker.hp > 0) {
+      if (M.contactStun && this.rng.next() < M.contactStun) attacker.stunT = Math.max(attacker.stunT, attacker.boss ? 0.35 : 1);
+      if (M.contactPoison) { attacker.poison = Math.min(8, attacker.poison + M.contactPoison); attacker.poisonT = 4; }
+    }
+    if (M.dodge > 0 && this.rng.next() < Math.min(0.6, M.dodge)) {
+      p.invuln = 0.25;
+      this.text(p.x, p.y - 30, '¡Esquivado!', '#9fd8ff', 9);
+      return;
+    }
     const reduce = Math.min(BALANCE.player.maxDefense, p.dmgReduce + p.buffs.def.n * p.buffs.def.amount + (p.item === 'assaultvest' ? 0.2 : 0));
     const k = typeMultiplier(element, p.species.types) * guard(cat === 'special' ? p.species.stats.sd : p.species.stats.df);
-    let dmg = Math.max(1, Math.round(amount * k * (1 - reduce)));
+    let raw = amount * k * (1 - reduce) * M.dmgTaken * M.enemyDmg;
+    if (M.fullHpShield && p.hp >= p.maxHp - 0.5) raw *= 1 - M.fullHpShield;
+    let dmg = Math.max(1, Math.round(raw));
     if (p.item === 'focussash' && p.focusCd <= 0 && dmg >= p.hp && p.hp > 1) {
       dmg = Math.ceil(p.hp - 1);
       p.focusCd = 60;
       this.text(p.x, p.y - 30, '¡Banda Focus!', '#ffd23f', 10);
+    } else if (p.sturdyLeft > 0 && dmg >= p.hp && p.hp > 1) {
+      dmg = Math.ceil(p.hp - 1);
+      p.sturdyLeft--;
+      this.text(p.x, p.y - 30, '¡Robustez!', '#ffd23f', 10);
     }
     p.hp -= dmg;
     p.invuln = BALANCE.player.invulnerability;
@@ -525,10 +554,17 @@ export class World {
   ): void {
     if (e.hp <= 0) return;
     const p = this.player;
+    const M = p.mods;
     const typeK = typeMultiplier(element, e.types);
     const def = cat === 'special' ? e.def.sd : cat === 'physical' ? e.def.df : 75;
-    const crit = p.crit > 0 && this.rng.next() < p.crit;
-    let dmg = base * typeK * guard(def) * (crit ? BALANCE.player.critMult : 1);
+    const critChance = p.crit + M.crit;
+    const crit = critChance > 0 && this.rng.next() < critChance;
+    let dmg = base * typeK * guard(def) * (crit ? BALANCE.player.critMult + M.critMult : 1) * M.dmg;
+    // Mismo tipo que el Pokémon (STAB) y Mar Llamas/Torrente/Espesura/Enjambre con poca vida.
+    if (cat && p.species.types.includes(element)) {
+      dmg *= 1 + M.stab;
+      if (M.pinch && p.hp < p.maxHp / 3) dmg *= 1 + M.pinch;
+    }
     if (fx.hex && (e.burn > 0 || e.poison > 0 || e.slow > 0)) dmg *= fx.hex;
     dmg = Math.max(1, Math.round(dmg));
     // El escudo absorbe primero.
@@ -546,9 +582,19 @@ export class World {
       e.kx += (dx / l) * knock * BALANCE.ps.space;
       e.ky += (dy / l) * knock * BALANCE.ps.space;
     }
-    if (fx.burn) { e.burn = Math.min(8, e.burn + fx.burn); e.burnT = 3; }
-    if (fx.poison) { e.poison = Math.min(8, e.poison + fx.poison); e.poisonT = 4; }
-    if (fx.slow) { e.slow = Math.max(e.slow, fx.slow); e.slowT = Math.max(e.slowT, 1.2); }
+    // Estados del movimiento + los de las habilidades (Cuerpo Llama, Punto Tóxico…).
+    const burn = (fx.burn ?? 0) + (cat ? M.burnOnHit : 0);
+    const poison = (fx.poison ?? 0) + (cat ? M.poisonOnHit : 0);
+    const slow = Math.max(fx.slow ?? 0, cat ? M.slowOnHit : 0);
+    if (burn) { e.burn = Math.min(8, e.burn + burn); e.burnT = 3; }
+    if (poison) { e.poison = Math.min(8, e.poison + poison); e.poisonT = 4; }
+    if (slow) { e.slow = Math.max(e.slow, slow); e.slowT = Math.max(e.slowT, 1.2); }
+    if (cat && M.stunChance && e.hp > 0 && this.rng.next() < M.stunChance) e.stunT = Math.max(e.stunT, e.boss ? 0.3 : 0.8);
+    // Golpe Certero: KO directo a un enemigo normal con poca vida.
+    if (cat && M.execute && !e.boss && e.hp > 0 && e.hp < e.maxHp * M.executeAt && this.rng.next() < M.execute) {
+      e.hp = 0;
+      this.text(e.x, e.y - e.bodyH - 14, '¡KO!', '#ff6040', 11);
+    }
     if (fx.drain) p.hp = Math.min(p.maxHp, p.hp + Math.min(4, dmg * 0.05));
     if (p.item === 'shellbell') p.hp = Math.min(p.maxHp, p.hp + dmg * 0.04);
     if (p.item === 'lifeorb') p.hp = Math.max(1, p.hp - 0.15);
@@ -569,12 +615,17 @@ export class World {
   removeDead(): void {
     if (!this.enemies.some((e) => e.hp <= 0)) return;
     const alive: Enemy[] = [];
+    const M = this.player.mods;
+    const blasts: { x: number; y: number; dmg: number }[] = [];
     for (const e of this.enemies) {
       if (e.hp > 0) {
         alive.push(e);
         continue;
       }
       this.kills++;
+      // Absorción y Detonación.
+      if (M.killHeal) this.player.hp = Math.min(this.player.maxHp, this.player.hp + this.player.maxHp * M.killHeal);
+      if (M.killExplode && !e.summoned) blasts.push({ x: e.x, y: e.y, dmg: e.maxHp * M.killExplode });
       this.runGold += e.def.gold;
       e.anim.play('Faint', { hold: true });
       this.corpses.push({ x: e.x, y: e.y, anim: e.anim, fade: 0.9, boss: !!e.boss });
@@ -598,6 +649,17 @@ export class World {
     }
     this.enemies = alive.filter((e) => e.hp > 0);
     if (this.target && this.target.hp <= 0) this.target = null;
+    // Las explosiones dañan a los demás; los que caigan se procesan en el siguiente fotograma.
+    const r = M.killExplodeRadius;
+    for (const b of blasts) {
+      this.ring(b.x, b.y, 6, r, '#ff9a3c', 0.35, 4);
+      this.burst(b.x, b.y - 6, '#ffb03d', 10);
+      for (const o of this.enemies) {
+        if (Math.hypot(o.x - b.x, o.y - b.y) > r + o.r) continue;
+        this.hurtEnemyRaw(o, b.dmg, '#ffb03d');
+        if (M.killExplodePoison) { o.poison = Math.min(8, o.poison + M.killExplodePoison); o.poisonT = 4; }
+      }
+    }
   }
 
   private dropLoot(e: Enemy): void {
@@ -715,6 +777,7 @@ export class World {
     p.baseSpeed = p.species.stats.speed;
     p.hp = Math.min(p.maxHp, p.maxHp * ratio + p.maxHp * 0.25);
     this.updatePlayerBody();
+    this.refreshMods();
     this.burst(p.x, p.y - 12, '#ffffff', 30);
     this.ring(p.x, p.y, 10, 80, '#ffffff', 0.6, 4);
     this.events.push({ type: 'evolved', from: from.name, to: p.species.name });
@@ -769,7 +832,16 @@ export class World {
       case 'gold':
         this.bonusGold += act.amount;
         break;
+      case 'ability': {
+        const a = ABILITIES[act.abilityId];
+        if (a && (p.abilities[a.id] ?? 0) < a.maxStacks) {
+          p.abilities[a.id] = (p.abilities[a.id] ?? 0) + 1;
+          if (a.id === 'robustez') p.sturdyLeft++;
+        }
+        break;
+      }
     }
+    this.refreshMods();
     this.pendingLevelUps--;
     this.choices = [];
     if (this.pendingLevelUps > 0) {
@@ -802,6 +874,16 @@ export class World {
     if (p.moves.some((m) => m.def.id === id)) return;
     const def = getMove(id);
     p.moves.push({ def, level: 1, evolved: false, name: def.name, t: 0.3, angle: 0, s: moveStats(def, 1), dealt: 0 });
+    if (p.mods) this.refreshMods();
+  }
+
+  /** Recalcula habilidades/sinergias y avisa de las sinergias nuevas. */
+  refreshMods(): void {
+    for (const syn of recomputeMods(this.player)) {
+      this.events.push({ type: 'synergy', name: syn.name, description: syn.description });
+      this.events.push({ type: 'sfx', name: 'legend' });
+      this.ring(this.player.x, this.player.y, 8, 90, '#c58bff', 0.7, 5);
+    }
   }
 
   addBuff(stat: BuffStat, amount: number, dur: number, max: number): void {
@@ -872,7 +954,7 @@ export class World {
         id: this.newId(), x: e.x, y: e.y - e.bodyH * 0.4, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         r: 5, dmg: e.shotDmg * k, friendly: false, element: e.types[0], cat: e.cat, pierce: 0, life: 2.8, t: 0,
         color: '#ff7a9e', hits: new Set(), homing: 0, boom: 0, back: false, bounce: 0,
-        burn: 0, poison: 0, slow: 0, knock: 0, drain: 0, move: null, shape: 'orb',
+        burn: 0, poison: 0, slow: 0, knock: 0, drain: 0, move: null, wallBounce: 0, shape: 'orb',
       });
     }
     if (!e.anim.busy()) e.anim.play('Shoot');

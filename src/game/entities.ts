@@ -1,3 +1,4 @@
+import type { CombatMods } from '../data/abilities';
 import type { BossDef, EnemyDef, Behavior } from '../data/enemies';
 import type { ItemId } from '../data/items';
 import type { BuffStat, MoveCategory, MoveDef, MoveNums } from '../data/moves';
@@ -61,6 +62,15 @@ export interface Player extends Vec {
   moving: boolean;
   hitFlash: number;
   lastPatch: Vec | null;
+  /** Habilidades de la partida (id → acumulaciones). */
+  abilities: Record<string, number>;
+  /** Modificadores de combate (pasiva + habilidades + sinergias). */
+  mods: CombatMods;
+  synergies: string[];
+  /** Usos de Robustez que quedan en esta sala. */
+  sturdyLeft: number;
+  /** Ángulo de los escudos de Pantalla Luz. */
+  guardAngle: number;
 }
 
 export type EnemyPhase = 'walk' | 'aim' | 'dash' | 'fuse' | 'cast';
@@ -154,6 +164,8 @@ export interface Projectile extends Vec {
   burn: number; poison: number; slow: number; knock: number; drain: number;
   /** Movimiento de origen (para estadísticas y evolución). */
   move: OwnedMove | null;
+  /** Rebotes que le quedan contra las paredes. */
+  wallBounce: number;
   shape: string;
 }
 

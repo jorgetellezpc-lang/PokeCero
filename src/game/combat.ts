@@ -86,6 +86,11 @@ export const firesWhileMoving = (m: OwnedMove) => ALWAYS_ON.has(m.def.kind);
 export function updateCombat(w: World, dt: number): void {
   const p = w.player;
   const cdItem = p.item === 'quickclaw' ? 0.8 : 1;
+  // Ráfaga: repite la última andanada poco después (si sigues quieto).
+  if (w.volleys.length) {
+    for (const v of w.volleys) if ((v.t -= dt) <= 0 && !p.moving) fireProjectiles(w, v.move, false);
+    w.volleys = w.volleys.filter((v) => v.t > 0);
+  }
   for (const m of p.moves) {
     if (m.def.kind === 'orbit') {
       orbit(w, m, dt);
@@ -150,23 +155,47 @@ function spawnProjectile(w: World, m: OwnedMove, x: number, y: number, a: number
     dmg: power(w, m), friendly: true, element: m.def.type, cat: categoryOf(m.def), pierce: s.pierce ?? 0,
     life: s.life ?? 1.5, t: 0, color: color(m), hits: new Set(), homing: s.homing ?? 0, boom: 0, back: false,
     bounce: s.bounce ?? 0, burn: s.burn ?? 0, poison: s.poison ?? 0, slow: s.slow ?? 0, knock: s.knock ?? 0,
-    drain: s.drain ?? 0, move: m, shape: m.def.type, ...extra,
+    drain: s.drain ?? 0, move: m, wallBounce: 0, shape: m.def.type, ...extra,
   });
 }
 
-function fireProjectiles(w: World, m: OwnedMove): void {
+/** Direcciones extra de las habilidades (Abanico, Flancos, Retaguardia). */
+export function extraAngles(M: { diagonal: number; side: number; rear: number }): number[] {
+  const out: number[] = [];
+  for (let j = 0; j < M.diagonal; j++) { const a = Math.PI / 4 - j * (Math.PI / 12); out.push(a, -a); }
+  for (let j = 0; j < M.side; j++) { const a = Math.PI / 2 + j * (Math.PI / 9); out.push(a, -a); }
+  for (let j = 0; j < M.rear; j++) out.push(Math.PI + (j === 0 ? 0 : Math.ceil(j / 2) * (j % 2 ? 1 : -1) * 0.25));
+  return out;
+}
+
+function fireProjectiles(w: World, m: OwnedMove, first = true): void {
   const p = w.player;
+  const M = p.mods;
   const s = m.s;
   const n = Math.max(1, s.count ?? 1);
   const spread = s.spread ?? 0;
+  const speed = s.speed ?? 300;
+  const extra: Partial<Projectile> = {
+    dmg: power(w, m) * M.projDmg, pierce: (s.pierce ?? 0) + M.pierce, bounce: (s.bounce ?? 0) + M.ricochet,
+    wallBounce: M.wallBounce,
+  };
+  // Disparo frontal: proyectiles PARALELOS separados (Doble Disparo).
+  const lanes = 1 + M.front;
+  const ca = Math.cos(p.aim + Math.PI / 2);
+  const sa = Math.sin(p.aim + Math.PI / 2);
   // Siempre uno recto al blanco y el resto alternando a los lados (0, +s, -s,
   // +2s…). Con el abanico simétrico de PokéSurvivor, 2 proyectiles salían a
   // ambos lados y fallaban a los enemigos pequeños.
   for (let i = 0; i < n; i++) {
     const off = i === 0 ? 0 : Math.ceil(i / 2) * (i % 2 ? 1 : -1) * spread * 1.2;
     const a = p.aim + off + w.rng.range(-0.03, 0.03);
-    spawnProjectile(w, m, p.x, p.y - 12, a, s.speed ?? 300);
+    for (let l = 0; l < lanes; l++) {
+      const d = (l - (lanes - 1) / 2) * 9;
+      spawnProjectile(w, m, p.x + ca * d, p.y - 12 + sa * d, a, speed, extra);
+    }
   }
+  for (const off of extraAngles(M)) spawnProjectile(w, m, p.x, p.y - 12, p.aim + off, speed, extra);
+  if (first) for (let k = 1; k <= M.multishot; k++) w.volleys.push({ t: 0.13 * k, move: m });
 }
 
 function nova(w: World, m: OwnedMove): void {
@@ -451,8 +480,17 @@ export function updateProjectiles(w: World, dt: number): void {
     }
     pr.x += pr.vx * dt;
     pr.y += pr.vy * dt;
+    // Rebote en las paredes (Rebote Muro).
+    if (pr.friendly && pr.wallBounce > 0) {
+      const mg = BALANCE.arena.margin;
+      if ((pr.x < mg && pr.vx < 0) || (pr.x > w.W - mg && pr.vx > 0)) { pr.vx = -pr.vx; pr.wallBounce--; pr.hits.clear(); pr.t = Math.max(0, pr.t - 0.4); }
+      else if ((pr.y < mg && pr.vy < 0) || (pr.y > w.H - mg && pr.vy > 0)) { pr.vy = -pr.vy; pr.wallBounce--; pr.hits.clear(); pr.t = Math.max(0, pr.t - 0.4); }
+    }
     let alive = pr.t < pr.life && pr.x > -30 && pr.x < w.W + 30 && pr.y > -30 && pr.y < w.H + 30;
-    if (alive && !pr.friendly) {
+    if (alive && !pr.friendly && blockedByGuardian(w, pr)) {
+      w.burst(pr.x, pr.y, '#bfe8ff', 6);
+      alive = false;
+    } else if (alive && !pr.friendly) {
       if (Math.hypot(pr.x - p.x, pr.y - (p.y - 10)) < pr.r + p.r * 0.8) {
         w.hurtPlayer(pr.dmg, pr.element, pr.cat === 'special' ? 'special' : 'physical');
         w.burst(pr.x, pr.y, pr.color, 7);
@@ -491,6 +529,25 @@ export function updateProjectiles(w: World, dt: number): void {
     if (alive) keep.push(pr);
   }
   w.projectiles = keep;
+}
+
+/** Posiciones de los escudos de Pantalla Luz alrededor del jugador. */
+export function guardianPositions(w: World): { x: number; y: number }[] {
+  const p = w.player;
+  const n = p.mods.guardians;
+  const out: { x: number; y: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = p.guardAngle + (i / n) * Math.PI * 2;
+    out.push({ x: p.x + Math.cos(a) * GUARD_DIST, y: p.y - 10 + Math.sin(a) * GUARD_DIST });
+  }
+  return out;
+}
+export const GUARD_DIST = 30;
+export const GUARD_R = 8;
+
+function blockedByGuardian(w: World, pr: Projectile): boolean {
+  if (!w.player.mods.guardians) return false;
+  return guardianPositions(w).some((g) => Math.hypot(pr.x - g.x, pr.y - g.y) < pr.r + GUARD_R);
 }
 
 // ---------------------------------------------------------------------------

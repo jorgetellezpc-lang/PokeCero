@@ -118,7 +118,7 @@ export const BALANCE = {
     /** Máximo de potenciadores (no hacen daño) que se ofrecen. */
     maxBuffs: 2,
     /** Pesos de cada tipo de carta (PokéSurvivor). */
-    weights: { newMove: 10, evolution: 40, moveUpgrade: 8, stat: 4, statFull: 7, statForEvolution: 14 },
+    weights: { newMove: 10, evolution: 40, moveUpgrade: 8, stat: 4, statFull: 7, statForEvolution: 14, ability: 9 },
     /** Curación de la carta de reserva (solo si no hay suficientes opciones). */
     fallbackHeal: 0.35,
     fallbackGold: 25,
