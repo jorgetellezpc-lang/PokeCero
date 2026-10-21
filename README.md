@@ -33,7 +33,7 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 
 ## Controles
 
-- **Móvil:** toca y arrastra en cualquier punto de la pantalla para mover el joystick. Los ataques son automáticos (estilo PokéSurvivor).
+- **Móvil:** toca y arrastra en cualquier punto de la pantalla para mover el joystick. Al soltar el dedo y quedarte **quieto**, atacas solo (estilo Archero); al moverte, esquivas.
 - **Escritorio:** WASD o flechas para moverse; Esc o P para pausar.
 
 ## Estructura
@@ -50,6 +50,7 @@ src/
     bossAI.ts           IA de minibosses y jefes
     rooms.ts            Oleadas, tramos y curva de dificultad
     upgradeGenerator.ts Las 3 cartas de subida de nivel
+    abilities.ts        Pasiva + habilidades + sinergias → modificadores de combate
   meta/                 Progreso permanente: guardado, mejoras por Pokémon, recompensas, gachapón
   render/               Canvas, sprites animados (animator.ts) y efectos pixel art (vfx.ts)
   audio/                Sintetizador Web Audio y partituras

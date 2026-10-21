@@ -7,6 +7,8 @@
 // ============================================================================
 
 export const BALANCE = {
+  /** Límites de rendimiento (móvil). PROVISIONAL. */
+  perf: { maxProjectiles: 360 },
   /**
    * Adaptación de los números de PokéSurvivor (mundo abierto, horizontal) a la
    * arena vertical de Pokécero.

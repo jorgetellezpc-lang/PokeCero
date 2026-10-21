@@ -212,6 +212,7 @@ export class RunScreen implements Screen {
           recordBestRoom(store, this.gymId, ev.room);
           audio.music(songForRoom(ev.room, ev.kind));
           this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!' : `Sala ${ev.room}`, ev.kind === 'normal' ? '' : 'danger');
+          if (ev.index === 0) setTimeout(() => toast('Muévete para esquivar · Quédate quieto para atacar'), 900);
           break;
         case 'roomCleared': {
           // Los tickets de hito se guardan al momento y solo una vez.

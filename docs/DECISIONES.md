@@ -8,7 +8,7 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 |---|---|
 | Base | Pokécero integra PokéSurvivor (sistemas, datos, sprites, efectos y música) adaptado a salas verticales estilo Archero. Por eso el proyecto es **no comercial** para siempre: lo exigen las licencias PolyForm Noncommercial y CC BY-NC (ver `THIRD_PARTY_NOTICES.md`). |
 | Tecnología | Vite + TypeScript. El combate se dibuja en Canvas 2D y los menús son HTML/CSS. La lógica de la partida no depende del navegador y se prueba en Node. |
-| Estilo de ataque | Automático y continuo (PokéSurvivor). **Diferencia con PokéSurvivor:** allí solo se lanza el movimiento activo; en Pokécero se lanzan todos a la vez (máximo 4), para poder jugar con una mano. |
+| Estilo de ataque | **Archero (opción B):** atacas automáticamente solo cuando estás quieto; moverte es esquivar. Orbes, auras y rastros funcionan siempre. Se lanzan todos tus movimientos a la vez (máximo 4). Todos los iniciales son a distancia. |
 | Sprites | Sprites animados de Mundo Misterioso (SpriteCollab) de los 151 de Kanto, más Sudowoodo. Tienen 8 direcciones y 7 animaciones. |
 | Completar una sala | Derrotar a todos los enemigos y cruzar la salida superior (Archero). |
 | Estructura del gimnasio | 50 salas, con minibosses en las salas 20 y 40 y jefe en la 50. |
@@ -42,6 +42,21 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 - **Recogibles:** experiencia, oro, bayas, tickets y objetos.
 - **Sonido:** sintetizador Web Audio con los temas de aldea (menú), bosque, cueva y volcán (según la sala) y jefe, más efectos de sonido.
 
+## Combate roguelite estilo Archero (implementación original)
+
+Archero2Clone no tiene licencia, así que solo se usó como referencia funcional; el código es propio.
+
+- **Habilidades por datos** (`src/data/abilities.ts`): 19 habilidades con id, nombre, descripción, rareza (Común/Rara/Épica/Legendaria), límite de acumulación, efecto, condiciones de aparición (tipo de movimiento, tipo elemental, nivel) y exclusiones. Ejemplos: Doble Disparo, Abanico, Flancos, Retaguardia, Ráfaga, Perforación, Rebote, Rebote Muro, Cuerpo Llama, Punto Tóxico, Toque Gélido, Electricidad Estática, Francotirador, Golpe Certero, Detonación, Absorción, Pantalla Luz, Doble Equipo y Robustez.
+- **Sinergias** (7): se activan solas al reunir sus piezas y se anuncian con un aviso. Por ejemplo, Infierno (Cuerpo Llama + movimiento de Fuego), Cobertura Total (Abanico + Flancos + Retaguardia) y Nube Tóxica (Punto Tóxico + Detonación).
+- **Pasiva de cada Pokémon** según su tipo principal: Mar Llamas, Torrente, Espesura, Electricidad Estática, Levitación, Robustez, Intimidación… Además, los movimientos de su mismo tipo hacen +20 % (STAB).
+- **Cartas:** las habilidades entran en el sorteo de las 3 cartas junto a movimientos y estadísticas. Su color indica la rareza, y la carta avisa si completa una sinergia.
+- **Jefes con 3 fases** (al 66 % y al 33 % de vida). Cada fase añade ataques propios con aviso en el suelo:
+  - Geodude: Rodada y Magnitud.
+  - Sudowoodo: Avalancha y Tumba Rocas.
+  - Onix: Avalancha, Excavar (bajo tierra no se le puede golpear) y Tormenta Arena.
+  - En la última fase se enfurecen.
+- **Rendimiento:** como mucho hay 360 proyectiles a la vez; si se pasa, desaparecen antes los tuyos más viejos (`balance.perf`).
+
 ## Provisional (pendiente de decisión de diseño)
 
 | Tema | Valor actual | Dónde |
@@ -50,7 +65,9 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 | Escala de PokéSurvivor a la arena | Sprites ×1,4; alcances ×0,7; proyectiles ×0,8; daño de movimientos ×0,5 | `balance.ps` |
 | Enemigos por sala | De 4 a 14, en 1–3 sub-oleadas, con un máximo de 12 vivos | `balance.difficulty`, `balance.rooms` |
 | Tramos de enemigos | Uno cada 10 salas, con la vida y el daño base de PokéSurvivor; dentro de cada tramo, +10 % de vida y +3 % de daño por sala | `data/enemies.ts`, `balance.difficulty` |
-| Jefes | Vida ×24 (miniboss) y ×60 (jefe) sobre el tramo de su sala | `balance.bosses` |
+| Jefes | Vida ×24 (miniboss) y ×60 (jefe) sobre el tramo de su sala; fases al 66 % y al 33 % | `balance.bosses`, `data/enemies.ts` |
+| Habilidades y sinergias | Magnitudes, rarezas (pesos 7/4/2/1) y peso de carta 9 | `data/abilities.ts`, `balance.upgrades.weights.ability` |
+| Obstáculos en las salas | Sin obstáculos (pendiente de decidir) | — |
 | Curva de experiencia | 5 + 2·L + L^1,35 por nivel, con un máximo de nivel 36 | `balance.experience` |
 | Evoluciones de especie | Nivel oficial. Las de piedra o intercambio no evolucionan en partida (pendiente). | `data/pokemon.ts` |
 | Movimiento inicial | Según el tipo principal (tabla de PokéSurvivor) | `data/moves.ts` |
@@ -63,6 +80,7 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 
 - El tipo importa contra Brock, que es de Roca/Tierra: Squirtle y Bulbasaur lo superan con facilidad; Charmander y, sobre todo, Pikachu sufren contra los minibosses, porque lo eléctrico hace ×0,3 a Geodude.
 - Una partida de 50 salas dura unos 8–15 minutos y una en modo prueba, unos 2 minutos.
+- Con habilidades, el bot gana unas 13 de cada 16 partidas de 50 salas. Probablemente es demasiado fácil para una persona, pero hay que probarlo jugando antes de endurecerlo. Pikachu sigue cayendo a menudo ante Geodude en el modo prueba.
 
 ## Sin integrar todavía (de PokéSurvivor)
 

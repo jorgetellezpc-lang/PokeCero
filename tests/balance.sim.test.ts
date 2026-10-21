@@ -6,7 +6,7 @@ import { roomSequence } from '../src/game/rooms';
 import { World } from '../src/game/world';
 import { brock } from './helpers';
 
-function bot(w: World) {
+export function bot(w: World) {
   const p = w.player;
   if (w.exitOpen && w.pickups.length === 0) {
     const dx = w.exit.x - p.x;
@@ -74,7 +74,7 @@ for (const test of [true, false]) for (const sp of ['charmander', 'squirtle', 'b
         deathRoom = w.room;
       }
       const p = w.player;
-      res.push(`seed${seed}: ${w.phase} sala ${deathRoom} nv ${p.level} ${p.species.id} ${p.moves.map((m) => `${m.def.id}${m.evolved ? '★' : m.level}`).join(',')} ${(t / 3600).toFixed(1)}min kills ${w.kills}`);
+      res.push(`seed${seed}: ${w.phase} sala ${deathRoom} nv ${p.level} ${p.species.id} ${p.moves.map((m) => `${m.def.id}${m.evolved ? '★' : m.level}`).join(',')} [${Object.entries(p.abilities).map(([k, n]) => `${k}×${n}`).join(',')}] ${(t / 3600).toFixed(1)}min kills ${w.kills}`);
     }
     console.log(sp, test ? '(modo prueba)' : '(50 salas)', '\n' + res.join('\n'));
   }, 300000);

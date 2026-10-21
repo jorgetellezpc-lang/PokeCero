@@ -1,6 +1,7 @@
 import { PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
 import { getMove } from '../../data/moves';
 import { getSpecies, obtainablePokemon, sideOf } from '../../data/pokemon';
+import { passiveOf } from '../../game/abilities';
 import { RARITY_COLOR, RARITY_NAME } from '../../meta/gacha';
 import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
 import { iconDataUrl } from '../../render/sprites';
@@ -32,6 +33,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
         statLine('Def. Esp.', sp.stats.sd),
       ),
       h('div', { class: 'hero-attack' }, `Empieza con ${getMove(sp.startingAttack).name} · Pega mejor con ataques ${side === 'special' ? 'especiales' : 'físicos'} · ${sp.learnset.length} movimientos posibles`),
+      h('div', { class: 'hero-attack', 'data-testid': 'hero-passive' }, `Habilidad: ${passiveOf(sp).name} — ${passiveOf(sp).description}`),
       sp.evolution ? h('div', { class: 'hero-attack' }, `Evoluciona a ${getSpecies(sp.evolution.to).name} en Nv ${sp.evolution.level} (en partida)`) : null,
       h('div', { class: 'hint' }, 'Toca para cambiar de Pokémon'),
     ),

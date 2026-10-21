@@ -254,9 +254,10 @@ function boomerang(w: World, m: OwnedMove): void {
   const spread = s.spread ?? 0.5;
   const out = s.radius! / (s.speed ?? 300);
   for (let i = 0; i < n; i++) {
-    // Abanico a la mitad que en PokéSurvivor: en la arena estrecha, a corta
-    // distancia, dos hojas abiertas rodeaban al enemigo sin tocarlo.
-    const a = p.aim + (n === 1 ? 0 : (i / (n - 1) - 0.5) * spread * Math.min(n, 3) * 0.5);
+    // Una hoja recta al blanco y el resto alternando a los lados, con la mitad
+    // de abanico que en PokéSurvivor: en la arena estrecha, dos hojas abiertas
+    // rodeaban al enemigo sin tocarlo.
+    const a = p.aim + (i === 0 ? 0 : Math.ceil(i / 2) * (i % 2 ? 1 : -1) * spread * 0.5);
     spawnProjectile(w, m, p.x, p.y - 10, a, s.speed ?? 300, { life: out * 4 + 1.5, pierce: 999, boom: out });
   }
 }
@@ -462,7 +463,9 @@ export function updateProjectiles(w: World, dt: number): void {
       }
       if (pr.back) {
         const d = Math.hypot(p.x - pr.x, p.y - 12 - pr.y) || 1;
-        const speed = Math.hypot(pr.vx, pr.vy) || 300;
+        // Velocidad fija de vuelta: con la del momento, al girar se frenaba
+        // hasta quedarse quieta en el aire.
+        const speed = pr.move?.s.speed ?? 300;
         const k = Math.min(1, dt * 7);
         pr.vx += ((p.x - pr.x) / d * speed * 1.1 - pr.vx) * k;
         pr.vy += ((p.y - 12 - pr.y) / d * speed * 1.1 - pr.vy) * k;
@@ -528,7 +531,13 @@ export function updateProjectiles(w: World, dt: number): void {
     }
     if (alive) keep.push(pr);
   }
-  w.projectiles = keep;
+  // Tope de proyectiles (rendimiento en móvil): desaparecen antes los tuyos más viejos.
+  const cap = BALANCE.perf.maxProjectiles;
+  if (keep.length > cap) {
+    const old = keep.filter((x) => x.friendly).sort((a, b) => b.t - a.t).slice(0, keep.length - cap);
+    const drop = new Set(old);
+    w.projectiles = keep.filter((x) => !drop.has(x));
+  } else w.projectiles = keep;
 }
 
 /** Posiciones de los escudos de Pantalla Luz alrededor del jugador. */

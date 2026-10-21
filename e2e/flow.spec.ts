@@ -41,6 +41,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await page.click('[data-tab="pokemon"]');
   await expect(page.locator('.hero-name')).toContainText('Charmander');
   await expect(page.locator('.upgrade-row')).toHaveCount(10);
+  await expect(page.getByTestId('hero-passive')).toContainText('Mar Llamas');
   await shot(page, '02-pokemon');
   await page.click('[data-tab="settings"]');
   await expect(page.locator('[data-setting="testMode"]')).toBeChecked();
@@ -77,12 +78,22 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.locator('.card')).toHaveCount(3);
   await page.waitForTimeout(400);
   await shot(page, '07-cartas');
-  const progress = 'return w.player.moves.length + Object.values(w.player.statsTaken).reduce((a,b)=>a+b,0) + w.player.moves.reduce((a,b)=>a+b.level,0);';
+  const progress = 'return w.player.moves.length + Object.values(w.player.statsTaken).reduce((a,b)=>a+b,0) + w.player.moves.reduce((a,b)=>a+b.level,0) + Object.values(w.player.abilities).reduce((a,b)=>a+b,0) + w.bonusGold + Math.round(w.player.hp);';
   const attacksBefore = (await world(page, progress)) as number;
   await page.getByTestId('card-0').click();
   await expect(page.locator('.overlay')).toBeHidden();
   const attacksAfter = (await world(page, progress)) as number;
   expect(attacksAfter).toBeGreaterThan(attacksBefore);
+
+  // Habilidad + sinergia: aparece el aviso y se listan en la pausa
+  await world(page, 'w.player.abilities["cuerpo-llama"] = 1; w.refreshMods();');
+  await expect(page.locator('.banner')).toContainText('Infierno');
+  await page.getByTestId('pause').click();
+  await expect(page.getByTestId('ability-list')).toContainText('Mar Llamas');
+  await expect(page.getByTestId('ability-list')).toContainText('Cuerpo Llama');
+  await expect(page.getByTestId('ability-list')).toContainText('Infierno');
+  await shot(page, '07b-pausa-habilidades');
+  await page.getByTestId('resume').click();
 
   // Superar la sala y cruzar la salida
   await world(page, 'w.debugKillAll();');
