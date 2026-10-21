@@ -343,3 +343,39 @@ button { font-family: var(--font); color: inherit; }
     background: #05081a; font-size: 12px; text-align: center; padding: 20px;
   }
 }
+
+/* ---------------- Integración PokéSurvivor ---------------- */
+.dex-no { font-size: 8px; color: var(--muted); }
+.poke-grid { grid-template-columns: repeat(4, 1fr); max-height: 60dvh; overflow-y: auto; }
+.poke-slot { position: relative; border-color: var(--rar, var(--border)); font-size: 6px; }
+.poke-slot.selected { box-shadow: 0 0 0 3px var(--gold); }
+.slot-no { position: absolute; top: 2px; left: 4px; font-size: 6px; color: var(--muted); }
+.slot-sprite { width: 48px; height: 48px; }
+.hero-sprite { width: 96px; height: 96px; }
+
+.gacha-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.gacha-buttons .btn { margin: 6px 0; font-size: 10px; }
+.gacha-results { display: flex; justify-content: center; margin: 8px 0; }
+.gacha-results.multi { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.gacha-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px;
+  background: var(--panel); border: 3px solid var(--rar); border-radius: 6px; font-size: 7px; text-align: center;
+  animation: pop 0.3s backwards;
+}
+.gacha-results.multi .gacha-card { font-size: 5px; }
+.gacha-results.multi .gacha-card:nth-child(n) { animation-delay: calc(var(--i, 0) * 0.05s); }
+.gacha-results.multi .gacha-sprite { width: 48px; height: 48px; }
+.rarity-tag { color: var(--rar); }
+.rarity-table { display: grid; gap: 4px; margin-top: 8px; }
+.rarity-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 6px 8px;
+  background: var(--panel-dark); border-left: 6px solid var(--rar); border-radius: 4px; font-size: 8px;
+}
+
+.slider { flex: 0 0 140px; accent-color: var(--gold); }
+
+.card.fam-evo { background: linear-gradient(135deg, #5a4210, #2a3f9c 60%); border-color: #ffd23f; }
+.card.fam-evo .card-cat { color: var(--gold); }
+.atk-chip.evolved { background: rgba(255, 210, 63, 0.25); }
+.atk-chip.item-chip { border-color: var(--gold); color: var(--gold); }
+.move-list { margin: 8px 0; }

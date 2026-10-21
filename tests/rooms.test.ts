@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/config/balance';
-import { ENEMIES } from '../src/data/enemies';
+import { castForTier, isRangedBehavior } from '../src/data/enemies';
 import { Rng } from '../src/game/rng';
-import { difficultyFor, enemyCountFor, planRoom, roomKind, roomSequence, scalingFor } from '../src/game/rooms';
+import { difficultyFor, enemyCountFor, planRoom, roomKind, roomSequence, tierForRoom } from '../src/game/rooms';
 import { brock, makeWorld, run } from './helpers';
+
+const pickFrom = (rng: Rng) => <T>(list: T[], n: number): T[] => {
+  const copy = [...list];
+  const out: T[] = [];
+  while (out.length < n && copy.length) out.push(copy.splice(Math.floor(rng.next() * copy.length), 1)[0]);
+  return out;
+};
 
 describe('salas y dificultad', () => {
   it('estructura de 50 salas con minibosses en 20 y 40 y jefe en 50', () => {
@@ -14,23 +21,33 @@ describe('salas y dificultad', () => {
     expect(roomKind(19)).toBe('normal');
   });
 
-  it('la dificultad empieza en 1/10 y crece', () => {
+  it('la dificultad empieza en 1/10, crece y los enemigos cambian de tramo', () => {
     expect(difficultyFor(1)).toBe(1);
     expect(difficultyFor(50)).toBe(10);
-    for (let r = 2; r <= 50; r++) {
-      expect(enemyCountFor(r)).toBeGreaterThanOrEqual(enemyCountFor(r - 1));
-      expect(scalingFor(r).hpMult).toBeGreaterThan(scalingFor(r - 1).hpMult);
+    for (let r = 2; r <= 50; r++) expect(enemyCountFor(r)).toBeGreaterThanOrEqual(enemyCountFor(r - 1));
+    expect(tierForRoom(1)).toBe(0);
+    expect(tierForRoom(11)).toBe(1);
+    expect(tierForRoom(49)).toBe(4);
+  });
+
+  it('cada partida sortea un elenco por tramo, con apoyo y personalidades', () => {
+    const rng = new Rng(9);
+    for (let t = 0; t < 5; t++) {
+      const cast = castForTier(t, pickFrom(rng));
+      expect(cast.length).toBe(BALANCE.enemies.castSize);
+      expect(cast.every((e) => e.dex <= 151)).toBe(true);
+      expect(cast.some((e) => e.behavior === 'runner')).toBe(true);
     }
   });
 
-  it('las oleadas mezclan cuerpo a cuerpo y distancia a partir de la sala 2', () => {
+  it('desde la sala 2 las oleadas mezclan cuerpo a cuerpo y distancia', () => {
     const rng = new Rng(7);
+    const casts = [0, 1, 2, 3, 4].map((t) => castForTier(t, pickFrom(rng)));
     for (let r = BALANCE.difficulty.guaranteedRangedFrom; r < 50; r++) {
       if (roomKind(r) !== 'normal') continue;
-      const ids = planRoom(brock, r, rng).waves.flat();
-      const types = new Set(ids.map((id) => ENEMIES[id].archetype));
-      expect(types.has('ranged')).toBe(true);
-      expect(types.has('melee')).toBe(true);
+      const defs = planRoom(brock, r, casts[tierForRoom(r)], rng).waves.flat();
+      expect(defs.some((d) => isRangedBehavior(d.behavior)), `sala ${r}`).toBe(true);
+      expect(defs.some((d) => !isRangedBehavior(d.behavior)), `sala ${r}`).toBe(true);
     }
   });
 
@@ -38,9 +55,11 @@ describe('salas y dificultad', () => {
     const w = makeWorld();
     expect(w.room).toBe(1);
     w.debugKillAll();
-    run(w, 1);
-    for (let i = 0; i < 3 && w.phase === 'levelup'; i++) w.chooseUpgrade(0);
-    run(w, 1);
+    for (let i = 0; i < 120; i++) {
+      while (w.phase === 'levelup') w.chooseUpgrade(0);
+      if (w.phase === 'item') w.chooseItem(true);
+      w.update(1 / 60, { x: 0, y: 0 });
+    }
     expect(w.roomCleared).toBe(true);
     expect(w.exitOpen).toBe(true);
     w.player.x = w.exit.x;
@@ -49,7 +68,7 @@ describe('salas y dificultad', () => {
     expect(w.room).toBe(2);
   });
 
-  it('las salas de miniboss y jefe generan su jefe con barra de vida', () => {
+  it('las salas de miniboss y jefe generan su jefe', () => {
     for (const room of [20, 40, 50]) {
       const w = makeWorld({ rooms: [room] });
       run(w, 3);
@@ -58,32 +77,34 @@ describe('salas y dificultad', () => {
     }
   });
 
-  it('derrotar al jefe de la sala 50 da la victoria', () => {
+  it('derrotar al jefe de la sala 50 da la victoria y suelta un objeto', () => {
     const w = makeWorld({ rooms: [50] });
     run(w, 3);
-    expect(w.boss).not.toBeNull();
     w.debugKillAll();
     expect(w.events.some((e) => e.type === 'bossDefeated')).toBe(true);
-    for (let i = 0; i < 400 && w.phase !== 'victory'; i++) {
+    expect(w.pickups.some((g) => g.kind === 'item')).toBe(true);
+    for (let i = 0; i < 600 && w.phase !== 'victory'; i++) {
       if (w.phase === 'levelup') w.chooseUpgrade(0);
+      if (w.phase === 'item') w.chooseItem(true);
       w.update(1 / 60, { x: 0, y: 0 });
     }
     expect(w.phase).toBe('victory');
   });
 
-  it('los jefes usan patrones distintos y su embestida/rocas pueden dañar', () => {
+  it('el jefe usa varios ataques con aviso y se enfurece a media vida', () => {
     const w = makeWorld({ rooms: [50] });
     run(w, 2);
     const boss = w.boss!;
     const seen = new Set<string>();
-    w.player.hp = 1e9;
-    w.player.maxHp = 1e9;
-    for (let i = 0; i < 60 * 25; i++) {
-      w.update(1 / 60, { x: Math.sin(i / 50), y: 0 });
-      if (boss.pattern) seen.add(boss.pattern);
+    w.player.hp = w.player.maxHp = 1e9;
+    for (let i = 0; i < 60 * 30; i++) {
+      w.update(1 / 60, { x: Math.sin(i / 50), y: Math.cos(i / 70) * 0.5 });
+      if (boss.ai?.cast) seen.add(boss.ai.cast.id);
       if (w.phase === 'levelup') w.chooseUpgrade(0);
+      if (i === 60 * 15) boss.hp = boss.maxHp * 0.4;
     }
     expect(seen.size).toBeGreaterThanOrEqual(3);
+    expect(boss.ai!.fury).toBe(true);
     expect(w.player.hp).toBeLessThan(1e9);
   });
 });

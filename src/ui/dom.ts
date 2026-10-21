@@ -32,18 +32,22 @@ export function img(src: string, cls = '', alt = ''): HTMLImageElement {
   return h('img', { src, class: `pix ${cls}`, alt, draggable: 'false' });
 }
 
-export const TYPE_NAMES: Record<string, string> = {
-  normal: 'Normal', fire: 'Fuego', water: 'Agua', grass: 'Planta', electric: 'Eléctrico', rock: 'Roca',
-  ground: 'Tierra', poison: 'Veneno', flying: 'Volador', bug: 'Bicho', psychic: 'Psíquico', fighting: 'Lucha',
-};
+export { TYPE_COLORS, TYPE_NAMES } from '../data/typeColors';
+import { TYPE_COLORS, TYPE_NAMES } from '../data/typeColors';
+import { portrait } from '../render/animator';
 
-export const TYPE_COLORS: Record<string, string> = {
-  normal: '#a8a878', fire: '#f08030', water: '#6890f0', grass: '#78c850', electric: '#f8d030', rock: '#b8a038',
-  ground: '#e0c068', poison: '#a040a0', flying: '#a890f0', bug: '#a8b820', psychic: '#f85888', fighting: '#c03028',
-};
+/** Retrato del Pokémon (primer fotograma de su sprite); se rellena al cargar. */
+export function pokeImg(dex: number, size = 64, cls = '', silhouette = false): HTMLImageElement {
+  const el = img('', cls);
+  el.width = size;
+  el.height = size;
+  void portrait(dex, size * 2, silhouette).then((url) => { if (url) el.src = url; });
+  return el;
+}
 
 export function typeChip(t: string): HTMLElement {
-  return h('span', { class: 'type-chip', style: `background:${TYPE_COLORS[t] ?? '#888'}` }, TYPE_NAMES[t] ?? t);
+  const k = t as keyof typeof TYPE_COLORS;
+  return h('span', { class: 'type-chip', style: `background:${TYPE_COLORS[k] ?? '#888'}` }, TYPE_NAMES[k] ?? t);
 }
 
 export function toast(text: string): void {
