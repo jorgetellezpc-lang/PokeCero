@@ -1,5 +1,5 @@
 import type { CombatMods } from '../data/abilities';
-import type { BossDef, EnemyDef, Behavior } from '../data/enemies';
+import type { BossDef, BossSignature, EnemyDef, Behavior } from '../data/enemies';
 import type { ItemId } from '../data/items';
 import type { BuffStat, MoveCategory, MoveDef, MoveNums } from '../data/moves';
 import type { PokemonSpecies } from '../data/pokemon';
@@ -76,7 +76,7 @@ export interface Player extends Vec {
 export type EnemyPhase = 'walk' | 'aim' | 'dash' | 'fuse' | 'cast';
 
 export interface BossCast {
-  id: 'slam' | 'dash' | 'leap' | 'rain' | 'beam' | 'volley' | 'nova';
+  id: 'slam' | 'dash' | 'leap' | 'rain' | 'beam' | 'volley' | 'nova' | BossSignature;
   t: number;
   wind: number;
   after: number;
@@ -85,6 +85,10 @@ export interface BossCast {
   dur?: number;
   go?: boolean;
   fired?: boolean;
+  /** Repeticiones que quedan (Rodada). */
+  n?: number;
+  tx?: number;
+  ty?: number;
 }
 
 export interface BossBrain {
@@ -97,6 +101,10 @@ export interface BossBrain {
   cast: BossCast | null;
   fury: boolean;
   side: number;
+  /** Fase actual (0, 1, 2…). */
+  phase: number;
+  /** Ataque que usará en cuanto pueda (al cambiar de fase). */
+  forced?: BossCast['id'];
 }
 
 export interface Jump { sx: number; sy: number; tx: number; ty: number; t: number; dur: number }
@@ -136,6 +144,8 @@ export interface Enemy extends Vec {
   side: number;
   ai: BossBrain | null;
   summoned: boolean;
+  /** Bajo tierra (Excavar): no se le puede golpear. */
+  hidden: boolean;
   /** Orbes: enfriamiento por movimiento (id → s). */
   orbitCd: Record<string, number>;
 }

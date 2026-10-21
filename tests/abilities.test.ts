@@ -88,9 +88,9 @@ describe('habilidades', () => {
     take(w, 'perforacion', 2);
     emptyRoom(w);
     const p = w.player;
-    const a = spawnAt(w, 74, 'turret', p.x, p.y - 80);
-    const b = spawnAt(w, 74, 'turret', p.x, p.y - 140);
-    const c = spawnAt(w, 74, 'turret', p.x, p.y - 200);
+    const a = spawnAt(w, 74, 'tank', p.x, p.y - 80);
+    const b = spawnAt(w, 74, 'tank', p.x, p.y - 140);
+    const c = spawnAt(w, 74, 'tank', p.x, p.y - 200);
     [a, b, c].forEach((e) => { e.hp = e.maxHp = 9999; });
     w.player.moves[0].t = 0;
     w.update(1 / 60, { x: 0, y: 0 });
@@ -141,7 +141,7 @@ describe('habilidades', () => {
     const w = makeWorld();
     take(w, 'robustez');
     emptyRoom(w);
-    spawnAt(w, 74, 'turret', 40, 40).hp = 9999;
+    spawnAt(w, 74, 'tank', 40, 40).hp = 9999;
     const p = w.player;
     w.hurtPlayer(9999, 'normal', 'physical');
     expect(p.hp).toBe(1);
@@ -154,7 +154,7 @@ describe('habilidades', () => {
     const w = makeWorld();
     take(w, 'evasion', 3);
     emptyRoom(w);
-    spawnAt(w, 74, 'turret', 40, 40).hp = 9999;
+    spawnAt(w, 74, 'tank', 40, 40).hp = 9999;
     const p = w.player;
     let dodged = 0;
     for (let i = 0; i < 300; i++) {
@@ -174,8 +174,8 @@ describe('habilidades', () => {
     emptyRoom(w);
     const p = w.player;
     p.moves = [];
-    const a = spawnAt(w, 74, 'turret', 180, 200);
-    const b = spawnAt(w, 74, 'turret', 195, 200);
+    const a = spawnAt(w, 74, 'tank', 180, 200);
+    const b = spawnAt(w, 74, 'tank', 195, 200);
     b.hp = b.maxHp = 500;
     a.maxHp = 400;
     p.hp = p.maxHp / 2;
@@ -191,7 +191,7 @@ describe('habilidades', () => {
     take(w, 'ataque-certero');
     w.player.mods.execute = 1;
     emptyRoom(w);
-    const e = spawnAt(w, 74, 'turret', 180, 200);
+    const e = spawnAt(w, 74, 'tank', 180, 200);
     e.maxHp = 1000;
     e.hp = 200;
     w.hitEnemy(e, 1, 'normal', 'physical', 0, 1, 0, {});
@@ -205,7 +205,7 @@ describe('habilidades', () => {
     expect(w.events.some((e) => e.type === 'synergy' && e.name === 'Infierno')).toBe(true);
     expect(w.player.mods.dotMult).toBe(2);
     emptyRoom(w);
-    const e = spawnAt(w, 74, 'turret', 180, 200);
+    const e = spawnAt(w, 74, 'tank', 180, 200);
     w.hitEnemy(e, 1, 'water', 'special', 0, 1, 0, {});
     expect(e.burn).toBeGreaterThan(0);
   });
@@ -229,7 +229,7 @@ describe('habilidades', () => {
       w.player.mods.crit = 0;
       w.player.mods.stab = stab;
       emptyRoom(w);
-      const e = spawnAt(w, 19, 'turret', 180, 200);
+      const e = spawnAt(w, 19, 'tank', 180, 200);
       e.hp = e.maxHp = 9999;
       w.hitEnemy(e, 50, 'fire', 'special', 0, 1, 0, {});
       return 9999 - e.hp;
@@ -241,7 +241,7 @@ describe('habilidades', () => {
     const w = makeWorld({ speciesId: 'gastly' });
     expect(w.player.mods.levitate).toBe(true);
     emptyRoom(w);
-    spawnAt(w, 74, 'turret', 40, 40).hp = 9999;
+    spawnAt(w, 74, 'tank', 40, 40).hp = 9999;
     w.player.moves = [];
     const p = w.player;
     const hp = p.hp;

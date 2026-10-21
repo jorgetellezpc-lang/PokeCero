@@ -498,7 +498,7 @@ export function updateProjectiles(w: World, dt: number): void {
       }
     } else if (alive) {
       for (const e of w.enemies) {
-        if (pr.hits.has(e.id) || e.hp <= 0) continue;
+        if (pr.hits.has(e.id) || e.hp <= 0 || e.hidden) continue;
         if (Math.hypot(pr.x - e.x, pr.y - (e.y - e.bodyH * 0.4)) < pr.r + e.r) {
           pr.hits.add(e.id);
           const l = Math.hypot(pr.vx, pr.vy) || 1;

@@ -10,7 +10,9 @@ import type { World } from './world';
 // Minibosses y jefes. IA basada en la de PokéSurvivor (js/entities/enemy.js):
 // cada jefe tiene 4 ataques, 2 de cerca (Pisotón + Embestida o Salto) y 2 de
 // lejos según su tipo, y alterna entre ir a por ti y pelear a distancia. Todo
-// avisa en el suelo. Por debajo de la mitad de vida se enfurece.
+// avisa en el suelo. Además, cada jefe tiene FASES (data/enemies.ts) que
+// añaden ataques propios: Rodada, Magnitud, Avalancha, Tumba Rocas, Excavar y
+// Tormenta Arena. En la última fase se enfurece.
 // Required Notice: Copyright 2026 JPTER78 (https://github.com/JPTER78/pokesurvivor)
 // ============================================================================
 
@@ -33,7 +35,7 @@ function brain(w: World, e: Enemy): BossBrain {
   const far = e.behavior === 'ranged';
   return {
     melee, ranged, farLike: far ? 0.65 : 0.35, mode: far ? 'far' : 'close', modeT: w.rng.range(6, 8),
-    cd: 1.6, cast: null, fury: false, side: w.rng.next() < 0.5 ? -1 : 1,
+    cd: 1.6, cast: null, fury: false, side: w.rng.next() < 0.5 ? -1 : 1, phase: 0,
   };
 }
 
@@ -61,9 +63,21 @@ export function updateBoss(w: World, e: Enemy, dt: number): void {
     }
     return;
   }
+  // Cambio de fase: aviso, breve pausa y estrena su ataque nuevo.
+  const phases = e.boss!.phases;
+  const next = phases[ai.phase + 1];
+  if (next && e.hp < e.maxHp * next.at && !ai.cast) {
+    ai.phase++;
+    e.speed *= next.speed / phases[ai.phase - 1].speed;
+    w.ring(e.x, e.y, e.r, e.r * 5, '#ffd23f', 0.6, 5);
+    w.shake = Math.max(w.shake, 0.4);
+    w.events.push({ type: 'bossPhase', name: next.name, phase: ai.phase + 1 });
+    e.stunT = 0;
+    ai.cd = 0.8;
+    ai.forced = next.moves[next.moves.length - 1];
+  }
   if (!ai.fury && e.hp < e.maxHp * e.boss!.phase2At) {
     ai.fury = true;
-    e.speed *= 1.15;
     w.ring(e.x, e.y, e.r, e.r * 5, '#ff4a4a', 0.6, 5);
     w.shake = Math.max(w.shake, 0.5);
     w.events.push({ type: 'bossEnraged', name: e.def.name });
@@ -112,7 +126,13 @@ function move(w: World, e: Enemy, ai: BossBrain, dt: number): [number, number, '
   }
   if (ai.cd <= 0) {
     let id: BossCast['id'] | null = null;
-    if (ai.mode === 'close') {
+    const phase = e.boss!.phases[ai.phase];
+    if (ai.forced) {
+      id = ai.forced;
+      ai.forced = undefined;
+    } else if (phase && phase.moves.length && w.rng.next() < phase.signatureChance) {
+      id = w.rng.pick(phase.moves);
+    } else if (ai.mode === 'close') {
       const ok = ai.melee.filter((m) => (m === 'slam' ? d < 125 * sp() : d < 320 * sp()));
       id = ok.length && w.rng.next() < 0.8 ? w.rng.pick(ok) : d < 480 * sp() ? w.rng.pick(ai.ranged) : null;
     } else {
@@ -178,6 +198,93 @@ function start(w: World, e: Enemy, ai: BossBrain, id: BossCast['id']): void {
       e.anim.play('Charge', { speed: 1.4 });
       w.ring(e.x, e.y, e.r, e.r * 2.4, col, c.wind, 2);
       break;
+    default:
+      startSignature(w, e, c, f, hz);
+      break;
+  }
+}
+
+type HazardStyle = { element: Enemy['types'][number]; cat: Enemy['cat']; color: string };
+
+/** Ataques propios de las fases. Todos avisan en el suelo antes de golpear. */
+function startSignature(w: World, e: Enemy, c: BossCast, f: number, hz: HazardStyle): void {
+  const p = w.player;
+  const mg = BALANCE.arena.margin + 20;
+  switch (c.id) {
+    case 'rollout':
+      // Rodada: tres embestidas seguidas, cada una apuntada de nuevo.
+      c.n = 3;
+      c.len = 260 * sp();
+      c.dur = 0.3;
+      c.wind = 0.55 * f;
+      w.addHazard({ kind: 'beam', x: e.x, y: e.y, angle: c.ang, len: c.len + e.r, w: e.r * 2 + 12, delay: c.wind + c.dur, dmg: e.damage, ...hz });
+      e.anim.play('Charge', { speed: 1.5 });
+      break;
+    case 'quake':
+      // Magnitud: ondas de rocas que salen del jefe en 8 direcciones.
+      for (let ring = 1; ring <= 3; ring++) {
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + (ring % 2) * (Math.PI / 8);
+          const d = ring * 62 * sp() + e.r;
+          w.addHazard({ kind: 'zone', x: e.x + Math.cos(a) * d, y: e.y + Math.sin(a) * d, r: 26 * sp() + 6, delay: 0.8 + ring * 0.28, dmg: e.damage * 0.9, ...hz });
+        }
+      }
+      w.addHazard({ kind: 'zone', x: e.x, y: e.y, r: e.r + 40 * sp(), delay: 0.8, dmg: e.damage, ...hz });
+      c.wind = 1.4;
+      c.after = 0.3;
+      e.anim.play('Charge', { speed: 1.1 });
+      break;
+    case 'slide': {
+      // Avalancha: una fila de rocas que avanza hacia donde estás.
+      const n = 7;
+      for (let i = 0; i < n; i++) {
+        const d = e.r + (i + 1) * 46 * sp();
+        w.addHazard({ kind: 'zone', x: e.x + Math.cos(c.ang) * d, y: e.y + Math.sin(c.ang) * d, r: 30 * sp() + 6, delay: 0.75 + i * 0.12, dmg: e.shotDmg * 1.1, ...hz });
+      }
+      c.wind = 0.6;
+      e.anim.play('Shoot');
+      break;
+    }
+    case 'tomb': {
+      // Tumba Rocas: te rodea con rocas dejando un hueco; el centro también cae.
+      const n = 10;
+      const gap = Math.floor(w.rng.next() * n);
+      const R = 92 * sp() + 20;
+      for (let i = 0; i < n; i++) {
+        if (i === gap || i === (gap + 1) % n) continue;
+        const a = (i / n) * Math.PI * 2;
+        w.addHazard({ kind: 'zone', x: p.x + Math.cos(a) * R, y: p.y + Math.sin(a) * R, r: 26 * sp() + 6, delay: 1.25, dmg: e.shotDmg * 1.2, ...hz });
+      }
+      w.addHazard({ kind: 'zone', x: p.x, y: p.y, r: 58 * sp() + 8, delay: 1.25, dmg: e.shotDmg * 1.3, ...hz });
+      c.wind = 0.9;
+      c.after = 0.5;
+      e.anim.play('Charge', { speed: 1.2 });
+      break;
+    }
+    case 'dig':
+      // Excavar: se entierra, va bajo tierra hasta tu posición y sale de golpe.
+      e.hidden = true;
+      c.tx = p.x;
+      c.ty = p.y;
+      c.wind = 1.25 * f;
+      c.after = 0.4;
+      w.addHazard({ kind: 'zone', x: p.x, y: p.y, r: e.r + 34 * sp(), delay: c.wind, dmg: e.damage * 1.3, ...hz });
+      w.burst(e.x, e.y, '#b08a5a', 16);
+      break;
+    case 'storm':
+      // Tormenta Arena: rocas por toda la sala (y dos sobre ti).
+      for (let i = 0; i < 10; i++) {
+        const onYou = i < 2;
+        const x = onYou ? p.x + w.rng.range(-30, 30) : w.rng.range(mg, w.W - mg);
+        const y = onYou ? p.y + w.rng.range(-30, 30) : w.rng.range(mg + 40, w.H - mg);
+        w.addHazard({ kind: 'zone', x, y, r: 34 * sp() + 6, delay: 0.9 + i * 0.1, dmg: e.shotDmg, ...hz });
+      }
+      c.wind = 0.8;
+      c.after = 0.6;
+      e.anim.play('Charge');
+      break;
+    default:
+      break;
   }
 }
 
@@ -185,6 +292,36 @@ function cast(w: World, e: Enemy, ai: BossBrain, dt: number): [number, number, '
   const p = w.player;
   const c = ai.cast!;
   c.t += dt;
+  if (c.id === 'dig') {
+    if (c.t < c.wind) {
+      // Bajo tierra se desliza hasta el aviso.
+      const d = Math.hypot(c.tx! - e.x, c.ty! - e.y);
+      if (d > 4) {
+        const speed = Math.max(d / Math.max(0.1, c.wind - c.t), 60);
+        return [((c.tx! - e.x) / d) * speed, ((c.ty! - e.y) / d) * speed, 'Walk'];
+      }
+      return [0, 0, 'Idle'];
+    }
+    if (e.hidden) {
+      e.hidden = false;
+      w.burst(e.x, e.y, '#b08a5a', 24);
+      w.shake = Math.max(w.shake, 0.3);
+      e.anim.play('Attack', { speed: 1.4 });
+    }
+  }
+  if (c.id === 'rollout' && c.t >= c.wind) {
+    if (c.t >= c.wind + c.dur!) {
+      if (--c.n! <= 0) return end(w, ai);
+      // Siguiente vuelta: vuelve a apuntar.
+      c.t = 0;
+      c.wind = 0.35;
+      c.ang = Math.atan2(p.y - e.y, p.x - e.x);
+      w.addHazard({ kind: 'beam', x: e.x, y: e.y, angle: c.ang, len: c.len! + e.r, w: e.r * 2 + 12, delay: c.wind + c.dur!, dmg: e.damage, element: e.types[0], cat: e.cat, color: TYPE_COLORS[e.types[0]] ?? '#ff7a9e' });
+      return [0, 0, 'Idle'];
+    }
+    const speed = c.len! / c.dur!;
+    return [Math.cos(c.ang) * speed, Math.sin(c.ang) * speed, 'Walk'];
+  }
   if (c.id === 'dash' && c.t >= c.wind) {
     if (!c.go) {
       c.go = true;

@@ -249,6 +249,10 @@ export class RunScreen implements Screen {
           this.showBanner(`¡Sinergia: ${ev.name}!`, 'gold');
           toast(ev.description);
           break;
+        case 'bossPhase':
+          this.showBanner(`Fase ${ev.phase}: ${ev.name}`, 'danger');
+          this.app.audio.sfx('boss');
+          break;
         case 'bossEnraged':
           this.showBanner(`¡${ev.name} se ha enfurecido!`, 'danger');
           break;

@@ -91,20 +91,29 @@ describe('salas y dificultad', () => {
     expect(w.phase).toBe('victory');
   });
 
-  it('el jefe usa varios ataques con aviso y se enfurece a media vida', () => {
+  it('el jefe pasa por 3 fases con ataques propios y se enfurece en la última', () => {
     const w = makeWorld({ rooms: [50] });
     run(w, 2);
     const boss = w.boss!;
     const seen = new Set<string>();
+    const phases: number[] = [];
     w.player.hp = w.player.maxHp = 1e9;
-    for (let i = 0; i < 60 * 30; i++) {
+    for (let i = 0; i < 60 * 45; i++) {
       w.update(1 / 60, { x: Math.sin(i / 50), y: Math.cos(i / 70) * 0.5 });
       if (boss.ai?.cast) seen.add(boss.ai.cast.id);
+      for (const ev of w.events.splice(0)) if (ev.type === 'bossPhase') phases.push(ev.phase);
       if (w.phase === 'levelup') w.chooseUpgrade(0);
-      if (i === 60 * 15) boss.hp = boss.maxHp * 0.4;
+      if (i === 60 * 12) boss.hp = boss.maxHp * 0.6;
+      if (i === 60 * 26) boss.hp = boss.maxHp * 0.3;
+      boss.hp = Math.max(boss.hp, 1);
     }
-    expect(seen.size).toBeGreaterThanOrEqual(3);
-    expect(boss.ai!.fury).toBe(true);
+    expect(phases).toEqual([2, 3]);
+    expect(seen.size).toBeGreaterThanOrEqual(4);
+    // Onix: estrena Excavar en la fase 2 y Tormenta Arena en la 3.
+    expect(seen.has('dig')).toBe(true);
+    expect(seen.has('storm')).toBe(true);
+    expect(boss.ai!.fury).toBe(true)
+;
     expect(w.player.hp).toBeLessThan(1e9);
   });
 });

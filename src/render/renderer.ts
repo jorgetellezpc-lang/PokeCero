@@ -304,6 +304,14 @@ export class Renderer {
     }
     let x = e.x;
     if (e.phase === 'aim' || e.phase === 'fuse') x += Math.sin(w.time * 60) * 1.2;
+    if (e.hidden) {
+      // Bajo tierra: solo se ve el montículo que avanza.
+      ctx.fillStyle = 'rgba(150, 110, 70, 0.8)';
+      ctx.beginPath();
+      ctx.ellipse(e.x, e.y, e.r * 1.1, e.r * 0.45, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
     const ok = e.anim.draw(ctx, x, e.y - lift, { flash: e.flash > 0, softFlash: !!e.boss });
     if (!ok) fallback(ctx, x, e.y - lift, '#a070c0');
     const top = e.y - lift - e.bodyH - 4;

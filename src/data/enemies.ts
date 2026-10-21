@@ -60,12 +60,29 @@ export interface EnemyDef {
   cat: 'physical' | 'special';
 }
 
+/** Ataques propios de cada jefe (además de los 4 genéricos de su IA). */
+export type BossSignature = 'rollout' | 'quake' | 'slide' | 'tomb' | 'dig' | 'storm';
+
+/** Fase de un jefe: empieza al bajar de `at` (fracción de vida). */
+export interface BossPhaseDef {
+  at: number;
+  name: string;
+  /** Ataques propios que añade (se acumulan con los de fases anteriores). */
+  moves: BossSignature[];
+  /** Probabilidad de elegir un ataque propio cuando le toca atacar. */
+  signatureChance: number;
+  /** Multiplicador de velocidad desde esta fase. */
+  speed: number;
+}
+
 export interface BossDef extends EnemyDef {
   role: 'miniboss' | 'boss';
   title: string;
   contactDamage: number;
   /** Fracción de vida a la que se enfurece. */
   phase2At: number;
+  /** Fases (la primera, con toda la vida). Valores PROVISIONALES. */
+  phases: BossPhaseDef[];
 }
 
 export const ENEMY_TIERS = [
@@ -191,12 +208,30 @@ export function castForTier(tierIndex: number, pick: <T>(list: T[], n: number) =
 // Minibosses y jefe del gimnasio de Brock. Selección PROVISIONAL (ejemplo del
 // blueprint): Geodude (20), Sudowoodo (40), Onix (50). Su IA de jefe está en
 // game/bossAI.ts.
-interface BossSpec { dex: number; role: BossDef['role']; behavior: Behavior; tier: number }
+interface BossSpec { dex: number; role: BossDef['role']; behavior: Behavior; tier: number; phases: BossPhaseDef[] }
+
+const ph = (at: number, name: string, moves: BossSignature[], signatureChance: number, speed = 1): BossPhaseDef =>
+  ({ at, name, moves, signatureChance, speed });
 
 const BOSS_SPECS: Record<string, BossSpec> = {
-  'geodude-boss': { dex: 74, role: 'miniboss', behavior: 'charger', tier: 1 },
-  'sudowoodo-boss': { dex: 185, role: 'miniboss', behavior: 'ranged', tier: 3 },
-  'onix-boss': { dex: 95, role: 'boss', behavior: 'charger', tier: 4 },
+  // Geodude: rueda hacia ti y, al final, hace temblar toda la sala.
+  'geodude-boss': { dex: 74, role: 'miniboss', behavior: 'charger', tier: 1, phases: [
+    ph(1, 'Geodude', [], 0),
+    ph(0.66, '¡Geodude usa Rodada!', ['rollout'], 0.45, 1.1),
+    ph(0.33, '¡Geodude usa Magnitud!', ['rollout', 'quake'], 0.55, 1.2),
+  ] },
+  // Sudowoodo: hace caer rocas en línea y luego te encierra.
+  'sudowoodo-boss': { dex: 185, role: 'miniboss', behavior: 'ranged', tier: 3, phases: [
+    ph(1, 'Sudowoodo', [], 0),
+    ph(0.66, '¡Sudowoodo usa Avalancha!', ['slide'], 0.45, 1.05),
+    ph(0.33, '¡Sudowoodo usa Tumba Rocas!', ['slide', 'tomb'], 0.55, 1.15),
+  ] },
+  // Onix: se entierra y sale bajo tus pies; al final, tormenta de arena.
+  'onix-boss': { dex: 95, role: 'boss', behavior: 'charger', tier: 4, phases: [
+    ph(1, 'Onix', ['slide'], 0.2),
+    ph(0.66, '¡Onix usa Excavar!', ['slide', 'dig'], 0.45, 1.1),
+    ph(0.33, '¡Onix usa Tormenta Arena!', ['dig', 'storm', 'rollout'], 0.6, 1.2),
+  ] },
 };
 
 /**
@@ -222,7 +257,8 @@ export function bossDefFor(id: string, tierIndex?: number): BossDef {
     role: spec.role,
     title: spec.role === 'boss' ? 'Jefe de gimnasio' : 'Miniboss',
     contactDamage: Math.round(tier.dmg * B.damage * 0.7),
-    phase2At: 0.5,
+    phase2At: 0.33,
+    phases: spec.phases,
   };
 }
 

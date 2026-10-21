@@ -37,6 +37,7 @@ export type WorldEvent =
   | { type: 'moveEvolved'; from: string; to: string }
   | { type: 'bossSpawn'; name: string; title: string }
   | { type: 'bossEnraged'; name: string }
+  | { type: 'bossPhase'; name: string; phase: number }
   | { type: 'bossDefeated'; room: number; role: BossDef['role'] }
   | { type: 'ticket'; amount: number }
   | { type: 'item'; id: ItemId }
@@ -279,7 +280,7 @@ export class World {
       hp, maxHp: hp, damage: def.damage * s.damageMult, shotDmg: (def.shotDmg ?? def.damage) * s.damageMult,
       speed: def.speed * s.speedMult, flash: 0,
       slow: 0, slowT: 0, burn: 0, burnT: 0, burnTick: 0, poison: 0, poisonT: 0, poisonTick: 0, stunT: 0,
-      shield: 0, shieldT: 0, kx: 0, ky: 0, touchCd: 0,
+      shield: 0, shieldT: 0, kx: 0, ky: 0, touchCd: 0, hidden: false,
       phase: 'walk', pt: this.rng.range(0.3, 1.2), dx: 0, dy: 0,
       shotCd: def.shotCd ? this.rng.range(0.5, def.shotCd) : 0, skillCd: this.rng.range(1, 4),
       jump: null, side: this.rng.next() < 0.5 ? -1 : 1, ai: null, summoned: mk.summoned, orbitCd: {},
@@ -425,10 +426,11 @@ export class World {
     let best: Enemy | null = null;
     let bd = Infinity;
     for (const e of this.enemies) {
+      if (e.hidden) continue;
       const d = dist(e, p);
       if (d < bd) { bd = d; best = e; }
     }
-    if (this.boss && this.boss.hp > 0 && dist(this.boss, p) < 300 && bd > 60) best = this.boss;
+    if (this.boss && this.boss.hp > 0 && !this.boss.hidden && dist(this.boss, p) < 300 && bd > 60) best = this.boss;
     this.target = best;
   }
 
@@ -552,7 +554,7 @@ export class World {
     e: Enemy, base: number, element: ElementType, cat: MoveCategory, dx = 0, dy = 0, knock = 0,
     fx: { burn?: number; poison?: number; slow?: number; drain?: number; move?: OwnedMove | null; hex?: number } = {},
   ): void {
-    if (e.hp <= 0) return;
+    if (e.hp <= 0 || e.hidden) return;
     const p = this.player;
     const M = p.mods;
     const typeK = typeMultiplier(element, e.types);
@@ -606,7 +608,7 @@ export class World {
 
   /** Daño de estado o de objeto que no pasa por tipos ni defensas. */
   hurtEnemyRaw(e: Enemy, dmg: number, color: string): void {
-    if (e.hp <= 0) return;
+    if (e.hp <= 0 || e.hidden) return;
     e.hp -= dmg;
     e.flash = 0.05;
     this.text(e.x, e.y - e.bodyH - 4, String(Math.max(1, Math.round(dmg))), color, 9);
