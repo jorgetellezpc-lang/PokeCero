@@ -89,7 +89,7 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
     ),
     resetBtn,
     h('p', { class: 'note center' }, 'El progreso se guarda en este navegador. Restablecerlo borra oro, tickets, medallas, Pokémon y mejoras.'),
-    h('p', { class: 'note center version' }, 'Pokécero · prototipo v0.3'),
+    h('p', { class: 'note center version' }, 'Pokécero · prototipo v0.4'),
   );
 }
 
@@ -101,7 +101,8 @@ function linkRow(ic: IconName, label: string, onclick: () => void): HTMLElement 
 const GUIDE = [
   'Muévete arrastrando el dedo por cualquier parte de la pantalla. Al soltarlo y quedarte quieto, tu Pokémon ataca solo al enemigo más cercano.',
   'Derrota a todos los enemigos de la sala y sube por la puerta del fondo para pasar a la siguiente.',
-  'Al subir de nivel eliges 1 de 3 cartas: movimientos nuevos, mejoras, estadísticas y habilidades. Algunas habilidades juntas activan sinergias.',
+  'Cada Pokémon tiene un único ataque que sale de sus tipos. Al subir de nivel eliges 1 de 3 cartas: mejoras de ese ataque, estadísticas y habilidades. Algunas habilidades juntas activan sinergias.',
+  'Con nivel suficiente y las mejoras clave, el ataque EVOLUCIONA (carta dorada). Si tu Pokémon evoluciona, su ataque se transforma y conserva las mejoras.',
   'Cada gimnasio tiene 50 salas, con minibosses en la 20 y la 40 y el líder en la 50. Los jefes cambian de fase al perder vida.',
   'El oro sirve para mejoras permanentes de cada Pokémon. Los tickets, para el gachapón. Al morir conservas el oro y los tickets.',
 ];

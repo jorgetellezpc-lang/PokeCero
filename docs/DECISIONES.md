@@ -18,10 +18,8 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 
 ## Integrado de PokéSurvivor
 
-- **Movimientos.** Hay ~100, con 23 comportamientos: proyectil, cuerpo a cuerpo, rayo, orbe, onda, aura, potenciador, bumerán, cadena, mina, meteoro, torreta, embestida, rastro, cono, teledirigido, rebote, carga, giro, terremoto, remolino, empujón y aturdimiento.
-  - Cada uno tiene 5 niveles, y los que hacen daño pueden evolucionar con una carta dorada.
-  - Los movimientos que puede aprender cada Pokémon salen de sus tipos más los de tipo Normal.
-  - Los ataques son físicos o especiales, según el Ataque o el Ataque Especial del Pokémon.
+- **Motor de movimientos.** Hay ~100 movimientos con 23 comportamientos: proyectil, cuerpo a cuerpo, rayo, orbe, onda, aura, potenciador, bumerán, cadena, mina, meteoro, torreta, embestida, rastro, cono, teledirigido, rebote, carga, giro, terremoto, remolino, empujón y aturdimiento.
+  - Desde la v0.4 el jugador ya no los aprende: tiene un único **ataque característico** (ver más abajo). El catálogo se conserva como biblioteca de comportamientos y lo siguen probando los tests.
 - **Tabla de tipos** completa de 18 tipos, suavizada: ×1,6 si es eficaz, ×0,6 si es poco eficaz y ×0,3 en vez de inmunidad.
 - **Estados alterados:** quemadura, veneno, ralentización, aturdimiento, empujón y escudo.
 - **Enemigos:**
@@ -30,9 +28,8 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
   - Hay 13 personalidades: perseguidor, embestida, distancia, tanque, corredor, curandero, escudo, invocador, kamikaze, rayo con aviso, zonas, abanico y salto.
 - **Jefes.** Cada uno tiene 4 ataques con aviso en el suelo (pisotón, embestida o salto, y dos de distancia según su tipo), alterna entre pelear de cerca y de lejos, y se enfurece al 50 % de vida.
 - **Cartas de nivel:**
-  - Tipos: movimiento nuevo, mejora de movimiento, estadística y evolución de movimiento.
+  - Tipos: mejora del ataque, evolución del ataque, estadística y habilidad.
   - Estadísticas: Vigor, Potencia, Carrera, Reflejos, Coraza, Síntesis, Imán, Aprendizaje y Baya Zidra.
-  - Como mucho se ofrecen 2 potenciadores.
 - **Objetos equipables** (uno por partida): los sueltan los jefes y, al encontrar otro, eliges con cuál quedarte.
 - **Mejoras permanentes por Pokémon:** Vitalidad, Fuerza, Zancada, Reflejos, Coraza, Síntesis, Imán, Sabiduría, Fortuna y Golpe Crítico.
 - **Gachapón:**
@@ -49,7 +46,7 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
 - **Habilidades por datos** (`src/data/abilities.ts`): 19 habilidades con id, nombre, descripción, rareza (Común/Rara/Épica/Legendaria), límite de acumulación, efecto, condiciones de aparición (tipo de movimiento, tipo elemental, nivel) y exclusiones. Ejemplos: Doble Disparo, Abanico, Flancos, Retaguardia, Ráfaga, Perforación, Rebote, Rebote Muro, Cuerpo Llama, Punto Tóxico, Toque Gélido, Electricidad Estática, Francotirador, Golpe Certero, Detonación, Absorción, Pantalla Luz, Doble Equipo y Robustez.
 - **Sinergias** (7): se activan solas al reunir sus piezas y se anuncian con un aviso. Por ejemplo, Infierno (Cuerpo Llama + movimiento de Fuego), Cobertura Total (Abanico + Flancos + Retaguardia) y Nube Tóxica (Punto Tóxico + Detonación).
 - **Pasiva de cada Pokémon** según su tipo principal: Mar Llamas, Torrente, Espesura, Electricidad Estática, Levitación, Robustez, Intimidación… Además, los movimientos de su mismo tipo hacen +20 % (STAB).
-- **Cartas:** las habilidades entran en el sorteo de las 3 cartas junto a movimientos y estadísticas. Su color indica la rareza, y la carta avisa si completa una sinergia.
+- **Cartas:** las habilidades entran en el sorteo de las 3 cartas junto a las mejoras del ataque y las estadísticas. Su color indica la rareza, y la carta avisa si completa una sinergia.
 - **Jefes con 3 fases** (al 66 % y al 33 % de vida). Cada fase añade ataques propios con aviso en el suelo:
   - Geodude: Rodada y Magnitud.
   - Sudowoodo: Avalancha y Tumba Rocas.
@@ -72,6 +69,84 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
   - Añade la dependencia `three` (MIT, ~140 KB comprimidos).
   - Los obstáculos frenan a los enemigos con un radio máximo de 13, para que los grandes quepan por los puentes.
 - **Rendimiento:** como mucho hay 360 proyectiles a la vez; si se pasa, desaparecen antes los tuyos más viejos (`balance.perf`).
+
+## Ataque característico por tipos (v0.4)
+
+Cada Pokémon tiene **un solo ataque**, generado a partir de sus tipos. Todas las cartas de ataque lo mejoran a él. El catálogo es declarativo y está en `src/data/signatures.ts`. Los valores provisionales están en `balance.attack`.
+
+- **Cómo se genera:**
+  - El primer tipo **lanza** el ataque: da el comportamiento, la forma del proyectil, el daño por tipo y los valores base, que salen de los movimientos iniciales de antes.
+  - El segundo tipo **aporta su efecto**.
+  - Excepción: Normal cede el lanzamiento al otro tipo. Por eso Pidgey lanza el ataque Volador con el efecto Normal.
+  - El ataque es físico o especial según el lado fuerte del Pokémon.
+  - Las 18 × 17 combinaciones salen solas, sin lista cerrada, y un test las recorre todas.
+
+| Tipo | Comportamiento | Ataque puro → evolucionado | Efecto como segundo tipo |
+|---|---|---|---|
+| Normal | teledirigido | Rapidez → Meteoro | +10 % daño |
+| Fuego | proyectil | Ascuas → Llamarada | quema |
+| Agua | proyectil perforante | Pistola Agua → Hidrocañón | atraviesa y empuja |
+| Planta | bumerán (2 hojas) | Hoja Afilada → Lluevehojas | te cura al golpear |
+| Eléctrico | proyectil rapidísimo | Impactrueno → Trueno | puede paralizar |
+| Psíquico | proyectil que persigue | Confusión → Psicocarga | busca al enemigo |
+| Veneno | proyectil | Residuos → Bomba Lodo | envenena |
+| Tierra | bumerán | Bumerán de Barro → Tierra Viva | estalla en un área pequeña |
+| Volador | teledirigido (2 cuchillas) | Tajo Aéreo → Ataque Aéreo | más rápido y corrige el rumbo |
+| Bicho | rebote | Rayo Señal → Zumbido | se divide al impactar |
+| Roca | proyectil pesado | Lanzarrocas → Roca Afilada | más daño y empuje |
+| Hielo | teledirigido rápido | Canto Helado → Ventisca | ralentiza |
+| Lucha | esfera que persigue | Esfera Aural → Onda Certera | más críticos |
+| Fantasma | proyectil perforante | Bola Sombra → Pesadilla | atraviesa y castiga los estados |
+| Dragón | rayo | Furia Dragón → Cometa Draco | +15 % daño |
+| Hada | teledirigido que cura | Beso Drenaje → Fuerza Lunar | encandila y cura |
+| Acero | rebote | Disparo Espejo → Foco Resplandor | rebota a otro enemigo |
+| Siniestro | teledirigido | Golpe Bajo → Tajo Umbrío | más críticos |
+
+- **Nombres:**
+  - En las combinaciones, el nombre se forma con el sustantivo del primer tipo y el adjetivo del segundo, concordando en género. Por ejemplo, Llama aérea, Chorro tóxico o Hoja psíquica.
+  - Algunas combinaciones tienen nombre propio, por ejemplo Tornado de Plumas (Normal/Volador), Tormenta Glacial (Agua/Hielo), Enredadera Tóxica (Planta/Veneno), Tormenta Magnética (Eléctrico/Acero), Avalancha Sísmica (Roca/Tierra), Nova Astral (Psíquico/Hada), Ciclón Dracónico (Dragón/Volador) y Ala Ígnea (Fuego/Volador).
+- **Excepciones por especie:**
+  - Cubone y Marowak: Huesomerang.
+  - Pikachu y Raichu: Rayo, que salta entre enemigos.
+  - Farfetch'd: Puerro Cortante, que va y vuelve.
+  - Voltorb y Electrode: las descargas estallan.
+  - Exeggcute y Exeggutor: huevos que estallan.
+  - Koffing y Weezing: dejan una nube tóxica.
+  - Magikarp: Salpicadura, más débil.
+- **Mejoras (17 cartas):**
+
+  | Familia | Cartas |
+  |---|---|
+  | Daño | Potencia, Cadencia, Velocidad |
+  | Forma | Tamaño, Alcance |
+  | Cantidad y trayectoria | Proyectil extra, Perforación, Trayectoria ondulante |
+  | Efecto | Rebote, Persecución, División, Explosión, Rastro elemental |
+  | Estado | Punto débil, Impacto aturdidor, Intensidad elemental |
+  | Tipos | Fusión (solo con dos tipos): duplica el efecto del segundo tipo |
+
+  - Solo salen las cartas que **encajan** con el comportamiento: el rayo no recibe proyectiles extra y el bumerán no recibe Perforación. Tampoco salen las que ya están al máximo o en el tope de `balance.attack.caps`.
+  - De las 3 cartas, al menos una es para el ataque mientras le queden mejoras.
+- **Evolución del ataque:**
+  - Requisitos: nivel 10, 5 mejoras y la **mejora clave** de su comportamiento. La clave es Perforación para el proyectil, Proyectil extra para el teledirigido, el bumerán y la cadena, Rebote para el rebote y Tamaño para el rayo. Esa carta avisa de que es la clave y sale con más frecuencia.
+  - Cumplidos los requisitos, sale una carta dorada con el efecto.
+  - Al evolucionar, el ataque recibe el refuerzo de su comportamiento (por ejemplo, ×1,8 de daño, +2 proyectiles y +2 de perforación en el proyectil) más el de su tipo (Fuego quema el doble y estalla, Veneno deja un charco…).
+- **Si la especie evoluciona,** el ataque se transforma con sus tipos nuevos y **conserva las mejoras**. Por ejemplo, Charmeleon con Ascuas pasa a Charizard con Ala Ígnea.
+- **Efectos nuevos del motor:**
+  - Explosión en área (50 % del golpe).
+  - Zona persistente: como mucho 6 a la vez, sin amontonarse.
+  - División en fragmentos (45 %).
+  - Parálisis (0,6 s; un 35 % de eso a los jefes).
+  - Crítico extra.
+  - Trayectoria ondulante.
+  - Ni los fragmentos, ni las explosiones, ni las zonas repiten estos efectos, para evitar cadenas.
+- **Lo que se ve:**
+  - El proyectil tiene la forma de su tipo y deja una estela corta del color del segundo tipo.
+  - La estela crece con las mejoras. Con 6 mejoras aparece un halo, y al evolucionar el halo es dorado.
+  - La explosión usa el color del segundo tipo.
+  - Todo es translúcido y corto, para no tapar enemigos ni avisos.
+  - Respeta el tope de 360 proyectiles.
+- **Ficha del Pokémon:** la pestaña *Ataque* muestra el ataque, sus valores, a qué evoluciona y con qué requisitos, en qué se convierte si la especie evoluciona y qué mejoras le encajan.
+- **Pantalla de pausa:** muestra las mejoras cogidas.
 
 ## Menús (v0.3)
 
@@ -116,8 +191,7 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 | Obstáculos en las salas | 7 diseños de Brock; la sala en la que empieza a salir cada uno | `data/layouts.ts` |
 | Curva de experiencia | 5 + 2·L + L^1,35 por nivel, con un máximo de nivel 36 | `balance.experience` |
 | Evoluciones de especie | Nivel oficial. Las de piedra o intercambio no evolucionan en partida (pendiente). | `data/pokemon.ts` |
-| Movimiento inicial | Según el tipo principal (tabla de PokéSurvivor) | `data/moves.ts` |
-| Ataques simultáneos | Máximo 4 | `balance.upgrades` |
+| Ataque característico | Valores base, efectos por tipo, cartas, topes y requisitos de evolución (nivel 10, 5 mejoras + la clave) | `data/signatures.ts`, `balance.attack` |
 | Tickets | 5 + 5 + 10 por gimnasio, una sola vez; 1/200 por enemigo; 10 de bienvenida | `balance.rewards`, `balance.enemies` |
 | Oro de bienvenida | 500 (como en PokéSurvivor) | `balance.rewards` |
 | Gachapón | 45 / 30 / 17 / 6,5 / 1,5 %; garantía a las 70 tiradas | `balance.gacha` |
@@ -133,4 +207,3 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - Shinies: faltan sus sprites, que son otros ~8 MB.
 - Mundo abierto, terreno, biomas, climas y grietas con legendarios: no encajan directamente con las salas.
 - Cuentas, cooperativo, ranking, misiones, logros, test de personalidad e idiomas.
-- Iconos pixel art propios de cada movimiento: las cartas usan el color del tipo.

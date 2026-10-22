@@ -1,6 +1,6 @@
-import { PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
+import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
 import { ITEMS, ITEM_IDS } from '../../data/items';
-import { getMove } from '../../data/moves';
+import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
 import { getSpecies, obtainablePokemon, sideOf, type PokemonSpecies } from '../../data/pokemon';
 import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
 import { passiveOf } from '../../game/abilities';
@@ -88,7 +88,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
 
   // --- pestañas ---
   const tabs: { id: SubTab; label: string; svg: IconName }[] = [
-    { id: 'stats', label: 'Mejoras', svg: 'up' }, { id: 'moves', label: 'Movimientos', svg: 'star' },
+    { id: 'stats', label: 'Mejoras', svg: 'up' }, { id: 'moves', label: 'Ataque', svg: 'star' },
     { id: 'items', label: 'Objetos', svg: 'bag' }, { id: 'info', label: 'Información', svg: 'info' },
   ];
   const tabBar = h('div', { class: 'pk-tabs' }, ...tabs.map((t) => h('button', {
@@ -149,15 +149,34 @@ function upgrades(menu: MenuScreen, sp: PokemonSpecies): HTMLElement {
 }
 
 function moves(sp: PokemonSpecies): HTMLElement {
-  const start = getMove(sp.startingAttack);
-  return h('section', { class: 'panel2 pk-body' },
-    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Movimientos'),
-      h('p', {}, `Empieza con ${start.name}. En partida puede aprender estos ${sp.learnset.length} (los de su tipo y los de tipo Normal).`)),
-    h('div', { class: 'move-grid' }, ...sp.learnset.map((id) => {
-      const m = getMove(id);
-      return h('div', { class: `move-cell ${id === sp.startingAttack ? 'start' : ''}`, style: `--t:${TYPE_COLORS[m.type]}` },
-        h('b', {}, m.name), h('small', {}, `${TYPE_NAMES[m.type]} · ${m.desc}`));
-    })),
+  const sig = signatureFor(sp);
+  const raw = rawAttackNums(sig, [], false);
+  const s = attackStats(sig, [], false);
+  const A = BALANCE.attack;
+  const colorA = TYPE_COLORS[sig.primary];
+  const typeLine = sig.secondary ? `${TYPE_NAMES[sig.primary]} + ${TYPE_NAMES[sig.secondary]}` : TYPE_NAMES[sig.primary];
+  const stat = (k: string, v: string) => h('div', { class: 'info-line' }, h('span', {}, k), h('b', {}, v));
+  const next = sp.evolution ? getSpecies(sp.evolution.to) : null;
+  const nextSig = next ? signatureFor(next) : null;
+  const fits = ATTACK_UPGRADES.filter((u) => u.fits(sig, raw));
+  return h('section', { class: 'panel2 pk-body', 'data-testid': 'signature-attack' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Ataque característico'),
+      h('p', {}, 'Cada Pokémon tiene un único ataque que sale de sus tipos. Todas las cartas de ataque de la partida lo mejoran.')),
+    h('div', { class: 'move-cell start', style: `--t:${colorA}` },
+      h('b', {}, sig.name), h('small', {}, `${typeLine} · ${sig.cat === 'special' ? 'Especial' : 'Físico'}`), h('small', {}, sig.desc),
+      sig.note ? h('small', {}, sig.note) : null),
+    stat('Daño base', String(Math.round((s.dmg ?? 0) * 10) / 10)),
+    stat('Ataques por segundo', (1 / s.cd).toFixed(1)),
+    sig.kind === 'chain' ? stat('Saltos', String(s.count ?? 1)) : sig.kind === 'beam' ? null : stat('Proyectiles', String(s.count ?? 1)),
+    h('div', { class: 'move-cell', style: '--t:#ffd23a' },
+      h('b', {}, `Evoluciona a ${sig.evoName}`),
+      h('small', {}, `En partida, desde el nivel ${A.evoLevel} con ${A.evoUpgrades} mejoras del ataque, entre ellas ${ATTACK_UPGRADE[EVO_KEY[sig.kind]].name}.`),
+      h('small', {}, sig.evoText.replace(/^./, (c) => c.toUpperCase()))),
+    nextSig && nextSig.name !== sig.name
+      ? h('p', { class: 'note' }, `Al evolucionar a ${next!.name}, el ataque pasa a ser ${nextSig.name} y conserva las mejoras.`) : null,
+    h('h4', { class: 'pk-h4' }, 'Mejoras posibles'),
+    h('div', { class: 'move-grid' }, ...fits.map((u) => h('div', { class: 'move-cell', style: `--t:${colorA}` },
+      h('b', {}, u.name), h('small', {}, u.text(sig, raw))))),
   );
 }
 

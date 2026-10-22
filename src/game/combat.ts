@@ -66,11 +66,42 @@ function segDist2(ax: number, ay: number, bx: number, by: number, cx: number, cy
 }
 
 /** Golpe de un movimiento a un enemigo (daño ya multiplicado por el ataque del jugador). */
-function hit(w: World, m: OwnedMove, e: Enemy, dmg: number, dx: number, dy: number, knock = m.s.knock ?? 0, k = 1): void {
+function hit(w: World, m: OwnedMove, e: Enemy, dmg: number, dx: number, dy: number, knock = m.s.knock ?? 0, k = 1, direct = true): void {
+  w.hitEnemy(e, dmg * k, m.def.type, categoryOf(m.def), dx, dy, knock / sp(), fxOf(m));
+  if (direct) impact(w, m, e, e.x, e.y, dmg * k);
+}
+
+const fxOf = (m: OwnedMove) => {
   const s = m.s;
-  w.hitEnemy(e, dmg * k, m.def.type, categoryOf(m.def), dx, dy, knock / sp(), {
-    burn: s.burn, poison: s.poison, slow: s.slow, drain: s.drain, move: m, hex: s.hex,
-  });
+  return { burn: s.burn, poison: s.poison, slow: s.slow, drain: s.drain, move: m, hex: s.hex, crit: s.crit, shock: s.shock };
+};
+
+/** Color secundario del ataque (estela, explosiones): el del tipo que aporta su efecto. */
+const accent = (m: OwnedMove) => TYPE_COLORS[m.def.trail ?? m.def.type];
+
+/**
+ * Efectos al impactar del ataque característico: explosión en área y zona
+ * persistente. Los golpes de la explosión y de la zona no los repiten.
+ */
+function impact(w: World, m: OwnedMove, from: Enemy, x: number, y: number, dmg: number): void {
+  const s = m.s;
+  const A = BALANCE.attack;
+  if (s.explode) {
+    const r = s.explode;
+    w.ring(x, y, 4, r, accent(m), 0.28, 3);
+    w.burst(x, y - 6, color(m), 6);
+    for (const e of w.enemies) {
+      if (e === from || e.hp <= 0 || dist(e, { x, y }) > r + e.r) continue;
+      w.hitEnemy(e, dmg * A.explodeK, m.def.type, categoryOf(m.def), e.x - x, e.y - y, 0, { ...fxOf(m), drain: 0, shock: 0 });
+    }
+  }
+  if (s.zone) {
+    const mine = w.fields.filter((f) => f.kind === 'patch' && f.move === m && !f.gone);
+    // Sin amontonar: una zona nueva solo si no hay otra muy cerca, y como mucho 6.
+    if (mine.some((f) => dist(f, { x, y }) < s.zone! * 0.7)) return;
+    for (const f of mine.slice(0, Math.max(0, mine.length - 5))) f.gone = true;
+    w.fields.push({ kind: 'patch', move: m, color: accent(m), x, y, t: 0, life: A.zoneLife, r: s.zone, dmg: dmg * A.zoneK, tick: 0.2 });
+  }
 }
 
 const power = (w: World, m: OwnedMove) => (m.s.dmg ?? 0) * w.atkFor(categoryOf(m.def));
@@ -156,8 +187,16 @@ function spawnProjectile(w: World, m: OwnedMove, x: number, y: number, a: number
     dmg: power(w, m), friendly: true, element: m.def.type, cat: categoryOf(m.def), pierce: s.pierce ?? 0,
     life: s.life ?? 1.5, t: 0, color: color(m), hits: new Set(), homing: s.homing ?? 0, boom: 0, back: false,
     bounce: s.bounce ?? 0, burn: s.burn ?? 0, poison: s.poison ?? 0, slow: s.slow ?? 0, knock: s.knock ?? 0,
-    drain: s.drain ?? 0, move: m, wallBounce: 0, shape: m.def.type, ...extra,
+    drain: s.drain ?? 0, move: m, wallBounce: 0, shape: m.def.shape ?? m.def.type,
+    wobble: s.wobble, trail: m.def.trail ? TYPE_COLORS[m.def.trail] : undefined, tier: tierOf(w, m), ...extra,
   });
+}
+
+/** Nivel visual del ataque (0-3): crece con las mejoras y es máximo al evolucionar. */
+function tierOf(w: World, m: OwnedMove): number {
+  if (!m.def.id.startsWith('sig:')) return 0;
+  const A = w.player.attack;
+  return A.evolved ? 3 : Math.min(2, Math.floor(A.ups.length / 3));
 }
 
 /** Direcciones extra de las habilidades (Abanico, Flancos, Retaguardia). */
@@ -407,7 +446,9 @@ function stunZone(w: World, m: OwnedMove): void {
 }
 
 function blast(w: World, f: Field, r: number, k = 1): void {
-  for (const e of w.enemies) if (dist(e, f) < r + e.r) hit(w, f.move, e, f.dmg * k, e.x - f.x, e.y - f.y);
+  // Las zonas del ataque (Rastro elemental) no vuelven a estallar ni a dejar zona.
+  const direct = !f.move.def.id.startsWith('sig:');
+  for (const e of w.enemies) if (dist(e, f) < r + e.r) hit(w, f.move, e, f.dmg * k, e.x - f.x, e.y - f.y, f.move.s.knock ?? 0, 1, direct);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,9 +495,12 @@ function nearestEnemy(w: World, x: number, y: number, range: number, skip?: Set<
   return best;
 }
 
+const WOBBLE_W = 13;
+
 export function updateProjectiles(w: World, dt: number): void {
   const p = w.player;
   const keep: Projectile[] = [];
+  const spawned: Projectile[] = [];
   for (const pr of w.projectiles) {
     pr.t += dt;
     if (pr.friendly && pr.boom) {
@@ -486,6 +530,13 @@ export function updateProjectiles(w: World, dt: number): void {
     }
     pr.x += pr.vx * dt;
     pr.y += pr.vy * dt;
+    // Trayectoria ondulante: vaivén lateral alrededor del rumbo.
+    if (pr.wobble) {
+      const l = Math.hypot(pr.vx, pr.vy) || 1;
+      const side = pr.wobble * WOBBLE_W * Math.cos(pr.t * WOBBLE_W) * dt;
+      pr.x += (-pr.vy / l) * side;
+      pr.y += (pr.vx / l) * side;
+    }
     // Rebote en las paredes (Rebote Muro).
     if (pr.friendly && pr.wallBounce > 0) {
       const mg = BALANCE.arena.margin;
@@ -526,10 +577,29 @@ export function updateProjectiles(w: World, dt: number): void {
         if (Math.hypot(pr.x - e.x, pr.y - (e.y - e.bodyH * 0.4)) < pr.r + e.r) {
           pr.hits.add(e.id);
           const l = Math.hypot(pr.vx, pr.vy) || 1;
+          const ms = pr.move?.s;
           w.hitEnemy(e, pr.dmg, pr.element, pr.cat, pr.vx / l, pr.vy / l, pr.knock / sp(), {
             burn: pr.burn, poison: pr.poison, slow: pr.slow, drain: pr.drain, move: pr.move,
+            hex: ms?.hex, crit: ms?.crit, shock: pr.frag ? 0 : ms?.shock,
           });
           w.burst(pr.x, pr.y, pr.color, 3);
+          if (pr.move && !pr.frag) {
+            impact(w, pr.move, e, e.x, e.y, pr.dmg);
+            // División: al primer impacto salen fragmentos en abanico hacia delante.
+            if (ms?.split && pr.hits.size === 1) {
+              const n = Math.round(ms.split) + 1;
+              const a0 = Math.atan2(pr.vy, pr.vx);
+              const speed = Math.hypot(pr.vx, pr.vy) || 300;
+              for (let i = 0; i < n; i++) {
+                const a = a0 + (i / (n - 1) - 0.5) * 1.1;
+                spawned.push({
+                  ...pr, id: w.newId(), vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, r: pr.r * 0.7,
+                  dmg: pr.dmg * BALANCE.attack.splitK, pierce: 0, bounce: 0, homing: 0, life: 0.5, t: 0,
+                  hits: new Set(pr.hits), frag: true, wobble: 0, boom: 0, back: false,
+                });
+              }
+            }
+          }
           // Rebote: sale hacia el enemigo más cercano que aún no ha tocado.
           if (pr.bounce > 0) {
             const next = nearestEnemy(w, e.x, e.y, 220 * sp(), pr.hits);
@@ -552,6 +622,7 @@ export function updateProjectiles(w: World, dt: number): void {
     }
     if (alive) keep.push(pr);
   }
+  keep.push(...spawned);
   // Tope de proyectiles (rendimiento en móvil): desaparecen antes los tuyos más viejos.
   const cap = BALANCE.perf.maxProjectiles;
   if (keep.length > cap) {

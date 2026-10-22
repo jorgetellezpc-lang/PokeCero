@@ -338,8 +338,31 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, p: Projectile, tim
     drawShape(ctx, shapeFor(null, p.element), p.element, p.x, p.y, { angle, frame: time * 10, scale: 0.85 });
     return;
   }
-  const shape = shapeFor(p.move?.def.id ?? null, p.element);
+  const shape = p.move?.def.shape ?? shapeFor(p.move?.def.id ?? null, p.element);
   const scale = Math.max(0.6, Math.min(1.6, p.r / 6));
+  const tier = p.tier ?? 0;
+  // Estela (color del segundo tipo) y halo que crecen con las mejoras. Cortos
+  // y translúcidos para no tapar enemigos ni avisos.
+  if (p.trail || tier) {
+    const k = 0.03 + tier * 0.01;
+    ctx.save();
+    ctx.globalAlpha = 0.35 + tier * 0.08;
+    ctx.strokeStyle = p.trail ?? p.color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = p.r * (0.8 + tier * 0.15);
+    ctx.beginPath();
+    ctx.moveTo(p.x - p.vx * k, p.y - p.vy * k);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    if (tier >= 2) {
+      ctx.globalAlpha = tier === 3 ? 0.35 : 0.2;
+      ctx.fillStyle = tier === 3 ? '#ffe9a0' : p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * (tier === 3 ? 1.9 : 1.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
   const a = isDirectional(shape) ? angle : spins(shape) ? time * 10 : 0;
   drawShape(ctx, shape, p.element, p.x, p.y, { angle: a, frame: frameCount(shape) > 1 ? time * 12 : 0, scale });
 }

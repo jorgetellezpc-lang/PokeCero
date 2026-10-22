@@ -18,6 +18,7 @@ import { Scene3D } from '../../render/scene3d';
 import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
 import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
+import { ATTACK_UPGRADE } from '../../data/signatures';
 
 // Pantalla de partida: conecta World (lógica), Renderer (dibujo), entrada
 // táctil/teclado, sonido y la interfaz HTML (HUD, cartas, objetos, pausa y
@@ -26,7 +27,7 @@ import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
 const STEP = 1 / 60;
 
 const FAMILY_CLASS: Record<UpgradeChoice['family'], string> = {
-  newMove: 'fam-new', moveUpgrade: 'fam-up', moveEvolution: 'fam-evo', stat: 'fam-stat', ability: 'fam-ability', fallback: 'fam-fb',
+  attack: 'fam-up', attackEvolution: 'fam-evo', stat: 'fam-stat', ability: 'fam-ability', fallback: 'fam-fb',
 };
 
 function songForRoom(room: number, kind: string): SongName {
@@ -267,6 +268,9 @@ export class RunScreen implements Screen {
         case 'moveEvolved':
           this.showBanner(`¡${ev.from} ha evolucionado a ${ev.to}!`, 'gold');
           break;
+        case 'attackChanged':
+          toast(`Tu ataque ahora es ${ev.to}`);
+          break;
         case 'synergy':
           this.showBanner(`¡Sinergia: ${ev.name}!`, 'gold');
           toast(ev.description);
@@ -328,7 +332,7 @@ export class RunScreen implements Screen {
     this.app.audio.sfx('level');
     let picked = false;
     const cards = w.choices.map((c, i) => {
-      const color = c.family === 'moveEvolution' ? '#ffd23f' : c.rarity ? RARITY_INFO[c.rarity].color : c.element ? TYPE_COLORS[c.element] : c.family === 'stat' ? '#58a8f8' : '#c8a040';
+      const color = c.family === 'attackEvolution' ? '#ffd23f' : c.rarity ? RARITY_INFO[c.rarity].color : c.element ? TYPE_COLORS[c.element] : c.family === 'stat' ? '#58a8f8' : '#c8a040';
       const btn = h('button', {
         class: `card ${FAMILY_CLASS[c.family]}${c.rarity ? ` rarity-${c.rarity}` : ''}${c.synergy ? ' has-synergy' : ''}`, style: `--accent:${color}`, 'data-testid': `card-${i}`, disabled: true,
         onclick: () => {
@@ -426,6 +430,7 @@ export class RunScreen implements Screen {
       h('div', { class: 'move-list' }, ...p.moves.map((m) => h('div', { class: 'result-line' },
         h('span', { style: `color:${TYPE_COLORS[m.def.type]}` }, `${m.name} ${m.evolved ? '★' : `Nv ${m.level}`}`),
         h('b', {}, `${Math.round(m.dealt)} daño`)))),
+      attackSummary(p),
       abilityList(p),
       h('button', { class: 'btn btn-play', 'data-testid': 'resume', onclick: () => this.togglePause() }, 'Continuar'),
       h('button', { class: 'btn btn-danger', 'data-testid': 'abandon', onclick: () => this.finish(false, true) }, 'Abandonar partida'),
@@ -476,15 +481,29 @@ function line(label: string, value: string): HTMLElement {
   return h('div', { class: 'result-line' }, h('span', {}, label), h('b', {}, value));
 }
 
+const ATTACK_GLYPH: Record<string, string> = {
+  potencia: '▲', cadencia: '»', velocidad: '➤', tamano: '●', alcance: '↗', multi: '⁂', perforacion: '➶', serpenteo: '∿',
+  rebote: '↯', persecucion: '◎', division: '⋔', explosion: '✸', zona: '◌', critico: '✦', aturdir: 'ϟ', intensidad: '♨', fusion: '⧉',
+};
+
 function cardGlyph(c: UpgradeChoice): string {
   switch (c.family) {
-    case 'newMove': return '✦';
-    case 'moveUpgrade': return '▲';
-    case 'moveEvolution': return '★';
+    case 'attack': return ATTACK_GLYPH[(c.action as { upgradeId: string }).upgradeId] ?? '▲';
+    case 'attackEvolution': return '★';
     case 'stat': return '◆';
     case 'ability': return ABILITIES[(c.action as { abilityId: string }).abilityId]?.icon ?? '✚';
     default: return '●';
   }
+}
+
+/** Mejoras cogidas del ataque (pantalla de pausa). */
+function attackSummary(p: World['player']): HTMLElement | null {
+  const A = p.attack;
+  if (!A.ups.length) return h('p', { class: 'note' }, A.sig.desc);
+  const count = new Map<string, number>();
+  for (const id of A.ups) count.set(id, (count.get(id) ?? 0) + 1);
+  return h('p', { class: 'note', 'data-testid': 'attack-ups' },
+    [...count].map(([id, n]) => `${ATTACK_UPGRADE[id]?.name ?? id}${n > 1 ? ` ×${n}` : ''}`).join(' · '));
 }
 
 /** Pasiva, habilidades y sinergias de la partida (pantalla de pausa). */

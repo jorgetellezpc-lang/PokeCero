@@ -692,6 +692,7 @@
 .move-cell b { font: 900 13px var(--m-body); }
 .move-cell small { font: 600 11px/1.3 var(--m-body); color: #c8d4ff; }
 .move-cell.start { box-shadow: 0 0 0 2px #ffd23a; }
+.pk-h4 { font: 900 14px var(--m-body); color: #ffd23a; margin: 10px 0 4px; }
 .info-line { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid #22396f; font: 700 14px var(--m-body); }
 .info-line b { color: #ffd23a; }
 

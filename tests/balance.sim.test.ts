@@ -67,7 +67,7 @@ export function bot(w: World) {
   return l > 0.05 ? { x: fx / l, y: fy / l } : { x: 0, y: 0 };
 }
 
-for (const test of [true, false]) for (const sp of ['charmander', 'squirtle', 'bulbasaur', 'pikachu']) {
+for (const test of [true, false]) for (const sp of (import.meta.env.SIM_SPECIES ?? 'charmander,squirtle,bulbasaur,pikachu').split(',')) {
   it.runIf(import.meta.env.SIM)(`sim ${sp} test=${test}`, () => {
     const res: string[] = [];
     for (let seed = 1; seed <= 4; seed++) {
@@ -82,7 +82,7 @@ for (const test of [true, false]) for (const sp of ['charmander', 'squirtle', 'b
         deathRoom = w.room;
       }
       const p = w.player;
-      res.push(`seed${seed}: ${w.phase} sala ${deathRoom} nv ${p.level} ${p.species.id} ${p.moves.map((m) => `${m.def.id}${m.evolved ? '★' : m.level}`).join(',')} [${Object.entries(p.abilities).map(([k, n]) => `${k}×${n}`).join(',')}] ${(t / 3600).toFixed(1)}min kills ${w.kills}`);
+      res.push(`seed${seed}: ${w.phase} sala ${deathRoom} nv ${p.level} ${p.species.id} ${p.moves[0].name}${p.attack.evolved ? '★' : ''} {${p.attack.ups.join(',')}} [${Object.entries(p.abilities).map(([k, n]) => `${k}×${n}`).join(',')}] ${(t / 3600).toFixed(1)}min kills ${w.kills}`);
     }
     console.log(sp, test ? '(modo prueba)' : '(50 salas)', '\n' + res.join('\n'));
   }, 300000);

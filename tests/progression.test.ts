@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/config/balance';
-import { getMove, maxLevelOf, poolFor } from '../src/data/moves';
 import { getSpecies, POKEMON } from '../src/data/pokemon';
 import { xpToNext } from '../src/game/progression';
-import { Rng } from '../src/game/rng';
-import { generateChoices } from '../src/game/upgradeGenerator';
 import { emptyRoom, makeWorld, run, spawnAt } from './helpers';
 
 describe('experiencia y subidas de nivel', () => {
@@ -40,31 +37,13 @@ describe('experiencia y subidas de nivel', () => {
     };
     pick({ type: 'stat', stat: 'atk' } as never);
     expect(w.player.atkMul).toBeCloseTo(atk0 * 1.1);
-    pick({ type: 'newMove', moveId: 'fire-spin' } as never);
-    expect(w.player.moves.map((m) => m.def.id)).toContain('fire-spin');
-    const ember = w.player.moves[0];
-    const dmg0 = ember.s.dmg!;
-    pick({ type: 'moveUpgrade', moveId: 'ember' } as never);
-    pick({ type: 'moveUpgrade', moveId: 'ember' } as never);
-    expect(ember.level).toBe(3);
-    expect(ember.s.dmg!).toBeGreaterThan(dmg0);
-  });
-
-  it('un movimiento al máximo con su estadística cogida da una carta dorada de evolución', () => {
-    const w = makeWorld();
-    const ember = w.player.moves[0];
-    ember.level = maxLevelOf(ember.def);
-    w.player.statsTaken.atk = 1; // Ascuas → Llamarada necesita Potencia
-    const c = generateChoices(w.player, new Rng(1));
-    expect(c[0].family).toBe('moveEvolution');
-    w.pendingLevelUps = 1;
-    w.phase = 'levelup';
-    w.choices = c;
-    const before = ember.s.dmg!;
-    w.chooseUpgrade(0);
-    expect(ember.evolved).toBe(true);
-    expect(ember.name).toBe('Llamarada');
-    expect(ember.s.dmg!).toBeGreaterThan(before);
+    const atk = w.player.moves[0];
+    const dmg0 = atk.s.dmg!;
+    pick({ type: 'attack', upgradeId: 'potencia' } as never);
+    pick({ type: 'attack', upgradeId: 'potencia' } as never);
+    expect(w.player.attack.ups).toEqual(['potencia', 'potencia']);
+    expect(atk.level).toBe(3);
+    expect(atk.s.dmg!).toBeCloseTo(dmg0 * 1.22 * 1.22);
   });
 
   it('una mejora de daño hace que el enemigo muera antes', () => {
@@ -104,31 +83,14 @@ describe('experiencia y subidas de nivel', () => {
   });
 });
 
-describe('Pokémon y movimientos', () => {
-  it('hay 151 Pokémon de Kanto jugables, cada uno con movimientos de sus tipos', () => {
+describe('Pokémon', () => {
+  it('hay 151 Pokémon de Kanto jugables y cada uno empieza con un único ataque', () => {
     const kanto = Object.values(POKEMON).filter((p) => p.dex <= 151);
     expect(kanto).toHaveLength(151);
-    for (const p of kanto) {
-      expect(p.learnset.length).toBeGreaterThanOrEqual(10);
-      expect(p.learnset).toContain(p.startingAttack);
-      for (const id of p.learnset) {
-        const t = getMove(id).type;
-        expect(t === 'normal' || p.types.includes(t), `${p.name}: ${id}`).toBe(true);
-      }
+    for (const p of kanto.slice(0, 151)) {
+      const w = makeWorld({ speciesId: p.id });
+      expect(w.player.moves, p.name).toHaveLength(1);
+      expect(w.player.moves[0].def.id.startsWith('sig:')).toBe(true);
     }
-    expect(poolFor(['fire'])).toContain('ember');
-  });
-
-  it('el generador solo ofrece movimientos compatibles y respeta el máximo', () => {
-    const w = makeWorld();
-    const rng = new Rng(3);
-    for (let i = 0; i < 100; i++) {
-      for (const c of generateChoices(w.player, rng)) {
-        if (c.action.type === 'newMove') expect(w.player.species.learnset).toContain(c.action.moveId);
-      }
-    }
-    for (const id of ['tackle', 'fire-spin', 'flamethrower']) w.addMove(id);
-    expect(w.player.moves).toHaveLength(BALANCE.upgrades.maxAttacks);
-    for (let i = 0; i < 50; i++) expect(generateChoices(w.player, rng).some((c) => c.family === 'newMove')).toBe(false);
   });
 });

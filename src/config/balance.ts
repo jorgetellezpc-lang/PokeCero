@@ -119,15 +119,33 @@ export const BALANCE = {
     shinyRate: 0,
   },
 
+  /** Ataque característico por tipos (src/data/signatures.ts). PROVISIONAL. */
+  attack: {
+    /**
+     * Multiplicador de daño del ataque. Antes se sumaban hasta 4 movimientos a
+     * la vez; ahora hay uno solo y concentra ese daño.
+     */
+    power: 1.8,
+    /** Evolución del ataque: nivel mínimo, mejoras cogidas y la mejora clave de su comportamiento. */
+    evoLevel: 10,
+    evoUpgrades: 5,
+    /** Daño de la explosión, de la zona (por tic de 0,5 s) y de cada fragmento, sobre el golpe. */
+    explodeK: 0.5,
+    zoneK: 0.3,
+    zoneLife: 2.2,
+    splitK: 0.45,
+    /** Segundos de aturdimiento al electrocutar (a los jefes, ×0,35). */
+    shockStun: 0.6,
+    /** Topes de los efectos que se acumulan. */
+    caps: { slow: 0.6, shock: 0.4, crit: 0.45, burn: 4, poison: 4, count: 7, pierce: 6, bounce: 6, split: 3, explode: 60 },
+  },
   upgrades: {
     /** Cartas por subida de nivel (blueprint: exactamente 3). */
     choices: 3,
-    /** Máximo de movimientos simultáneos. PENDIENTE de diseño (PokéSurvivor: 4). */
-    maxAttacks: 4,
-    /** Máximo de potenciadores (no hacen daño) que se ofrecen. */
-    maxBuffs: 2,
-    /** Pesos de cada tipo de carta (PokéSurvivor). */
-    weights: { newMove: 10, evolution: 40, moveUpgrade: 8, stat: 4, statFull: 7, statForEvolution: 14, ability: 9 },
+    /** Un único ataque por Pokémon: todas las cartas lo mejoran a él. */
+    maxAttacks: 1,
+    /** Pesos de cada tipo de carta. `attackKey`: la mejora que falta para evolucionar el ataque. */
+    weights: { attack: 9, attackKey: 16, evolution: 40, stat: 4, statFull: 4, ability: 9 },
     /** Curación de la carta de reserva (solo si no hay suficientes opciones). */
     fallbackHeal: 0.35,
     fallbackGold: 25,

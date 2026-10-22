@@ -4,10 +4,12 @@ import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
 import { ARENAS, arenaObstacles, type ArenaDef } from '../data/arenas';
 import { layoutFor, type Obstacle } from '../data/layouts';
-import { evolutionOf, getMove, maxLevelOf, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
+import { getMove, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
+import { ATTACK_UPGRADE, attackDef, attackEvolutionReady, attackStats, signatureFor } from '../data/signatures';
 import { DEX, getSpecies } from '../data/pokemon';
 import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
 import { typeMultiplier } from '../data/typeChart';
+import { TYPE_COLORS } from '../data/typeColors';
 import type { ElementType, GymDef } from '../data/types';
 import { Animator, bodyHeight, bodyRadius, hovers, playerScale } from '../render/animator';
 import { recomputeMods } from './abilities';
@@ -38,6 +40,7 @@ export type WorldEvent =
   | { type: 'levelUp'; level: number }
   | { type: 'evolved'; from: string; to: string }
   | { type: 'moveEvolved'; from: string; to: string }
+  | { type: 'attackChanged'; from: string; to: string }
   | { type: 'bossSpawn'; name: string; title: string }
   | { type: 'bossEnraged'; name: string }
   | { type: 'bossPhase'; name: string; phase: number }
@@ -170,13 +173,14 @@ export class World {
       regenFlat: perk.regen, magnet: BALANCE.player.magnet * perk.magnetMul, xpMul: perk.xpMul,
       coinMul: perk.coinMul, crit: perk.crit,
       buffs: { patk: buff(), satk: buff(), spd: buff(), def: buff(), regen: buff() },
-      invuln: 0, level: 1, xp: 0, moves: [], statsTaken: {}, item: null, focusCd: 0,
+      invuln: 0, level: 1, xp: 0, moves: [], attack: { sig: signatureFor(species), ups: [], evolved: false },
+      statsTaken: {}, item: null, focusCd: 0,
       aim: -Math.PI / 2, moveAngle: -Math.PI / 2, moving: false, hitFlash: 0, lastPatch: null,
       abilities: {}, mods: { ...BASE_MODS }, synergies: [], sturdyLeft: 0, guardAngle: 0,
     };
     this.player.hp = this.player.maxHp;
     this.updatePlayerBody();
-    this.addMove(species.startingAttack);
+    this.rebuildAttack();
     recomputeMods(this.player);
     this.startRoom(0);
   }
@@ -591,14 +595,14 @@ export class World {
   /** Golpe del jugador a un enemigo. */
   hitEnemy(
     e: Enemy, base: number, element: ElementType, cat: MoveCategory, dx = 0, dy = 0, knock = 0,
-    fx: { burn?: number; poison?: number; slow?: number; drain?: number; move?: OwnedMove | null; hex?: number } = {},
+    fx: { burn?: number; poison?: number; slow?: number; drain?: number; move?: OwnedMove | null; hex?: number; crit?: number; shock?: number } = {},
   ): void {
     if (e.hp <= 0 || e.hidden) return;
     const p = this.player;
     const M = p.mods;
     const typeK = typeMultiplier(element, e.types);
     const def = cat === 'special' ? e.def.sd : cat === 'physical' ? e.def.df : 75;
-    const critChance = p.crit + M.crit;
+    const critChance = p.crit + M.crit + (fx.crit ?? 0);
     const crit = critChance > 0 && this.rng.next() < critChance;
     let dmg = base * typeK * guard(def) * (crit ? BALANCE.player.critMult + M.critMult : 1) * M.dmg;
     // Mismo tipo que el Pokémon (STAB) y Mar Llamas/Torrente/Espesura/Enjambre con poca vida.
@@ -631,6 +635,11 @@ export class World {
     if (poison) { e.poison = Math.min(8, e.poison + poison); e.poisonT = 4; }
     if (slow) { e.slow = Math.max(e.slow, slow); e.slowT = Math.max(e.slowT, 1.2); }
     if (cat && M.stunChance && e.hp > 0 && this.rng.next() < M.stunChance) e.stunT = Math.max(e.stunT, e.boss ? 0.3 : 0.8);
+    // Parálisis del ataque (tipo Eléctrico, Impacto aturdidor…).
+    if (fx.shock && e.hp > 0 && this.rng.next() < fx.shock) {
+      e.stunT = Math.max(e.stunT, BALANCE.attack.shockStun * (e.boss ? 0.35 : 1));
+      this.burst(e.x, e.y - e.bodyH * 0.6, '#ffe14d', 4);
+    }
     // Golpe Certero: KO directo a un enemigo normal con poca vida.
     if (cat && M.execute && !e.boss && e.hp > 0 && e.hp < e.maxHp * M.executeAt && this.rng.next() < M.execute) {
       e.hp = 0;
@@ -818,6 +827,11 @@ export class World {
     p.baseSpeed = p.species.stats.speed;
     p.hp = Math.min(p.maxHp, p.maxHp * ratio + p.maxHp * 0.25);
     this.updatePlayerBody();
+    // El ataque se transforma con los tipos nuevos y conserva sus mejoras.
+    const oldName = p.moves[0]?.name;
+    p.attack.sig = signatureFor(p.species);
+    this.rebuildAttack();
+    if (oldName && oldName !== p.moves[0].name) this.events.push({ type: 'attackChanged', from: oldName, to: p.moves[0].name });
     this.refreshMods();
     this.burst(p.x, p.y - 12, '#ffffff', 30);
     this.ring(p.x, p.y, 10, 80, '#ffffff', 0.6, 4);
@@ -837,28 +851,25 @@ export class World {
     const p = this.player;
     const act = choice.action;
     switch (act.type) {
-      case 'newMove':
-        this.addMove(act.moveId);
-        break;
-      case 'moveUpgrade': {
-        const m = p.moves.find((x) => x.def.id === act.moveId);
-        if (m && m.level < maxLevelOf(m.def)) {
-          m.level++;
-          m.s = moveStats(m.def, m.level, m.evolved);
+      case 'attack': {
+        const u = ATTACK_UPGRADE[act.upgradeId];
+        if (u && p.attack.ups.filter((x) => x === u.id).length < u.max) {
+          p.attack.ups.push(u.id);
+          this.rebuildAttack();
         }
         break;
       }
-      case 'moveEvolution': {
-        const m = p.moves.find((x) => x.def.id === act.moveId);
-        const evo = evolutionOf(act.moveId);
-        if (m && evo && !m.evolved) {
-          const old = m.name;
-          m.evolved = true;
-          m.name = evo.name;
-          m.s = moveStats(m.def, m.level, true);
+      case 'attackEvolution': {
+        const A = p.attack;
+        if (attackEvolutionReady(A.sig, A.ups, p.level, A.evolved)) {
+          const old = p.moves[0].name;
+          A.evolved = true;
+          this.rebuildAttack();
           this.ring(p.x, p.y, 8, 120, '#ffd23f', 0.8, 6);
+          this.ring(p.x, p.y, 4, 70, TYPE_COLORS[A.sig.secondary ?? A.sig.primary], 0.6, 4);
           this.burst(p.x, p.y - 12, '#ffe14d', 40);
-          this.events.push({ type: 'moveEvolved', from: old, to: m.name });
+          this.shake = Math.max(this.shake, 0.2);
+          this.events.push({ type: 'moveEvolved', from: old, to: p.moves[0].name });
           this.events.push({ type: 'sfx', name: 'legend' });
         }
         break;
@@ -910,6 +921,21 @@ export class World {
     void RUN_STAT_UPGRADES;
   }
 
+  /** Rehace el ataque característico (al empezar, al mejorarlo y al evolucionar). */
+  rebuildAttack(): void {
+    const p = this.player;
+    const A = p.attack;
+    const def = attackDef(A.sig, A.evolved);
+    const s = attackStats(A.sig, A.ups, A.evolved);
+    const cur = p.moves[0];
+    if (cur && cur.def.id.startsWith('sig:')) {
+      Object.assign(cur, { def, name: def.name, s, evolved: A.evolved, level: 1 + A.ups.length });
+    } else {
+      p.moves.unshift({ def, level: 1, evolved: false, name: def.name, t: 0.3, angle: 0, s, dealt: 0 });
+    }
+  }
+
+  /** Movimiento suelto del catálogo antiguo (lo usan los tests de comportamientos). */
   addMove(id: string): void {
     const p = this.player;
     if (p.moves.some((m) => m.def.id === id)) return;

@@ -46,6 +46,19 @@ export interface MoveNums {
   slow?: number;
   drain?: number;
   hex?: number;
+  // --- efectos del ataque característico (signatures.ts) ---
+  /** Radio de la explosión al impactar (daño en área). */
+  explode?: number;
+  /** Radio de la zona persistente que deja al impactar. */
+  zone?: number;
+  /** Fragmentos extra al primer impacto. */
+  split?: number;
+  /** Probabilidad de aturdir al impactar. */
+  shock?: number;
+  /** Probabilidad extra de crítico. */
+  crit?: number;
+  /** Amplitud de la trayectoria ondulante. */
+  wobble?: number;
 }
 
 export interface MoveDef extends MoveNums {
@@ -55,6 +68,11 @@ export interface MoveDef extends MoveNums {
   kind: MoveKind;
   desc: string;
   stat?: BuffStat;
+  /** Categoría fija (el ataque característico usa el lado fuerte del Pokémon). */
+  cat?: 'physical' | 'special';
+  /** Forma del proyectil (vfx) y tipo secundario para la estela. */
+  shape?: string;
+  trail?: ElementType;
 }
 
 export type MoveMods = Partial<Record<keyof MoveNums, number>>;
@@ -354,7 +372,7 @@ const PHYSICAL = new Set([
 ]);
 
 export type MoveCategory = 'physical' | 'special' | null;
-export const categoryOf = (m: MoveDef): MoveCategory => (m.kind === 'buff' ? null : PHYSICAL.has(m.id) ? 'physical' : 'special');
+export const categoryOf = (m: MoveDef): MoveCategory => (m.kind === 'buff' ? null : m.cat ?? (PHYSICAL.has(m.id) ? 'physical' : 'special'));
 
 export const MOVES: Record<string, MoveDef> = Object.fromEntries(RAW.map((m) => [m.id, m]));
 export const ALL_MOVES = RAW;
@@ -367,33 +385,8 @@ export function getMove(id: string): MoveDef {
   return m;
 }
 
-const POOL: Partial<Record<ElementType, string[]>> = {};
-for (const m of RAW) (POOL[m.type] ??= []).push(m.id);
-
-/** Movimientos que puede aprender un Pokémon: los de sus tipos + los normales. */
-export function poolFor(types: ElementType[]): string[] {
-  const ids = new Set(POOL.normal);
-  for (const t of types) for (const id of POOL[t] ?? []) ids.add(id);
-  return [...ids];
-}
-
-// Todos empiezan con un ataque A DISTANCIA (estilo Archero: hay que pararse
-// para atacar, y un golpe cuerpo a cuerpo obligaría a pararse pegado al enemigo).
-const START: Partial<Record<ElementType, string>> = {
-  fire: 'ember', water: 'water-gun', grass: 'razor-leaf', electric: 'thunder-shock', psychic: 'confusion',
-  poison: 'sludge', ground: 'bonemerang', flying: 'air-slash', bug: 'signal-beam', rock: 'rock-throw', ice: 'ice-shard',
-  fighting: 'aura-sphere', ghost: 'shadow-ball', dragon: 'dragon-rage', fairy: 'draining-kiss', steel: 'mirror-shot',
-  dark: 'sucker-punch', normal: 'swift',
-};
-
-/** Movimiento inicial según el tipo principal. PROVISIONAL. */
-export function startFor(types: ElementType[]): string {
-  for (const t of types) if (START[t]) return START[t]!;
-  return 'tackle';
-}
-
 const MULT: (keyof MoveNums)[] = ['dmg', 'cd', 'speed', 'radius', 'dur', 'amount', 'arc', 'width', 'spread', 'life', 'size', 'rate', 'pull', 'knock', 'stun', 'charge'];
-const ADD: (keyof MoveNums)[] = ['count', 'pierce', 'stacks', 'bounce'];
+const ADD: (keyof MoveNums)[] = ['count', 'pierce', 'stacks', 'bounce', 'explode', 'zone', 'split', 'shock', 'crit', 'wobble'];
 
 export function applyMods(s: MoveNums, mods: MoveMods): void {
   for (const [k, v] of Object.entries(mods) as [keyof MoveNums, number][]) {
@@ -474,6 +467,8 @@ const EVO_MODS: Partial<Record<MoveKind, LadderStep>> = {
   stun: { t: '×1,8 daño, más radio y aturde más rato', m: { dmg: 1.8, radius: 1.3, stun: 1.4 } },
 };
 
+export const evoModsOf = (kind: MoveKind) => EVO_MODS[kind];
+
 export interface MoveEvolution { name: string; needs: NeedStat; text: string }
 
 export function evolutionOf(id: string): MoveEvolution | null {
@@ -485,7 +480,7 @@ export function evolutionOf(id: string): MoveEvolution | null {
 
 // ---------------- instancia de un movimiento en una partida ----------------
 
-const SPATIAL: (keyof MoveNums)[] = ['radius', 'width', 'size', 'range', 'knock', 'pull'];
+const SPATIAL: (keyof MoveNums)[] = ['radius', 'width', 'size', 'range', 'knock', 'pull', 'explode', 'zone', 'wobble'];
 
 /** Estadísticas efectivas de un movimiento en Pokécero (nivel, evolución y escala de la arena). */
 export function moveStats(def: MoveDef, level: number, evolved = false): MoveNums {
@@ -493,10 +488,15 @@ export function moveStats(def: MoveDef, level: number, evolved = false): MoveNum
   const ladder = LADDERS[def.kind];
   for (let i = 0; i < level - 1 && i < ladder.length; i++) applyMods(s, ladder[i].m);
   if (evolved && EVO_MODS[def.kind]) applyMods(s, EVO_MODS[def.kind]!.m);
+  return scaleNums(def.kind, s);
+}
+
+/** Pasa unos valores en unidades de PokéSurvivor a la arena de Pokécero. */
+export function scaleNums(kind: MoveKind, s: MoveNums): MoveNums {
   const k = BALANCE.ps.space;
   for (const key of SPATIAL) if (s[key] != null) s[key] = (s[key] as number) * k;
   // En orbe `speed` es velocidad angular: no se escala.
-  if (s.speed != null && def.kind !== 'orbit') s.speed *= BALANCE.ps.projectileSpeed;
+  if (s.speed != null && kind !== 'orbit') s.speed *= BALANCE.ps.projectileSpeed;
   if (s.dmg != null) s.dmg *= BALANCE.ps.damage;
   return s;
 }

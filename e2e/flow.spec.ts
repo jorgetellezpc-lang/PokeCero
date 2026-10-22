@@ -63,6 +63,12 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.locator('.upgrade-row')).toHaveCount(10);
   await expect(page.getByTestId('hero-passive')).toContainText('Mar Llamas');
   await shot(page, '02-pokemon');
+  // Ataque característico: uno por Pokémon, con su evolución y sus mejoras posibles.
+  await page.click('[data-sub="moves"]');
+  await expect(page.getByTestId('signature-attack')).toContainText('Ascuas');
+  await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
+  await shot(page, '02b-ataque');
+  await page.click('[data-sub="stats"]');
   await page.click('[data-tab="settings"]');
   await expect(page.locator('[data-setting="testMode"]')).toBeChecked();
   await shot(page, '03-ajustes');

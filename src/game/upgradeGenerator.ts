@@ -1,7 +1,6 @@
 import { BALANCE } from '../config/balance';
 import { ABILITIES, RARITY_INFO, type Rarity } from '../data/abilities';
-import { categoryOf, evolutionOf, getMove, ladderOf, maxLevelOf, type NeedStat } from '../data/moves';
-import { sideOf } from '../data/pokemon';
+import { ATTACK_UPGRADES, EVO_KEY, attackEvolutionReady, rawAttackNums, type AttackFamily, type AttackUpgrade } from '../data/signatures';
 import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
 import { TYPE_NAMES } from '../data/typeColors';
 import type { ElementType } from '../data/types';
@@ -14,17 +13,17 @@ import type { Rng } from './rng';
 // (js/systems/levelup.js). Required Notice: Copyright 2026 JPTER78
 // (https://github.com/JPTER78/pokesurvivor)
 //
-// Tipos de carta: movimiento nuevo (si quedan huecos), mejora de movimiento,
-// estadística y EVOLUCIÓN de movimiento (dorada: movimiento al máximo + su
-// estadística asociada cogida en la partida). Independiente de la interfaz.
+// Cada Pokémon tiene un único ataque (src/data/signatures.ts). Tipos de carta:
+// mejora del ataque (solo las que encajan con su comportamiento y no están al
+// máximo), EVOLUCIÓN del ataque (dorada, cuando se cumplen sus requisitos),
+// estadística y habilidad. Independiente de la interfaz.
 // ============================================================================
 
-export type UpgradeFamily = 'newMove' | 'moveUpgrade' | 'moveEvolution' | 'stat' | 'ability' | 'fallback';
+export type UpgradeFamily = 'attack' | 'attackEvolution' | 'stat' | 'ability' | 'fallback';
 
 export type UpgradeAction =
-  | { type: 'newMove'; moveId: string }
-  | { type: 'moveUpgrade'; moveId: string }
-  | { type: 'moveEvolution'; moveId: string }
+  | { type: 'attack'; upgradeId: string }
+  | { type: 'attackEvolution' }
   | { type: 'stat'; stat: RunStatId }
   | { type: 'ability'; abilityId: string }
   | { type: 'heal'; amount: number }
@@ -47,82 +46,67 @@ export interface UpgradeChoice {
   w: number;
 }
 
-const CAT_NAME = { physical: 'Físico', special: 'Especial' };
+const FAMILY_NAME: Record<AttackFamily, string> = {
+  daño: 'Daño', forma: 'Forma', cantidad: 'Cantidad', efecto: 'Efecto', estado: 'Estado', tipo: 'Tipos',
+};
+
+/** Mejoras del ataque que encajan y no están al máximo. */
+export function availableAttackUpgrades(p: Player): AttackUpgrade[] {
+  const A = p.attack;
+  const raw = rawAttackNums(A.sig, A.ups, A.evolved);
+  return ATTACK_UPGRADES.filter((u) => A.ups.filter((x) => x === u.id).length < u.max && u.fits(A.sig, raw));
+}
 
 export function candidateUpgrades(p: Player, rng: Rng): UpgradeChoice[] {
   const W = BALANCE.upgrades.weights;
   const out: UpgradeChoice[] = [];
-  const owned = new Set(p.moves.map((m) => m.def.id));
-  const full = p.moves.length >= BALANCE.upgrades.maxAttacks;
+  const A = p.attack;
+  const name = p.moves[0]?.name ?? A.sig.name;
 
-  // --- movimientos nuevos (6 candidatos; los de su lado fuerte, el doble) ---
-  if (!full) {
-    const buffs = p.moves.filter((m) => m.def.kind === 'buff').length;
-    const pool = p.species.learnset.filter((id) => !owned.has(id) && !(buffs >= BALANCE.upgrades.maxBuffs && getMove(id).kind === 'buff'));
-    const side = sideOf(p.species);
-    const fit = (id: string) => {
-      const cat = categoryOf(getMove(id));
-      return !cat || cat === side ? 2 : 1;
-    };
-    const rest = [...pool];
-    for (let i = 0; i < 6 && rest.length; i++) {
-      const id = rng.weighted(rest, fit);
-      rest.splice(rest.indexOf(id), 1);
-      const d = getMove(id);
-      const cat = categoryOf(d);
-      out.push({
-        key: `new:${id}`, family: 'newMove', action: { type: 'newMove', moveId: id }, w: W.newMove,
-        title: d.name, category: `Nuevo · ${TYPE_NAMES[d.type]}${cat ? ` · ${CAT_NAME[cat]}` : ''}`,
-        description: d.desc, detail: cat && cat !== side ? `Pega mejor con ataques ${side === 'special' ? 'especiales' : 'físicos'}` : '',
-        element: d.type,
-      });
-    }
-  }
-
-  // --- evoluciones listas (y estadísticas que las desbloquean) ---
-  const waiting: Partial<Record<NeedStat, string>> = {};
-  for (const m of p.moves) {
-    if (m.evolved || m.level < maxLevelOf(m.def)) continue;
-    const evo = evolutionOf(m.def.id);
-    if (!evo) continue;
-    if (!p.statsTaken[evo.needs]) {
-      waiting[evo.needs] = m.name;
-      continue;
-    }
+  // --- evolución del ataque ---
+  if (attackEvolutionReady(A.sig, A.ups, p.level, A.evolved)) {
     out.push({
-      key: `evo:${m.def.id}`, family: 'moveEvolution', action: { type: 'moveEvolution', moveId: m.def.id }, w: W.evolution,
-      title: `${m.name} → ${evo.name}`, category: 'EVOLUCIÓN', description: evo.text, detail: '', element: m.def.type,
+      key: 'evo:attack', family: 'attackEvolution', action: { type: 'attackEvolution' }, w: W.evolution,
+      title: `${name} → ${A.sig.evoName}`, category: 'EVOLUCIÓN', description: A.sig.evoText.replace(/^./, (c) => c.toUpperCase()),
+      detail: '', element: A.sig.primary,
     });
   }
 
-  // --- mejoras de movimientos que ya tienes ---
-  for (const m of p.moves) {
-    if (m.level >= maxLevelOf(m.def)) continue;
+  // --- mejoras del ataque (4 candidatas; la que falta para evolucionar pesa más) ---
+  const raw = rawAttackNums(A.sig, A.ups, A.evolved);
+  const key = EVO_KEY[A.sig.kind];
+  const rest = availableAttackUpgrades(p);
+  for (let i = 0; i < 4 && rest.length; i++) {
+    const u = rng.weighted(rest, (x) => (!A.evolved && x.id === key && !A.ups.includes(key) ? W.attackKey : W.attack));
+    rest.splice(rest.indexOf(u), 1);
+    const n = A.ups.filter((x) => x === u.id).length;
+    const isKey = !A.evolved && u.id === key && !A.ups.includes(key);
     out.push({
-      key: `up:${m.def.id}`, family: 'moveUpgrade', action: { type: 'moveUpgrade', moveId: m.def.id }, w: W.moveUpgrade,
-      title: m.name, category: `Mejora · Nv ${m.level} → ${m.level + 1}`, description: ladderOf(m.def)[m.level - 1].t,
-      detail: '', element: m.def.type,
+      key: `atk:${u.id}`, family: 'attack', action: { type: 'attack', upgradeId: u.id },
+      w: isKey ? W.attackKey : W.attack,
+      title: u.id === 'fusion' ? `Fusión ${TYPE_NAMES[A.sig.primary]}/${TYPE_NAMES[A.sig.secondary!]}` : u.name,
+      category: `${name} · ${FAMILY_NAME[u.family]}`, description: u.text(A.sig, raw),
+      detail: isKey ? 'Clave para evolucionar el ataque' : u.max > 1 ? `${n} / ${u.max}` : '',
+      element: u.family === 'tipo' ? A.sig.secondary ?? A.sig.primary : A.sig.primary,
     });
   }
 
-  // --- estadísticas (5 al azar con hueco + las que piden una evolución) ---
+  // --- estadísticas (4 al azar con hueco) ---
   const room = (id: RunStatId) => {
     const max = RUN_STAT_UPGRADES[id].max;
     return !max || (p.statsTaken[id] ?? 0) < max;
   };
-  const ids = (Object.keys(RUN_STAT_UPGRADES) as RunStatId[]).filter((id) => room(id) && !waiting[id as NeedStat]);
+  const ids = (Object.keys(RUN_STAT_UPGRADES) as RunStatId[]).filter((id) => room(id));
   for (let i = ids.length - 1; i > 0; i--) {
     const j = Math.floor(rng.next() * (i + 1));
     [ids[i], ids[j]] = [ids[j], ids[i]];
   }
-  const statIds = ids.slice(0, 5).concat((Object.keys(waiting) as NeedStat[]).filter((id) => room(id)));
-  for (const id of statIds) {
+  const attackLeft = out.some((c) => c.family === 'attack');
+  for (const id of ids.slice(0, 4)) {
     const s = RUN_STAT_UPGRADES[id];
-    const evoFor = waiting[id as NeedStat];
     out.push({
-      key: `stat:${id}`, family: 'stat', action: { type: 'stat', stat: id },
-      w: evoFor ? W.statForEvolution : full ? W.statFull : W.stat,
-      title: s.name, category: evoFor ? `Evoluciona ${evoFor}` : 'Mejora', description: s.description,
+      key: `stat:${id}`, family: 'stat', action: { type: 'stat', stat: id }, w: attackLeft ? W.stat : W.statFull,
+      title: s.name, category: 'Mejora', description: s.description,
       detail: s.max ? `${p.statsTaken[id] ?? 0} / ${s.max}` : '',
     });
   }
@@ -158,17 +142,22 @@ const FALLBACKS: UpgradeChoice[] = [
   },
 ];
 
-/** Exactamente `BALANCE.upgrades.choices` (3) cartas distintas, por peso. La evolución lista sale siempre. */
+/**
+ * Exactamente `BALANCE.upgrades.choices` (3) cartas distintas, por peso. La
+ * evolución lista sale siempre, y si al ataque le queda alguna mejora, al
+ * menos una de las tres es para él.
+ */
 export function generateChoices(p: Player, rng: Rng): UpgradeChoice[] {
   const n = BALANCE.upgrades.choices;
   const pool = candidateUpgrades(p, rng);
   const picked: UpgradeChoice[] = [];
-  const evo = pool.findIndex((c) => c.family === 'moveEvolution');
-  if (evo >= 0) picked.push(pool.splice(evo, 1)[0]);
-  while (picked.length < n && pool.length) {
-    const c = rng.weighted(pool, (x) => x.w);
-    pool.splice(pool.indexOf(c), 1);
-    if (!picked.some((x) => x.key === c.key)) picked.push(c);
+  const take = (c: UpgradeChoice) => { pool.splice(pool.indexOf(c), 1); picked.push(c); };
+  const evo = pool.find((c) => c.family === 'attackEvolution');
+  if (evo) take(evo);
+  while (picked.length < n && pool.length) take(rng.weighted(pool, (x) => x.w));
+  const atk = pool.filter((c) => c.family === 'attack');
+  if (atk.length && !picked.some((c) => c.family === 'attack' || c.family === 'attackEvolution')) {
+    picked[picked.length - 1] = rng.weighted(atk, (x) => x.w);
   }
   for (const fb of FALLBACKS) if (picked.length < n) picked.push(fb);
   return picked;

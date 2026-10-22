@@ -3,6 +3,7 @@ import type { BossDef, BossSignature, EnemyDef, Behavior } from '../data/enemies
 import type { ItemId } from '../data/items';
 import type { BuffStat, MoveCategory, MoveDef, MoveNums } from '../data/moves';
 import type { PokemonSpecies } from '../data/pokemon';
+import type { Signature } from '../data/signatures';
 import type { RunStatId } from '../data/runUpgrades';
 import type { ElementType } from '../data/types';
 import type { Animator } from '../render/animator';
@@ -28,6 +29,14 @@ export interface OwnedMove {
   dealt: number;
 }
 
+/** Ataque característico de la partida (src/data/signatures.ts). */
+export interface AttackState {
+  sig: Signature;
+  /** Mejoras cogidas, en orden (ids de ATTACK_UPGRADES). */
+  ups: string[];
+  evolved: boolean;
+}
+
 export interface Buff { n: number; t: number; amount: number; max: number }
 
 export interface Player extends Vec {
@@ -51,7 +60,9 @@ export interface Player extends Vec {
   invuln: number;
   level: number;
   xp: number;
+  /** Movimientos activos. Con el ataque característico, solo uno: el de `attack`. */
   moves: OwnedMove[];
+  attack: AttackState;
   /** Veces que se ha cogido cada carta de estadística. */
   statsTaken: Partial<Record<RunStatId, number>>;
   item: ItemId | null;
@@ -177,6 +188,13 @@ export interface Projectile extends Vec {
   /** Rebotes que le quedan contra las paredes. */
   wallBounce: number;
   shape: string;
+  /** Fragmento de una División (no se vuelve a dividir ni estalla). */
+  frag?: boolean;
+  /** Amplitud de la trayectoria ondulante. */
+  wobble?: number;
+  /** Color de la estela (tipo secundario) y nivel de mejora (0-3) para el brillo. */
+  trail?: string;
+  tier?: number;
 }
 
 export type FieldKind = 'mine' | 'meteor' | 'turret' | 'patch' | 'charge' | 'spin' | 'quake' | 'vortex' | 'stunzone';

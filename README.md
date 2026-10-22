@@ -1,6 +1,6 @@
 # Pokécero
 
-Juego web Pokémon de supervivencia y acción 2D (roguelite), pensado para móvil en vertical. Prototipo jugable v0.2.
+Juego web Pokémon de supervivencia y acción 2D (roguelite), pensado para móvil en vertical. Prototipo jugable v0.4.
 
 Integra **PokéSurvivor** (© 2026 JPTER78, PolyForm Noncommercial) adaptado a salas estilo Archero, con sprites de PMD SpriteCollab (CC BY-NC 4.0). Por eso Pokécero es un proyecto **sin ánimo de lucro**: no se puede vender, cobrar por él ni ponerle anuncios. Detalles en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
@@ -41,11 +41,12 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 ```
 src/
   config/balance.ts     Todos los parámetros de balance (PROVISIONALES)
-  data/                 Pokédex de Kanto, movimientos, enemigos, objetos, cartas, tipos, gimnasios
+  data/                 Pokédex de Kanto, ataque característico por tipos (signatures.ts), movimientos,
+                        enemigos, objetos, cartas, tipos, gimnasios
     ps/                 Datos extraídos de PokéSurvivor (Pokédex y geometría de sprites)
   game/                 Lógica de la partida, sin DOM (se prueba en Node)
     world.ts            Salas, jugador, daño, recogibles, XP, niveles, evoluciones, objetos
-    combat.ts           Los 23 comportamientos de movimiento, proyectiles y campos
+    combat.ts           Los comportamientos de ataque, efectos al impactar, proyectiles y campos
     enemyAI.ts          13 personalidades de enemigo y estados alterados
     bossAI.ts           IA de minibosses y jefes
     rooms.ts            Oleadas, tramos y curva de dificultad

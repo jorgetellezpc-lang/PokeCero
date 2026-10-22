@@ -1,5 +1,4 @@
 import dexRaw from './ps/pokedex.json';
-import { poolFor, startFor } from './moves';
 import type { ElementType } from './types';
 
 // Pokémon de Kanto (los 151) + Sudowoodo (miniboss provisional de Brock).
@@ -44,8 +43,6 @@ export interface PokemonSpecies {
   stats: PokemonStats;
   /** Forma base de su línea evolutiva. */
   line: string;
-  startingAttack: string;
-  learnset: string[];
   evolution?: { to: string; level: number };
   rarity: number;
   legendary: boolean;
@@ -108,8 +105,6 @@ for (const d of DEX) {
     types: d.types,
     stats: { hp: d.hp, speed: d.spd, pa: d.pa, sa: d.sa, df: d.df, sd: d.sd },
     line: slug(byDex.get(baseOf(d.dex))!.name),
-    startingAttack: startFor(d.types),
-    learnset: poolFor(d.types),
     evolution: evo ? { to: slug(byDex.get(evo.to)!.name), level: evo.level } : undefined,
     rarity: d.rarity,
     legendary: d.leg,
