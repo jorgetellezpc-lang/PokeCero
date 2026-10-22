@@ -102,8 +102,8 @@ export const BALANCE = {
 
   /** Vida y daño de los jefes como múltiplo de los del tramo de la sala. */
   bosses: {
-    miniboss: { hp: 24, damage: 1.8 },
-    boss: { hp: 60, damage: 2.3 },
+    miniboss: { hp: 20, damage: 1.5 },
+    boss: { hp: 55, damage: 2.0 },
   },
 
   enemies: {

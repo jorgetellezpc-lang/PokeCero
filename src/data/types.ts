@@ -23,6 +23,8 @@ export interface GymDef {
   /** Posición en el mapa de la región (0..1). */
   mapPos: { x: number; y: number };
   theme: { grass: string; grassDark: string; path: string; rock: string };
+  /** Arenas ilustradas (data/arenas.ts): salas normales y de jefe. */
+  arenas?: { normal: string; boss: string };
 }
 
 export interface RegionDef {

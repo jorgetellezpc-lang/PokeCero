@@ -90,6 +90,14 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - **Avisos «!»** en la navegación: en Pokémon si puedes pagar alguna mejora, y en Gachapón si tienes tickets.
 - **No integrado del ejemplo, a propósito:** la **energía** (rayo 30/30, "Comenzar ×5") y el **nivel de jugador**. Son sistemas nuevos de economía y progresión que el blueprint no tiene (y la energía es típica de juegos con pagos). En su lugar, la barra superior muestra tu Pokémon y tus medallas. El idioma no se incluye porque solo hay español.
 
+## Arenas ilustradas (gimnasio de Brock)
+
+- Las dos ilustraciones del usuario son el suelo de las salas: `public/arenas/arena-brock.webp` (salas normales) y `arena-brock-boss.webp` (salas 20, 40 y 50). Se borró el Pidgeotto que venía dibujado.
+- Las colisiones están calcadas sobre las rocas, los muros y las antorchas (`src/data/arenas.ts`). Las rocas se recortaron en una segunda imagen (`*-occ.webp`) que tapa a los Pokémon cuando pasan por detrás.
+- La cámara es cenital (la perspectiva ya viene en el dibujo) y te sigue sin salirse de la ilustración.
+- Para todas las salas normales de Brock se usa el mismo diseño. Los demás gimnasios siguen con salas generadas hasta tener sus ilustraciones.
+- Con las arenas, el bot moría mucho contra los minibosses: se rebajaron los jefes (miniboss vida ×20 y daño ×1,5; jefe ×55 y ×2). Ahora gana unas 14 de cada 32 partidas simuladas.
+
 ## Provisional (pendiente de decisión de diseño)
 
 | Tema | Valor actual | Dónde |

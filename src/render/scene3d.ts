@@ -5,6 +5,7 @@ import {
   WebGLRenderer, type Material,
 } from 'three';
 import { BALANCE } from '../config/balance';
+import type { ArenaDef } from '../data/arenas';
 import type { Obstacle } from '../data/layouts';
 import { guardianPositions, orbitPositions } from '../game/combat';
 import { jumpHeight } from '../game/enemyAI';
@@ -82,7 +83,12 @@ export class Scene3D {
     { pr: 2, shadows: true }, { pr: 1.5, shadows: true }, { pr: 1, shadows: true },
     { pr: 1, shadows: false }, { pr: 0.75, shadows: false }, { pr: 0.5, shadows: false },
   ];
-  private tilt = (BALANCE.camera.elevation * Math.PI) / 180;
+  private baseTilt = (BALANCE.camera.elevation * Math.PI) / 180;
+  /** Arena ilustrada de la sala (cámara cenital: la perspectiva ya está en el dibujo). */
+  private art: ArenaDef | null = null;
+  private get tilt(): number {
+    return this.art ? Math.PI / 2 : this.baseTilt;
+  }
 
   /** Crea la escena, o null si el dispositivo no tiene WebGL. */
   static create(glCanvas: HTMLCanvasElement, overlay: HTMLCanvasElement, mode: 'auto' | 'high' | 'medium' | 'low' = 'auto'): Scene3D | null {
@@ -193,8 +199,10 @@ export class Scene3D {
   // --------------------------------------------------------------------------
 
   private updateCamera(w: World, dt: number): void {
+    if (this.art) return this.updateArenaCamera(w, dt, this.art);
     const C = BALANCE.camera;
     const cam = this.camera;
+    cam.up.set(0, 1, 0);
     cam.fov = C.fov;
     const half = Math.atan(Math.tan((C.fov * Math.PI) / 360) * cam.aspect);
     const D = C.viewWidth / 2 / Math.tan(half);
@@ -237,9 +245,83 @@ export class Scene3D {
     }
   }
 
+  /** Cámara cenital sobre la ilustración: te sigue sin salirse del dibujo. */
+  private updateArenaCamera(w: World, dt: number, a: ArenaDef): void {
+    const C = BALANCE.camera;
+    const cam = this.camera;
+    cam.fov = 30;
+    const viewW = 330;
+    const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * cam.aspect);
+    const D = viewW / 2 / Math.tan(half);
+    const hh = D * Math.tan((cam.fov * Math.PI) / 360);
+    const x0 = -a.ox * a.s + viewW / 2;
+    const x1 = (a.imgW - a.ox) * a.s - viewW / 2;
+    const z0 = -a.oy * a.s + hh - 40; // arriba la interfaz tapa un trozo
+    const z1 = (a.imgH - a.oy) * a.s - hh;
+    const p = w.player;
+    const tx = x0 < x1 ? Math.max(x0, Math.min(x1, p.x)) : w.W / 2;
+    const tz = z0 < z1 ? Math.max(z0, Math.min(z1, p.y - C.lead * 0.6)) : w.H / 2;
+    const target = new Vector3(tx, 0, tz);
+    if (!this.camReady) {
+      this.camPos.copy(target);
+      this.camReady = true;
+    } else {
+      this.camPos.lerp(target, 1 - Math.exp(-dt * C.follow));
+    }
+    const sx = w.shake > 0 ? (Math.random() - 0.5) * 20 * w.shake : 0;
+    const sz = w.shake > 0 ? (Math.random() - 0.5) * 20 * w.shake : 0;
+    cam.up.set(0, 0, -1);
+    cam.position.set(this.camPos.x + sx, D, this.camPos.z + sz);
+    cam.near = D * 0.5;
+    cam.far = D * 1.5;
+    cam.lookAt(this.camPos.x + sx, 0, this.camPos.z + sz);
+    cam.updateProjectionMatrix();
+  }
+
   // --------------------------------------------------------------------------
   // Escenario de la sala
   // --------------------------------------------------------------------------
+
+  /** Sala sobre una ilustración: el dibujo es el suelo y las rocas te tapan al pasar por detrás. */
+  private buildArena(w: World, a: ArenaDef, g: Group): void {
+    this.scene.background = new Color('#140d06');
+    this.scene.fog = null;
+    const load = (src: string) => {
+      const img = new Image();
+      const t = new Texture(img);
+      t.colorSpace = SRGBColorSpace;
+      t.minFilter = LinearFilter;
+      t.generateMipmaps = false;
+      img.onload = () => { t.needsUpdate = true; };
+      img.src = src;
+      return t;
+    };
+    const s = a.s;
+    const ground = new Mesh(new PlaneGeometry(a.imgW * s, a.imgH * s), new MeshBasicMaterial({ map: load(a.image) }));
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set((a.imgW / 2 - a.ox) * s, 0, (a.imgH / 2 - a.oy) * s);
+    g.add(ground);
+    const occ = load(a.occluder);
+    for (const [x0, y0, x1, y1, top] of a.rocks) {
+      const rx0 = x0 - 14;
+      const rx1 = x1 + 14;
+      const ry0 = top - 10;
+      const ry1 = y1 + 6;
+      const geo = new PlaneGeometry((rx1 - rx0) * s, (ry1 - ry0) * s);
+      const uv = geo.attributes.uv.array as Float32Array;
+      const u0 = rx0 / a.imgW;
+      const u1 = rx1 / a.imgW;
+      const vt = 1 - ry0 / a.imgH;
+      const vb = 1 - ry1 / a.imgH;
+      uv.set([u0, vt, u1, vt, u0, vb, u1, vb]);
+      const m = new Mesh(geo, new MeshBasicMaterial({ map: occ, transparent: true, alphaTest: 0.5 }));
+      m.rotation.x = -Math.PI / 2;
+      // Altura de dibujo según la base: los Pokémon con los pies más arriba quedan detrás.
+      m.position.set(((rx0 + rx1) / 2 - a.ox) * s, depthY(((y0 + y1) / 2 - a.oy) * s), ((ry0 + ry1) / 2 - a.oy) * s);
+      g.add(m);
+    }
+    void w;
+  }
 
   private buildRoom(w: World): void {
     if (this.room) {
@@ -260,6 +342,25 @@ export class Scene3D {
     const g = new Group();
     this.room = g;
     this.waterTex = [];
+    this.bars = null;
+    this.glow = null;
+    this.art = w.arena;
+    if (w.arena) {
+      this.buildArena(w, w.arena, g);
+      this.decal.width = Math.ceil(w.W * DECAL_RES);
+      this.decal.height = Math.ceil(w.H * DECAL_RES);
+      this.decalMesh.scale.set(w.W, w.H, 1);
+      this.decalMesh.position.set(w.W / 2, 0.6, w.H / 2);
+      this.decalTex.dispose();
+      this.decalTex = new CanvasTexture(this.decal);
+      this.decalTex.colorSpace = SRGBColorSpace;
+      this.decalTex.minFilter = LinearFilter;
+      this.decalTex.generateMipmaps = false;
+      (this.decalMesh.material as MeshBasicMaterial).map = this.decalTex;
+      this.decalDirty = true;
+      this.scene.add(g);
+      return;
+    }
     const W = w.W;
     const H = w.H;
     const theme = w.gym.theme;
@@ -469,7 +570,6 @@ export class Scene3D {
       const mesh = new Mesh(new PlaneGeometry(1, 1), mat);
       const group = new Group();
       group.add(mesh);
-      group.rotation.x = -this.tilt;
       this.scene.add(group);
       v = { group, mesh, flash, used: true };
       this.views.set(key, v);
@@ -506,7 +606,9 @@ export class Scene3D {
     const hd = info.h * k;
     v.mesh.scale.set(wd, hd, 1);
     v.mesh.position.set(wd / 2 - info.ax * k, info.ay * k - hd / 2, 0);
-    v.group.position.set(x, lift, z);
+    v.group.rotation.x = -this.tilt;
+    if (this.art) v.group.position.set(x, depthY(z) + 0.001, z - lift);
+    else v.group.position.set(x, lift, z);
   }
 
   // --------------------------------------------------------------------------
@@ -515,11 +617,12 @@ export class Scene3D {
 
   /** Coloca el canvas para dibujar en coordenadas del mundo alrededor de (wx, wy), a `lift` de altura. */
   private place(wx: number, wy: number, lift: number): boolean {
-    const v = this.v.set(wx, lift, wy + lift).project(this.camera);
+    const zz = this.art ? wy : wy + lift;
+    const v = this.v.set(wx, lift, zz).project(this.camera);
     if (v.z > 1 || v.x < -1.3 || v.x > 1.3 || v.y < -1.3 || v.y > 1.3) return false;
     const sx = ((v.x + 1) / 2) * this.cssW;
     const sy = ((1 - v.y) / 2) * this.cssH;
-    const v2 = this.v.set(wx + 1, lift, wy + lift).project(this.camera);
+    const v2 = this.v.set(wx + 1, lift, zz).project(this.camera);
     const s = Math.abs(((v2.x + 1) / 2) * this.cssW - sx);
     const d = this.dpr;
     this.octx.setTransform(d * s, 0, 0, d * s, d * (sx - s * wx), d * (sy - s * wy));
@@ -584,7 +687,7 @@ export class Scene3D {
   }
 
   private screen(x: number, z: number, h: number): { x: number; y: number } {
-    const v = this.v.set(x, h, z).project(this.camera);
+    const v = this.v.set(x, h, this.art ? z - h : z).project(this.camera);
     return { x: ((v.x + 1) / 2) * this.cssW, y: ((1 - v.y) / 2) * this.cssH };
   }
 }
@@ -592,6 +695,11 @@ export class Scene3D {
 // ----------------------------------------------------------------------------
 // Texturas y modelos procedurales
 // ----------------------------------------------------------------------------
+
+/** Altura a la que se dibuja algo plano en la arena, según su profundidad (más abajo = delante). */
+function depthY(z: number): number {
+  return 2 + z * 0.004;
+}
 
 function pixelTexture(c: HTMLCanvasElement): CanvasTexture {
   const t = new CanvasTexture(c);

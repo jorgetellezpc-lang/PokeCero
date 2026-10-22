@@ -4,7 +4,10 @@ import { KANTO } from '../src/data/regions';
 import type { Enemy } from '../src/game/entities';
 import { World, type WorldOptions } from '../src/game/world';
 
-export const brock = KANTO.gyms[0];
+/** Gimnasio de Brock tal cual (con sus arenas ilustradas). */
+export const brockArt = KANTO.gyms[0];
+/** El mismo, con salas abiertas generadas: más fácil para pruebas con posiciones a mano. */
+export const brock = { ...brockArt, arenas: undefined };
 
 export function makeWorld(opts: Partial<WorldOptions> = {}): World {
   return new World({ speciesId: 'charmander', gym: brock, rooms: [1, 2, 3], seed: 42, ...opts });

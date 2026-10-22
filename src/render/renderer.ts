@@ -17,6 +17,7 @@ export interface Viewport { ox: number; oy: number; scale: number; dpr: number }
 export class Renderer {
   private bg: HTMLCanvasElement | null = null;
   private bgKey = '';
+  private arenaImgs = new Map<string, HTMLImageElement>();
   showDamageNumbers = true;
 
   constructor(private ctx: CanvasRenderingContext2D) {}
@@ -44,10 +45,21 @@ export class Renderer {
     }
     ctx.setTransform(vp.dpr * vp.scale, 0, 0, vp.dpr * vp.scale, vp.dpr * (vp.ox + sx), vp.dpr * (vp.oy + sy));
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(this.background(w), 0, 0, w.W, w.H);
-
-    drawExit(ctx, w);
-    drawWater(ctx, w);
+    const a = w.arena;
+    if (a) {
+      // Arena ilustrada: el dibujo es el suelo (y ya trae su salida).
+      let img = this.arenaImgs.get(a.image);
+      if (!img) {
+        img = new Image();
+        img.src = a.image;
+        this.arenaImgs.set(a.image, img);
+      }
+      if (img.complete && img.naturalWidth) ctx.drawImage(img, -a.ox * a.s, -a.oy * a.s, a.imgW * a.s, a.imgH * a.s);
+    } else {
+      ctx.drawImage(this.background(w), 0, 0, w.W, w.H);
+      drawExit(ctx, w);
+      drawWater(ctx, w);
+    }
     for (const f of w.fields) drawGroundField(ctx, f, w, false);
     for (const h of w.hazards) drawHazard(ctx, h, false);
     for (const m of w.markers) drawMarker(ctx, m, w.time, false);
@@ -84,7 +96,7 @@ export class Renderer {
         drawPlayerAura(ctx, p);
       },
     });
-    for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => drawRock(ctx, o) });
+    if (!w.arena) for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => drawRock(ctx, o) });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.fn();
 

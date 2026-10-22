@@ -2,6 +2,7 @@ import { BALANCE } from '../config/balance';
 import { ABILITIES, BASE_MODS } from '../data/abilities';
 import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '../data/enemies';
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
+import { ARENAS, arenaObstacles, type ArenaDef } from '../data/arenas';
 import { layoutFor, type Obstacle } from '../data/layouts';
 import { evolutionOf, getMove, maxLevelOf, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
 import { DEX, getSpecies } from '../data/pokemon';
@@ -84,7 +85,10 @@ export function guard(def: number): number {
 
 export class World {
   readonly W = BALANCE.arena.width;
-  readonly H = BALANCE.arena.height;
+  /** Alto de la sala actual (las arenas ilustradas tienen el suyo). */
+  H: number = BALANCE.arena.height;
+  /** Arena ilustrada de la sala actual, si la hay. */
+  arena: ArenaDef | null = null;
   readonly rng: Rng;
   readonly gym: GymDef;
   readonly rooms: number[];
@@ -216,7 +220,10 @@ export class World {
     this.plan = planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
     this.scaling = scalingFor(effective);
     const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
-    this.obstacles = layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
+    const arts = this.gym.arenas;
+    this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? arts.normal : arts.boss] ?? null : null;
+    this.H = this.arena ? this.arena.H : BALANCE.arena.height;
+    this.obstacles = this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
     this.nav = new NavGrid(this.W, this.H, this.obstacles);
     this.enemies = [];
     this.corpses = [];

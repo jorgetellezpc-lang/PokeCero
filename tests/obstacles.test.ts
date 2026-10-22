@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE } from '../src/config/balance';
+import { ARENAS, arenaObstacles } from '../src/data/arenas';
 import { BOSS_LAYOUT, LAYOUTS, layoutFor, stretch, type Obstacle } from '../src/data/layouts';
 import { isFree, NavGrid } from '../src/game/obstacles';
 import { roomSequence } from '../src/game/rooms';
 import type { World } from '../src/game/world';
-import { emptyRoom, makeWorld, run, spawnAt } from './helpers';
+import { brockArt, emptyRoom, makeWorld, run, spawnAt } from './helpers';
 
 const W = BALANCE.arena.width;
 const H = BALANCE.arena.height;
@@ -210,5 +211,31 @@ describe('obstáculos', () => {
         }
       }
     }
+  });
+
+  it('las arenas ilustradas tienen entrada, salida y todo su suelo conectado', () => {
+    for (const a of Object.values(ARENAS)) {
+      const obs = arenaObstacles(a);
+      const start = { x: 180, y: a.H - 70 };
+      const exit = { x: 180, y: 30 };
+      expect(isFree(start.x, start.y, 14, obs), `${a.id} entrada`).toBe(true);
+      expect(isFree(exit.x, exit.y, 10, obs), `${a.id} salida`).toBe(true);
+      const nav = new NavGrid(W, a.H, obs);
+      expect(nav.reachable(start, exit), `${a.id} camino`).toBe(true);
+      for (let x = 16; x < W - 16; x += 8) {
+        for (let y = 16; y < a.H - 16; y += 8) {
+          if (!isFree(x, y, 16, obs)) continue;
+          expect(nav.reachable({ x, y }, start), `${a.id} (${x},${y})`).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('el gimnasio de Brock usa sus arenas: normal en las salas y la del jefe en 20, 40 y 50', () => {
+    const w = makeWorld({ rooms: [1, 20, 50], gym: brockArt });
+    expect(w.arena?.id).toBe('brock-normal');
+    w.startRoom(1);
+    expect(w.arena?.id).toBe('brock-boss');
+    expect(w.H).toBe(ARENAS['brock-boss'].H);
   });
 });

@@ -4,7 +4,7 @@ import { it } from 'vitest';
 import { BALANCE } from '../src/config/balance';
 import { roomSequence } from '../src/game/rooms';
 import { World } from '../src/game/world';
-import { brock } from './helpers';
+import { brockArt as brock } from './helpers';
 
 export function bot(w: World) {
   const p = w.player;
