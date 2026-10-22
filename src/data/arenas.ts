@@ -1,3 +1,4 @@
+import { ARENA_COLLISION } from './arenaCollision';
 import type { Obstacle } from './layouts';
 
 // ============================================================================
@@ -67,8 +68,14 @@ export function arenaRect(a: ArenaDef, x0: number, y0: number, x1: number, y1: n
   return { x: (x0 - a.ox) * a.s, y: (y0 - a.oy) * a.s, w: (x1 - x0) * a.s, h: (y1 - y0) * a.s };
 }
 
-/** Colisiones de la arena en coordenadas del mundo. */
+/**
+ * Colisiones de la arena en coordenadas del mundo: máscara precisa generada a
+ * partir de la ilustración (borde del suelo trazado a mano y base real de cada
+ * roca), ver arenaCollision.ts. Si una arena no la tiene, se usan las cajas.
+ */
 export function arenaObstacles(a: ArenaDef): Obstacle[] {
+  const mask = ARENA_COLLISION[a.id];
+  if (mask) return mask.map(([x, y, w, h]) => ({ kind: 'rock' as const, x, y, w, h }));
   return [
     ...a.rocks.map(([x0, y0, x1, y1]) => ({ kind: 'rock' as const, ...arenaRect(a, x0, y0, x1, y1) })),
     ...a.blockers.map(([x0, y0, x1, y1]) => ({ kind: 'rock' as const, ...arenaRect(a, x0, y0, x1, y1) })),

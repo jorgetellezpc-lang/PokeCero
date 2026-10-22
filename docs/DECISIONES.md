@@ -95,6 +95,9 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - Las dos ilustraciones del usuario son el suelo de las salas: `public/arenas/arena-brock.webp` (salas normales) y `arena-brock-boss.webp` (salas 20, 40 y 50). Se borró el Pidgeotto que venía dibujado.
 - Las colisiones están calcadas sobre las rocas, los muros y las antorchas (`src/data/arenas.ts`). Las rocas se recortaron en una segunda imagen (`*-occ.webp`) que tapa a los Pokémon cuando pasan por detrás.
 - La cámara es cenital (la perspectiva ya viene en el dibujo) y te sigue sin salirse de la ilustración.
+- **Colisión precisa (v0.5):** máscara generada desde la ilustración (`src/data/arenaCollision.ts`, 6 píxeles de detalle): borde del suelo trazado a mano y base real de cada roca. Rendijas y bolsas por las que no cabe un Pokémon se rellenan solas. En las arenas se choca con los pies (radio 7), no con todo el cuerpo.
+- **Cámara de arena:** más cerca (ancho visible 215) y adelantada hacia donde te mueves o apuntas.
+- **Partida más sobria:** letra Rajdhani, barras finas, paneles oscuros y cartas negras con franja de color (`src/ui/run.css`).
 - Para todas las salas normales de Brock se usa el mismo diseño. Los demás gimnasios siguen con salas generadas hasta tener sus ilustraciones.
 - Con las arenas, el bot moría mucho contra los minibosses: se rebajaron los jefes (miniboss vida ×20 y daño ×1,5; jefe ×55 y ×2). Ahora gana unas 14 de cada 32 partidas simuladas.
 

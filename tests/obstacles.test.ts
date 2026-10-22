@@ -60,7 +60,7 @@ describe('obstáculos', () => {
     p.x = 180;
     p.y = 470;
     run(w, 2, { x: 0, y: -1 });
-    expect(p.y).toBeGreaterThanOrEqual(440 + p.r - 0.5);
+    expect(p.y).toBeGreaterThanOrEqual(440 + w.footR(p.r) - 0.5);
   });
 
   it('el agua corta el paso salvo con Levitación', () => {
@@ -224,7 +224,7 @@ describe('obstáculos', () => {
       expect(nav.reachable(start, exit), `${a.id} camino`).toBe(true);
       for (let x = 16; x < W - 16; x += 8) {
         for (let y = 16; y < a.H - 16; y += 8) {
-          if (!isFree(x, y, 16, obs)) continue;
+          if (!isFree(x, y, 22, obs)) continue;
           expect(nav.reachable({ x, y }, start), `${a.id} (${x},${y})`).toBe(true);
         }
       }

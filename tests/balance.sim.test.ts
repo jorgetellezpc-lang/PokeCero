@@ -3,13 +3,16 @@
 import { it } from 'vitest';
 import { BALANCE } from '../src/config/balance';
 import { roomSequence } from '../src/game/rooms';
+import { segmentBlocked } from '../src/game/obstacles';
 import { World } from '../src/game/world';
 import { brockArt as brock } from './helpers';
+
+const stall = new WeakMap<World, { kills: number; room: number; t: number }>();
 
 export function bot(w: World) {
   const p = w.player;
   if (w.exitOpen && w.pickups.length === 0) {
-    return w.nav.dirTo(p, w.exit.x, w.exit.y, p.r, p.mods.levitate);
+    return w.nav.dirTo(p, w.exit.x, w.exit.y, w.footR(p.r), p.mods.levitate);
   }
   let fx = 0;
   let fy = 0;
@@ -25,6 +28,14 @@ export function bot(w: World) {
   }
   for (const pr of w.projectiles) if (!pr.friendly && Math.hypot(pr.x - p.x, pr.y - p.y) < 60) danger = true;
   for (const h of w.hazards) if (h.kind === 'beam' || Math.hypot(h.x - p.x, h.y - p.y) < h.r + 20) danger = true;
+  // Sin línea de tiro (roca en medio) o 30 s sin avanzar: va a por su blanco rodeando las rocas.
+  const tg = w.target;
+  const st = stall.get(w) ?? { kills: -1, room: -1, t: 0 };
+  if (st.kills !== w.kills || st.room !== w.roomIndex) stall.set(w, { kills: w.kills, room: w.roomIndex, t: w.time });
+  const stuck = w.time - (stall.get(w)?.t ?? w.time) > 30;
+  if (tg && w.obstacles.length && (stuck || (!danger && segmentBlocked(p.x, p.y - 10, tg.x, tg.y - tg.bodyH * 0.4, w.obstacles, true, 6)))) {
+    return w.nav.dirTo(p, tg.x, tg.y, w.footR(p.r), p.mods.levitate);
+  }
   if (!danger && w.pickups.every((g) => Math.hypot(g.x - p.x, g.y - p.y) > 80 || w.enemies.length > 2)) return { x: 0, y: 0 };
   for (const pr of w.projectiles) {
     if (pr.friendly) continue;

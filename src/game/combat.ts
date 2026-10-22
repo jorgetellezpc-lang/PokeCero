@@ -4,7 +4,7 @@ import { TYPE_COLORS } from '../data/typeColors';
 import type { AnimName } from '../render/animator';
 import type { Enemy, Field, OwnedMove, Projectile } from './entities';
 import { dist } from './math';
-import { rockAt } from './obstacles';
+import { isFree, rockAt } from './obstacles';
 import type { World } from './world';
 
 // ============================================================================
@@ -347,6 +347,8 @@ function dash(w: World, m: OwnedMove): void {
     const x = sx + ca * d;
     const y = sy + sa * d;
     if (x < mg || x > w.W - mg || y < mg || y > w.H - mg) break;
+    // Se para al llegar a una roca o muro (no la atraviesa).
+    if (w.obstacles.length && !isFree(x, y, w.footR(p.r), w.obstacles, p.mods.levitate)) break;
     len = d;
   }
   p.x = sx + ca * len;

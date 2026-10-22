@@ -60,6 +60,8 @@ export class Scene3D {
   private roomKey: unknown = null;
   private camPos = new Vector3();
   private camReady = false;
+  private lookX = 0;
+  private lookZ = 0;
   private lastTime = 0;
   private waterTex: Texture[] = [];
   private bars: Group | null = null;
@@ -250,7 +252,7 @@ export class Scene3D {
     const C = BALANCE.camera;
     const cam = this.camera;
     cam.fov = 30;
-    const viewW = 330;
+    const viewW = C.arenaViewWidth;
     const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * cam.aspect);
     const D = viewW / 2 / Math.tan(half);
     const hh = D * Math.tan((cam.fov * Math.PI) / 360);
@@ -259,8 +261,12 @@ export class Scene3D {
     const z0 = -a.oy * a.s + hh - 40; // arriba la interfaz tapa un trozo
     const z1 = (a.imgH - a.oy) * a.s - hh;
     const p = w.player;
-    const tx = x0 < x1 ? Math.max(x0, Math.min(x1, p.x)) : w.W / 2;
-    const tz = z0 < z1 ? Math.max(z0, Math.min(z1, p.y - C.lead * 0.6)) : w.H / 2;
+    // Se adelanta un poco hacia donde te mueves; quieto, hacia tu blanco.
+    const look = p.moving ? p.moveAngle : w.target ? Math.atan2(w.target.y - p.y, w.target.x - p.x) : -Math.PI / 2;
+    this.lookX += (Math.cos(look) * C.arenaLook - this.lookX) * Math.min(1, dt * 2.5);
+    this.lookZ += (Math.sin(look) * C.arenaLook - this.lookZ) * Math.min(1, dt * 2.5);
+    const tx = x0 < x1 ? Math.max(x0, Math.min(x1, p.x + this.lookX)) : w.W / 2;
+    const tz = z0 < z1 ? Math.max(z0, Math.min(z1, p.y - 10 + this.lookZ)) : w.H / 2;
     const target = new Vector3(tx, 0, tz);
     if (!this.camReady) {
       this.camPos.copy(target);

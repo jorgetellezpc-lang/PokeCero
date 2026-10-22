@@ -48,9 +48,10 @@ export function tickCommon(w: World, e: Enemy, dt: number): boolean {
   const decay = Math.pow(0.0015, dt);
   e.kx *= decay;
   e.ky *= decay;
-  const m = BALANCE.arena.margin;
-  e.x = clamp(e.x, m + e.r, w.W - m - e.r);
-  e.y = clamp(e.y, m + e.r, w.H - m - e.r);
+  const m = w.arena ? 0 : BALANCE.arena.margin;
+  const er = w.arena ? w.footR(e.r) : e.r;
+  e.x = clamp(e.x, m + er, w.W - m - er);
+  e.y = clamp(e.y, m + er, w.H - m - er);
   return e.hp > 0;
 }
 
@@ -142,7 +143,8 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
   if (e.behavior === 'charger') {
     e.pt -= dt;
     if (e.phase === 'walk') {
-      if (d < 200 * sp() && e.pt <= 0) {
+      // Solo embiste si te ve (si no, se estrellaba contra la roca una y otra vez).
+      if (d < 200 * sp() && e.pt <= 0 && !(w.obstacles.length && segmentBlocked(e.x, e.y, p.x, p.y, w.obstacles, true, e.r * 0.6))) {
         e.phase = 'aim';
         e.pt = 0.55;
         e.anim.play('Charge', { speed: 1.6 });
@@ -171,7 +173,7 @@ export function updateEnemy(w: World, e: Enemy, dt: number): void {
     const range = e.def.range ?? 190 * sp();
     const keep = range * 0.82;
     // Sin línea de tiro (roca en medio): se recoloca rodeándola en vez de esperar.
-    const covered = w.obstacles.length > 0 && segmentBlocked(e.x, e.y - e.bodyH * 0.4, p.x, p.y - 10, w.obstacles, true, 3);
+    const covered = w.obstacles.length > 0 && segmentBlocked(e.x, e.y - e.bodyH * 0.4, p.x, p.y - 10, w.obstacles, true, 6);
     if (covered) {
       // vx/vy ya siguen el camino hacia ti.
     } else if (d < keep * 0.75) {

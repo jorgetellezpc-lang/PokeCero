@@ -195,7 +195,15 @@ export class World {
 
   /** Dirección para que un enemigo vaya hacia (tx, ty) rodeando obstáculos. */
   steer(e: Enemy, tx: number, ty: number): Vec {
-    return this.nav.dirTo(e, tx, ty, obstacleRadius(e), levitates(e.types));
+    return this.nav.dirTo(e, tx, ty, this.footR(e.r), levitates(e.types));
+  }
+
+  /**
+   * Radio con el que se choca con rocas y muros. En las arenas ilustradas es
+   * el de los pies (la base de las rocas ya está calcada al dibujo).
+   */
+  footR(r: number): number {
+    return this.arena ? Math.min(7, r * 0.6) : obstacleRadius(r);
   }
 
   newId(): number {
@@ -224,7 +232,7 @@ export class World {
     this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? arts.normal : arts.boss] ?? null : null;
     this.H = this.arena ? this.arena.H : BALANCE.arena.height;
     this.obstacles = this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
-    this.nav = new NavGrid(this.W, this.H, this.obstacles);
+    this.nav = new NavGrid(this.W, this.H, this.obstacles, this.arena ? 8 : 10);
     this.enemies = [];
     this.corpses = [];
     this.projectiles = [];
@@ -279,7 +287,9 @@ export class World {
       }
       x = clamp(x, m, this.W - m);
       y = clamp(y, m, this.H - m);
-      if (dist({ x, y }, this.player) >= (near ? 50 : BALANCE.rooms.minSpawnDistance) && isFree(x, y, 20, this.obstacles)) break;
+      const okPos = dist({ x, y }, this.player) >= (near ? 50 : BALANCE.rooms.minSpawnDistance) && isFree(x, y, 20, this.obstacles);
+      // Nunca en un sitio al que no se llegue andando.
+      if (okPos && (!this.obstacles.length || this.nav.reachable({ x, y }, this.player))) break;
     }
     this.markers.push({ x, y, t: BALANCE.rooms.spawnTelegraph * (summoned ? 0.6 : 1), def, boss: false, summoned });
   }
@@ -371,7 +381,7 @@ export class World {
       else updateEnemy(this, e, dt);
     }
     this.separateEnemies();
-    for (const e of this.enemies) if (!e.jump && !e.hidden) pushOut(e, obstacleRadius(e), this.obstacles, levitates(e.types));
+    for (const e of this.enemies) if (!e.jump && !e.hidden) pushOut(e, this.footR(e.r), this.obstacles, levitates(e.types));
     updateProjectiles(this, dt);
     updateFields(this, dt);
     this.updateHazards(dt);
@@ -417,10 +427,12 @@ export class World {
       p.y += (move.y / len) * mag * speed * dt;
       p.moveAngle = Math.atan2(move.y, move.x);
     }
-    pushOut(p, p.r, this.obstacles, p.mods.levitate);
-    const m = BALANCE.arena.margin;
-    p.x = clamp(p.x, m + p.r, this.W - m - p.r);
-    p.y = clamp(p.y, m + p.r, this.H - m - p.r);
+    pushOut(p, this.footR(p.r), this.obstacles, p.mods.levitate);
+    // Bordes de la sala (en las arenas ilustradas ya los marca la colisión del dibujo).
+    const m = this.arena ? 0 : BALANCE.arena.margin;
+    const pr = this.arena ? this.footR(p.r) : p.r;
+    p.x = clamp(p.x, m + pr, this.W - m - pr);
+    p.y = clamp(p.y, m + pr, this.H - m - pr);
     p.invuln = Math.max(0, p.invuln - dt);
     p.hitFlash = Math.max(0, p.hitFlash - dt);
     p.focusCd = Math.max(0, p.focusCd - dt);
@@ -453,7 +465,7 @@ export class World {
     for (const e of this.enemies) {
       if (e.hidden) continue;
       // Los que están detrás de una roca cuentan como más lejos: primero, los que ves.
-      const hidden = this.obstacles.length && segmentBlocked(p.x, p.y - 10, e.x, e.y - e.bodyH * 0.4, this.obstacles, true, 2);
+      const hidden = this.obstacles.length && segmentBlocked(p.x, p.y - 10, e.x, e.y - e.bodyH * 0.4, this.obstacles, true, 6);
       const d = dist(e, p) + (hidden ? 1000 : 0);
       if (d < bd) { bd = d; best = e; }
     }
@@ -1010,6 +1022,6 @@ function dirFromAngleSafe(a: number): number {
  * Radio con el que un enemigo choca con rocas y agua. Tiene tope (como el
  * jugador): si no, los Pokémon grandes no cabían por los puentes y se atascaban.
  */
-function obstacleRadius(e: Enemy): number {
-  return Math.min(e.r * 0.9, BALANCE.player.maxRadius);
+function obstacleRadius(r: number): number {
+  return Math.min(r * 0.9, BALANCE.player.maxRadius);
 }

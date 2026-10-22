@@ -34,7 +34,7 @@ export const BALANCE = {
    * viewWidth: ancho de sala que se ve a la altura del jugador; elevation:
    * inclinación en grados (90 = cenital); lead: cuánto se adelanta hacia arriba.
    */
-  camera: { viewWidth: 300, elevation: 52, fov: 46, lead: 60, follow: 6 },
+  camera: { viewWidth: 300, elevation: 52, fov: 46, lead: 60, follow: 6, arenaViewWidth: 215, arenaLook: 34 },
   /** Sala: más alta que la pantalla; la cámara sigue al jugador (estilo Archero). */
   arena: { width: 360, height: 840, margin: 14 },
 

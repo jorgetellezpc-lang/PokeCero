@@ -9,6 +9,16 @@ export const blocks = (o: Obstacle, flyer: boolean) => o.kind === 'rock' || !fly
 
 /** Saca un círculo de los obstáculos que lo bloquean. Devuelve true si chocó. */
 export function pushOut(c: Vec, r: number, obstacles: Obstacle[], flyer = false): boolean {
+  // Varias pasadas: al salir de un trozo de roca se puede caer en el de al lado.
+  let any = false;
+  for (let pass = 0; pass < 4; pass++) {
+    if (!pushOnce(c, r, obstacles, flyer)) break;
+    any = true;
+  }
+  return any;
+}
+
+function pushOnce(c: Vec, r: number, obstacles: Obstacle[], flyer: boolean): boolean {
   let hit = false;
   for (const o of obstacles) {
     if (!blocks(o, flyer)) continue;
@@ -173,19 +183,50 @@ export class NavGrid {
     const cj = (c - ci) / this.cols;
     let best = -1;
     let bd = f[c] >= 0 ? f[c] : 1e9;
-    for (const [di, dj] of DIRS8) {
+    // Pegado a un obstáculo (tu celda cuenta como ocupada): busca la celda libre más cercana alrededor.
+    const ring = f[c] >= 0 ? DIRS8 : RING2;
+    for (const [di, dj] of ring) {
       const ni = ci + di;
       const nj = cj + dj;
       if (ni < 0 || nj < 0 || ni >= this.cols || nj >= this.rows) continue;
       const n = nj * this.cols + ni;
       // Diagonal solo si las dos celdas de al lado están libres (no corta esquinas).
-      if (di && dj && (f[cj * this.cols + ni] < 0 || f[nj * this.cols + ci] < 0)) continue;
-      if (f[n] >= 0 && f[n] < bd) { bd = f[n]; best = n; }
+      if (f[c] >= 0 && di && dj && (f[cj * this.cols + ni] < 0 || f[nj * this.cols + ci] < 0)) continue;
+      if (f[n] < 0 || f[n] >= bd) continue;
+      // Pegado a una roca: solo casillas a las que se llega en línea recta.
+      if (f[c] < 0 && segmentBlocked(from.x, from.y, (ni + 0.5) * CELL, (nj + 0.5) * CELL, this.obstacles, flyer, r * 0.9)) continue;
+      bd = f[n];
+      best = n;
     }
     if (best < 0) return { x: dx / d, y: dy / d };
-    const bi = best % this.cols;
-    const bx = (bi + 0.5) * CELL - from.x;
-    const by = ((best - bi) / this.cols + 0.5) * CELL - from.y;
+    // Sigue el camino y apunta a la casilla más lejana que se ve sin chocar
+    // (así no se engancha en las esquinas de las rocas).
+    let aim = best;
+    let cur = best;
+    for (let step = 0; step < 14; step++) {
+      const ci2 = cur % this.cols;
+      const cj2 = (cur - ci2) / this.cols;
+      let nxt = -1;
+      let nd = f[cur];
+      for (const [di, dj] of DIRS8) {
+        const ni = ci2 + di;
+        const nj = cj2 + dj;
+        if (ni < 0 || nj < 0 || ni >= this.cols || nj >= this.rows) continue;
+        const n = nj * this.cols + ni;
+        if (di && dj && (f[cj2 * this.cols + ni] < 0 || f[nj * this.cols + ci2] < 0)) continue;
+        if (f[n] >= 0 && f[n] < nd) { nd = f[n]; nxt = n; }
+      }
+      if (nxt < 0) break;
+      const ni = nxt % this.cols;
+      const px = (ni + 0.5) * CELL;
+      const py = ((nxt - ni) / this.cols + 0.5) * CELL;
+      if (segmentBlocked(from.x, from.y, px, py, this.obstacles, flyer, r)) break;
+      aim = nxt;
+      cur = nxt;
+    }
+    const ai = aim % this.cols;
+    const bx = (ai + 0.5) * CELL - from.x;
+    const by = ((aim - ai) / this.cols + 0.5) * CELL - from.y;
     const l = Math.hypot(bx, by) || 1;
     return { x: bx / l, y: by / l };
   }
@@ -198,6 +239,8 @@ export class NavGrid {
 
 const DIRS4 = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 const DIRS8 = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]] as const;
+const RING2: (readonly [number, number])[] = [];
+for (let dj = -2; dj <= 2; dj++) for (let di = -2; di <= 2; di++) if (di || dj) RING2.push([di, dj]);
 
 /** Pokémon que cruzan el agua. */
 export const levitates = (types: readonly string[]) => types.includes('flying') || types.includes('ghost');

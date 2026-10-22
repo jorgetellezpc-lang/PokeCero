@@ -289,7 +289,7 @@ export function drawEnemyMarks(ctx: CanvasRenderingContext2D, e: Enemy): void {
   const top = e.y - jumpHeight(e) - e.bodyH - 4;
   if (e.phase === 'aim' || e.phase === 'fuse') {
     ctx.fillStyle = '#ff4040';
-    ctx.font = 'bold 12px "Press Start 2P", monospace';
+    ctx.font = '700 15px Rajdhani, "Arial Narrow", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('!', e.x, top - 4);
   }
@@ -415,9 +415,11 @@ export function drawEnemyBar(ctx: CanvasRenderingContext2D, e: Enemy): void {
 export function drawText(ctx: CanvasRenderingContext2D, t: FloatText): void {
   ctx.textAlign = 'center';
   ctx.globalAlpha = Math.min(1, t.life * 3);
-  ctx.font = `${t.size}px "Press Start 2P", monospace`;
-  ctx.fillStyle = '#1c1424';
-  ctx.fillText(t.text, t.x + 1, t.y + 1);
+  ctx.font = `700 ${Math.round(t.size * 1.35)}px Rajdhani, "Arial Narrow", sans-serif`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+  ctx.strokeText(t.text, t.x, t.y);
   ctx.fillStyle = t.color;
   ctx.fillText(t.text, t.x, t.y);
   ctx.globalAlpha = 1;
