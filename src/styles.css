@@ -250,6 +250,8 @@ button { font-family: var(--font); color: inherit; }
 
 .run { background: #141020; touch-action: none; }
 .game-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.game-overlay { pointer-events: none; }
+.vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 55%, transparent 55%, rgba(5, 4, 12, 0.55) 100%); }
 
 .hud {
   position: absolute; left: 0; right: 0; top: 0; padding: calc(6px + var(--safe-top)) 8px 4px;

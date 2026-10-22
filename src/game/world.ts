@@ -191,7 +191,7 @@ export class World {
 
   /** Dirección para que un enemigo vaya hacia (tx, ty) rodeando obstáculos. */
   steer(e: Enemy, tx: number, ty: number): Vec {
-    return this.nav.dirTo(e, tx, ty, e.r, levitates(e.types));
+    return this.nav.dirTo(e, tx, ty, obstacleRadius(e), levitates(e.types));
   }
 
   newId(): number {
@@ -216,7 +216,7 @@ export class World {
     this.plan = planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
     this.scaling = scalingFor(effective);
     const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
-    this.obstacles = layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W);
+    this.obstacles = layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
     this.nav = new NavGrid(this.W, this.H, this.obstacles);
     this.enemies = [];
     this.corpses = [];
@@ -240,7 +240,7 @@ export class World {
     this.pendingWaves = this.plan.waves.map((w) => [...w]);
     if (this.plan.bossId) {
       const def = bossDefFor(this.plan.bossId, tierForRoom(effective));
-      this.markers.push({ x: this.W / 2, y: 170, t: BALANCE.rooms.spawnTelegraph * 1.6, def, boss: true, summoned: false });
+      this.markers.push({ x: this.W / 2, y: Math.round(this.H * 0.35), t: BALANCE.rooms.spawnTelegraph * 1.6, def, boss: true, summoned: false });
     } else {
       this.spawnNextWave();
     }
@@ -364,7 +364,7 @@ export class World {
       else updateEnemy(this, e, dt);
     }
     this.separateEnemies();
-    for (const e of this.enemies) if (!e.jump && !e.hidden) pushOut(e, e.r * 0.9, this.obstacles, levitates(e.types));
+    for (const e of this.enemies) if (!e.jump && !e.hidden) pushOut(e, obstacleRadius(e), this.obstacles, levitates(e.types));
     updateProjectiles(this, dt);
     updateFields(this, dt);
     this.updateHazards(dt);
@@ -997,4 +997,12 @@ export class World {
 
 function dirFromAngleSafe(a: number): number {
   return ((Math.round((Math.PI / 2 - a) / (Math.PI / 4)) % 8) + 8) % 8;
+}
+
+/**
+ * Radio con el que un enemigo choca con rocas y agua. Tiene tope (como el
+ * jugador): si no, los Pokémon grandes no cabían por los puentes y se atascaban.
+ */
+function obstacleRadius(e: Enemy): number {
+  return Math.min(e.r * 0.9, BALANCE.player.maxRadius);
 }

@@ -14,6 +14,7 @@ import { awardMedal, bankRunGold, claimMilestone, recordBestRoom } from '../../m
 import { perksFor } from '../../meta/shop';
 import { preload } from '../../render/animator';
 import { Renderer, type Viewport } from '../../render/renderer';
+import { Scene3D } from '../../render/scene3d';
 import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
 import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
@@ -37,7 +38,10 @@ export class RunScreen implements Screen {
   el: HTMLElement;
   world: World;
   private canvas: HTMLCanvasElement;
-  private renderer: Renderer;
+  /** Dibujo 3D; si el dispositivo no tiene WebGL 2, se usa el 2D clásico. */
+  private scene3d: Scene3D | null;
+  private renderer: Renderer | null = null;
+  private overlayCanvas: HTMLCanvasElement;
   private input: InputController;
   private vp: Viewport = { ox: 0, oy: 0, scale: 1, dpr: 1 };
   private cssW = 0;
@@ -77,14 +81,22 @@ export class RunScreen implements Screen {
     preload([...dexes]);
 
     this.canvas = h('canvas', { class: 'game-canvas' });
-    this.renderer = new Renderer(this.canvas.getContext('2d')!);
-    this.renderer.showDamageNumbers = store.data.settings.damageNumbers;
+    this.overlayCanvas = h('canvas', { class: 'game-canvas game-overlay' });
+    this.scene3d = Scene3D.create(this.canvas, this.overlayCanvas);
+    if (this.scene3d) {
+      this.scene3d.showDamageNumbers = store.data.settings.damageNumbers;
+    } else {
+      this.canvas = h('canvas', { class: 'game-canvas' });
+      this.renderer = new Renderer(this.canvas.getContext('2d')!);
+      this.renderer.showDamageNumbers = store.data.settings.damageNumbers;
+    }
 
     const hud = this.buildHud();
     this.banner = h('div', { class: 'banner' });
     this.overlay = h('div', { class: 'overlay hidden' });
     this.safeProbe = h('div', { class: 'safe-probe' });
-    this.el = h('div', { class: 'screen run' }, this.canvas, hud, this.banner, this.overlay, this.safeProbe);
+    this.el = h('div', { class: `screen run ${this.scene3d ? 'run-3d' : ''}`, 'data-view': this.scene3d ? '3d' : '2d' },
+      this.canvas, ...(this.scene3d ? [this.overlayCanvas, h('div', { class: 'vignette' })] : []), hud, this.banner, this.overlay, this.safeProbe);
 
     this.input = new InputController(this.el, () => this.togglePause());
     this.resizeObs = new ResizeObserver(() => this.resize());
@@ -95,6 +107,7 @@ export class RunScreen implements Screen {
 
   destroy(): void {
     cancelAnimationFrame(this.raf);
+    this.scene3d?.dispose();
     this.input.destroy();
     this.resizeObs.disconnect();
     document.removeEventListener('visibilitychange', this.onVisibility);
@@ -166,6 +179,10 @@ export class RunScreen implements Screen {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     this.cssW = rect.width;
     this.cssH = rect.height;
+    if (this.scene3d) {
+      this.scene3d.resize(rect.width, rect.height, dpr);
+      return;
+    }
     this.canvas.width = Math.round(rect.width * dpr);
     this.canvas.height = Math.round(rect.height * dpr);
     const hudEl = this.el.querySelector('.hud') as HTMLElement;
@@ -197,7 +214,10 @@ export class RunScreen implements Screen {
     }
     this.handleEvents();
     this.checkOverlays();
-    if (this.cssW) this.renderer.draw(this.world, this.vp, this.cssW, this.cssH);
+    if (this.cssW) {
+      if (this.scene3d) this.scene3d.draw(this.world);
+      else this.renderer?.draw(this.world, this.vp, this.cssW, this.cssH);
+    }
     this.updateHud();
   };
 

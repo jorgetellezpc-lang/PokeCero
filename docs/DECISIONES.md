@@ -62,6 +62,15 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
   - Los enemigos rodean los obstáculos con una cuadrícula de navegación. Los que disparan, si una roca les tapa, se recolocan.
   - Apuntas primero a los enemigos que ves.
   - Los tests comprueban que no hay zonas cerradas, que siempre hay camino a la salida y que nadie aparece dentro de un obstáculo.
+- **Escenario 3D** (`src/render/scene3d.ts`, con Three.js):
+  - La sala mide 360 × 840: más alta que la pantalla, y la cámara inclinada (52°) sigue al jugador.
+  - Hay suelo, muros de piedra, puerta con barrotes (que se abren al limpiar la sala), rocas facetadas, agua con brillo, pinos fuera de los muros, luz, sombras y niebla.
+  - Los Pokémon son sus sprites animados de pie, mirando a la cámara.
+  - Los avisos, zonas y sombras se pintan en una capa sobre el suelo. Proyectiles, números y barras se dibujan encima, con las mismas piezas que el 2D (`src/render/draw2d.ts`).
+  - **Calidad automática:** si el móvil no llega a ~40 fps, baja la resolución y después quita las sombras, y lo recuerda durante la sesión.
+  - Sin WebGL 2 se usa el dibujo 2D clásico (`renderer.ts`).
+  - Añade la dependencia `three` (MIT, ~140 KB comprimidos).
+  - Los obstáculos frenan a los enemigos con un radio máximo de 13, para que los grandes quepan por los puentes.
 - **Rendimiento:** como mucho hay 360 proyectiles a la vez; si se pasa, desaparecen antes los tuyos más viejos (`balance.perf`).
 
 ## Provisional (pendiente de decisión de diseño)
@@ -74,6 +83,8 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
 | Tramos de enemigos | Uno cada 10 salas, con la vida y el daño base de PokéSurvivor; dentro de cada tramo, +10 % de vida y +3 % de daño por sala | `data/enemies.ts`, `balance.difficulty` |
 | Jefes | Vida ×24 (miniboss) y ×60 (jefe) sobre el tramo de su sala; fases al 66 % y al 33 % | `balance.bosses`, `data/enemies.ts` |
 | Habilidades y sinergias | Magnitudes, rarezas (pesos 7/4/2/1) y peso de carta 9 | `data/abilities.ts`, `balance.upgrades.weights.ability` |
+| Cámara 3D | Ancho visible 300, inclinación 52°, campo de visión 46°, adelanto 60 | `balance.camera` |
+| Tamaño de sala | 360 × 840 (los diseños se escriben a 600 de alto y se estiran) | `balance.arena` |
 | Obstáculos en las salas | 7 diseños de Brock; la sala en la que empieza a salir cada uno | `data/layouts.ts` |
 | Curva de experiencia | 5 + 2·L + L^1,35 por nivel, con un máximo de nivel 36 | `balance.experience` |
 | Evoluciones de especie | Nivel oficial. Las de piedra o intercambio no evolucionan en partida (pendiente). | `data/pokemon.ts` |

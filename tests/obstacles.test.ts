@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { BOSS_LAYOUT, LAYOUTS, layoutFor, type Obstacle } from '../src/data/layouts';
+import { BALANCE } from '../src/config/balance';
+import { BOSS_LAYOUT, LAYOUTS, layoutFor, stretch, type Obstacle } from '../src/data/layouts';
 import { isFree, NavGrid } from '../src/game/obstacles';
 import { roomSequence } from '../src/game/rooms';
 import type { World } from '../src/game/world';
 import { emptyRoom, makeWorld, run, spawnAt } from './helpers';
 
-const W = 360;
-const H = 600;
-const START = { x: 180, y: 530 };
+const W = BALANCE.arena.width;
+const H = BALANCE.arena.height;
+const START = { x: 180, y: H - 70 };
 const EXIT = { x: 180, y: 30 };
 
 function setObstacles(w: World, list: Obstacle[]): void {
@@ -22,10 +23,10 @@ describe('obstáculos', () => {
   it('todos los diseños dejan libre la entrada, la salida y el sitio del jefe, sin zonas cerradas', () => {
     for (const l of [...LAYOUTS, BOSS_LAYOUT]) {
       for (const flip of [false, true]) {
-        const obs = l.obstacles.map((o) => (flip ? { ...o, x: W - o.x - o.w } : o));
+        const obs = l.obstacles.map((o) => stretch(flip ? { ...o, x: W - o.x - o.w } : o, H / 600));
         expect(isFree(START.x, START.y, 20, obs), `${l.id} entrada`).toBe(true);
         expect(isFree(EXIT.x, EXIT.y + 10, 20, obs), `${l.id} salida`).toBe(true);
-        expect(isFree(180, 170, 30, obs) || l !== BOSS_LAYOUT, `${l.id} jefe`).toBe(true);
+        expect(isFree(180, Math.round(H * 0.35), 30, obs) || l !== BOSS_LAYOUT, `${l.id} jefe`).toBe(true);
         const nav = new NavGrid(W, H, obs);
         expect(nav.reachable(START, EXIT), `${l.id} camino`).toBe(true);
         // Cualquier punto libre de la zona de juego se puede alcanzar andando.
@@ -106,6 +107,22 @@ describe('obstáculos', () => {
     e.hp = 1e9;
     run(w, 8);
     expect(p.hp).toBeLessThan(1e6);
+  });
+
+  it('un Pokémon grande cruza un puente estrecho del río', () => {
+    const w = makeWorld();
+    emptyRoom(w);
+    const p = w.player;
+    p.moves = [];
+    p.hp = p.maxHp = 1e9;
+    setObstacles(w, [water(14, 392, 110, 84), water(170, 392, 30, 84), water(240, 392, 106, 84)]);
+    p.x = 180;
+    p.y = 700;
+    const e = spawnAt(w, 95, 'chase', 147, 330); // Onix
+    e.r = 30;
+    e.hp = 1e9;
+    run(w, 10);
+    expect(e.y).toBeGreaterThan(500);
   });
 
   it('los voladores cruzan el agua en línea recta', () => {

@@ -38,3 +38,9 @@ Stats base, tipos y nombres de los Pokémon: [PokeAPI](https://pokeapi.co/), a t
 ## Marcas
 
 Pokémon y todos los nombres y personajes relacionados son marcas y propiedad de Nintendo, Creatures Inc., GAME FREAK y The Pokémon Company. Este proyecto no está afiliado ni aprobado por ellos.
+
+## Three.js
+
+El escenario 3D usa [Three.js](https://threejs.org) 0.185.1 (dependencia de npm, no se ha modificado).
+
+- **Licencia:** MIT — Copyright © 2010-2026 three.js authors. https://github.com/mrdoob/three.js/blob/dev/LICENSE

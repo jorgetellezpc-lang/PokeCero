@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 60_000,
+  timeout: 180_000,
   use: {
     baseURL: 'http://localhost:4173',
     ...devices['Pixel 7'],

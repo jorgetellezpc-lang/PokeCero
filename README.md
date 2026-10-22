@@ -33,7 +33,7 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 
 ## Controles
 
-- **Móvil:** toca y arrastra en cualquier punto de la pantalla para mover el joystick. Al soltar el dedo y quedarte **quieto**, atacas solo (estilo Archero); al moverte, esquivas.
+- **Móvil:** toca y arrastra en cualquier punto de la pantalla para mover el joystick. Al soltar el dedo y quedarte **quieto**, atacas solo (estilo Archero); al moverte, esquivas. La cámara te sigue por la sala en 3D.
 - **Escritorio:** WASD o flechas para moverse; Esc o P para pausar.
 
 ## Estructura
@@ -52,7 +52,8 @@ src/
     upgradeGenerator.ts Las 3 cartas de subida de nivel
     abilities.ts        Pasiva + habilidades + sinergias → modificadores de combate
   meta/                 Progreso permanente: guardado, mejoras por Pokémon, recompensas, gachapón
-  render/               Canvas, sprites animados (animator.ts) y efectos pixel art (vfx.ts)
+  render/               Escenario 3D (scene3d.ts, Three.js), dibujo 2D de respaldo (renderer.ts, draw2d.ts),
+                        sprites animados (animator.ts) y efectos pixel art (vfx.ts)
   audio/                Sintetizador Web Audio y partituras
   input/                Joystick táctil y teclado
   ui/                   Menú principal (4 pestañas) y pantalla de partida

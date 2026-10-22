@@ -1,9 +1,9 @@
 import type { RoomKind } from '../game/rooms';
 
 // ============================================================================
-// Obstáculos de las salas (estilo Archero). Coordenadas del mundo: la arena
-// mide 360 × 600, entras abajo en el centro (180, 530) y la salida está arriba
-// en el centro. Diseños PROVISIONALES.
+// Obstáculos de las salas (estilo Archero). Los diseños se escriben para una
+// sala de 360 × 600 (entras abajo en el centro y la salida está arriba) y se
+// estiran en vertical al alto real de la sala. Diseños PROVISIONALES.
 //
 // - rock: no se puede pasar y para todos los proyectiles.
 // - water: no se puede pasar, pero los proyectiles cruzan por encima. Los
@@ -41,7 +41,11 @@ export const BOSS_LAYOUT: LayoutDef = { id: 'jefe', name: 'Arena del jefe', minR
 export const OPEN_LAYOUT: LayoutDef = { id: 'abierta', name: 'Abierta', minRoom: 0, obstacles: [] };
 
 /** Diseño de una sala: abierta la primera, de jefe en las de jefe y uno al azar en el resto. */
-export function layoutFor(room: number, kind: RoomKind, pick: () => number, width = 360): Obstacle[] {
+export function layoutFor(room: number, kind: RoomKind, pick: () => number, width = 360, height = 600): Obstacle[] {
+  return layoutBase(room, kind, pick, width).map((o) => stretch(o, height / 600));
+}
+
+function layoutBase(room: number, kind: RoomKind, pick: () => number, width: number): Obstacle[] {
   if (kind !== 'normal') return mirror(BOSS_LAYOUT.obstacles, false, width);
   const pool = LAYOUTS.filter((l) => l.minRoom <= room);
   if (room <= 1 || !pool.length) return [];
@@ -49,6 +53,11 @@ export function layoutFor(room: number, kind: RoomKind, pick: () => number, widt
   if (room % 10 === 1) return [];
   const l = pool[Math.floor(pick() * pool.length) % pool.length];
   return mirror(l.obstacles, pick() < 0.5, width);
+}
+
+/** Estira en vertical (posición y alto) a una sala más alta. */
+export function stretch(o: Obstacle, k: number): Obstacle {
+  return { ...o, y: Math.round(o.y * k), h: Math.round(o.h * k) };
 }
 
 function mirror(list: Obstacle[], flip: boolean, width: number): Obstacle[] {

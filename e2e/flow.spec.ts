@@ -9,6 +9,17 @@ const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
 };
 
+/** Elige cartas y objetos hasta que aparezca el resultado de la partida. */
+async function pickUntilResult(page: Page) {
+  for (let i = 0; i < 120; i++) {
+    if (await page.getByTestId('result').isVisible()) return;
+    const phase = await world(page, 'return w.phase;');
+    if (phase === 'item') await page.getByTestId('item-new').click();
+    else if (phase === 'levelup') await page.getByTestId('card-0').click();
+    await page.waitForTimeout(450);
+  }
+}
+
 /** Elige la primera carta en todas las subidas de nivel pendientes. */
 async function pickAllCards(page: Page) {
   for (let i = 0; i < 20; i++) {
@@ -56,7 +67,9 @@ test('ciclo completo del prototipo', async ({ page }) => {
   // Entrar al gimnasio
   await page.click('[data-tab="map"]');
   await page.getByTestId('play').click();
-  await expect(page.locator('.game-canvas')).toBeVisible();
+  await expect(page.locator('.game-canvas').first()).toBeVisible();
+  // Con WebGL 2 se juega en 3D (si no, el 2D clásico de respaldo).
+  await expect(page.locator('.run')).toHaveAttribute('data-view', '3d');
   await expect(page.getByTestId('room')).toHaveText('Sala 1/50');
   await page.waitForTimeout(1500);
   await shot(page, '05-combate');
@@ -99,7 +112,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await world(page, 'w.debugKillAll();');
   await page.waitForTimeout(1200);
   await pickAllCards(page);
-  await expect.poll(() => world(page, 'return w.exitOpen && w.pickups.length === 0;')).toBe(true);
+  await expect.poll(() => world(page, 'return w.exitOpen && w.pickups.length === 0;'), { timeout: 15000 }).toBe(true);
   await shot(page, '08-salida');
   await world(page, 'w.player.x = w.exit.x; w.player.y = w.exit.y + 12;');
   await expect(page.getByTestId('room')).toHaveText('Sala 4/50');
@@ -129,7 +142,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await shot(page, '11-jefe');
   await world(page, 'w.debugKillAll();');
   await page.waitForTimeout(500);
-  await pickAllCards(page);
+  await pickUntilResult(page);
   await expect(page.getByTestId('result')).toContainText('¡Victoria!', { timeout: 5000 });
   await shot(page, '12-victoria');
   await page.getByTestId('result-continue').click();
@@ -143,7 +156,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.locator('.boss-bar')).toBeVisible({ timeout: 5000 });
   await world(page, 'w.debugKillAll();');
   await page.waitForTimeout(300);
-  await pickAllCards(page);
+  await pickUntilResult(page);
   await expect(page.getByTestId('result')).toContainText('ya la tenías', { timeout: 5000 });
   await page.getByTestId('result-continue').click();
   expect(Number(await page.getByTestId('tickets').textContent())).toBeLessThan(ticketsAfterWin + 10);
@@ -173,4 +186,22 @@ test('sin desplazamiento de página y joystick no hace scroll', async ({ page })
   expect(scroll[0]).toBeLessThanOrEqual(scroll[1]);
   const touchAction = await page.locator('.run').evaluate((el) => getComputedStyle(el).touchAction);
   expect(touchAction).toBe('none');
+});
+
+test('sin WebGL 2 se juega con el dibujo 2D clásico', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => {
+    const orig = HTMLCanvasElement.prototype.getContext;
+    // @ts-expect-error simulación de un dispositivo sin WebGL 2
+    HTMLCanvasElement.prototype.getContext = function (type: string, ...rest: unknown[]) {
+      return type === 'webgl2' ? null : orig.call(this, type, ...rest);
+    };
+  });
+  await page.goto('/?debug');
+  await page.getByTestId('play').click();
+  await expect(page.locator('.run')).toHaveAttribute('data-view', '2d');
+  await page.waitForTimeout(1500);
+  expect(await world(page, 'return w.time;')).toBeGreaterThan(0.5);
+  expect(errors).toEqual([]);
 });

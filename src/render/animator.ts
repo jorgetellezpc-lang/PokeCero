@@ -122,12 +122,12 @@ export function playerScale(dex: number): number {
 }
 
 /** Sombra elíptica bajo los pies, según el tamaño de sombra de PMD. */
-export function drawShadow(ctx: CanvasRenderingContext2D, dex: number, x: number, y: number, scale = 1): void {
+export function drawShadow(ctx: CanvasRenderingContext2D, dex: number, x: number, y: number, scale = 1, flat = false): void {
   const s = spriteMeta(dex)?.s ?? 1;
   const rx = [5, 8, 12][Math.max(0, Math.min(2, s))] * PX() * scale;
   ctx.fillStyle = 'rgba(0,0,0,.34)';
   ctx.beginPath();
-  ctx.ellipse(x, y, rx, rx * 0.42, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y, rx, rx * (flat ? 0.75 : 0.42), 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -194,6 +194,27 @@ export class Animator {
         this.frame = 0;
       }
     }
+  }
+
+  /**
+   * Fotograma que toca ahora: hoja, recorte y ancla a los pies (para el 3D).
+   * Mismas reglas que draw(): si la hoja aún no ha cargado, usa Idle.
+   */
+  frameInfo(): { img: HTMLImageElement; sx: number; sy: number; w: number; h: number; ax: number; ay: number; k: number } | null {
+    let m = animMeta(this.dex, this.cur);
+    let s = sheet(this.dex, this.cur);
+    let frame = this.frame;
+    if (s && !s.ready) {
+      const idle = sheet(this.dex, 'Idle');
+      if (idle?.ready) {
+        s = idle;
+        m = animMeta(this.dex, 'Idle');
+        frame = 0;
+      }
+    }
+    if (!m || !s || !s.ready) return null;
+    const row = Math.min(this.dir, m.r - 1);
+    return { img: s.img, sx: Math.min(frame, m.n - 1) * m.w, sy: row * m.h, w: m.w, h: m.h, ax: m.ax, ay: m.ay, k: PX() * this.scale };
   }
 
   /** Dibuja con los pies en (x, y). */

@@ -29,7 +29,14 @@ export const BALANCE = {
   },
 
   /** Tamaño lógico de la arena (unidades de mundo). La pantalla escala esto. */
-  arena: { width: 360, height: 600, margin: 14 },
+  /**
+   * Cámara 3D (estilo Archero). PROVISIONAL.
+   * viewWidth: ancho de sala que se ve a la altura del jugador; elevation:
+   * inclinación en grados (90 = cenital); lead: cuánto se adelanta hacia arriba.
+   */
+  camera: { viewWidth: 300, elevation: 52, fov: 46, lead: 60, follow: 6 },
+  /** Sala: más alta que la pantalla; la cámara sigue al jugador (estilo Archero). */
+  arena: { width: 360, height: 840, margin: 14 },
 
   player: {
     /** Radio de colisión máximo (los Pokémon grandes chocan como uno normal). */
