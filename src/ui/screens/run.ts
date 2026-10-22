@@ -85,6 +85,7 @@ export class RunScreen implements Screen {
     this.scene3d = Scene3D.create(this.canvas, this.overlayCanvas, store.data.settings.graphics);
     if (this.scene3d) {
       this.scene3d.showDamageNumbers = store.data.settings.damageNumbers;
+      this.scene3d.zoom = store.data.settings.zoom;
     } else {
       this.canvas = h('canvas', { class: 'game-canvas' });
       this.renderer = new Renderer(this.canvas.getContext('2d')!);

@@ -49,6 +49,8 @@ interface SpriteView {
 
 export class Scene3D {
   showDamageNumbers = true;
+  /** Zoom de la cámara (ajuste del jugador): 1 = normal, más = más cerca. */
+  zoom = 1;
   private gl: WebGLRenderer;
   private scene = new Scene();
   private camera = new PerspectiveCamera(30, 1, 10, 6000);
@@ -207,7 +209,7 @@ export class Scene3D {
     cam.up.set(0, 1, 0);
     cam.fov = C.fov;
     const half = Math.atan(Math.tan((C.fov * Math.PI) / 360) * cam.aspect);
-    const D = C.viewWidth / 2 / Math.tan(half);
+    const D = C.viewWidth / this.zoom / 2 / Math.tan(half);
     // Qué franja de suelo cae en el borde de arriba y de abajo de la pantalla
     // (respecto al punto al que mira), para no enseñar mucho fuera de la sala.
     const f2 = (C.fov * Math.PI) / 360;
@@ -252,7 +254,7 @@ export class Scene3D {
     const C = BALANCE.camera;
     const cam = this.camera;
     cam.fov = 30;
-    const viewW = C.arenaViewWidth;
+    const viewW = C.arenaViewWidth / this.zoom;
     const half = Math.atan(Math.tan((cam.fov * Math.PI) / 360) * cam.aspect);
     const D = viewW / 2 / Math.tan(half);
     const hh = D * Math.tan((cam.fov * Math.PI) / 360);

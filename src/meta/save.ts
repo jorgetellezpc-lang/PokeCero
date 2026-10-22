@@ -19,6 +19,8 @@ export interface Settings {
   sfx: number;
   /** Calidad del escenario 3D: automática o fija. */
   graphics: GraphicsQuality;
+  /** Zoom de la cámara en partida: 1 = normal, más = más cerca. */
+  zoom: number;
 }
 
 export type GraphicsQuality = 'auto' | 'high' | 'medium' | 'low';
@@ -55,7 +57,7 @@ export function defaultSave(): SaveData {
     claimedRewards: [],
     upgrades: {},
     pity: 0,
-    settings: { testMode: true, damageNumbers: true, vibration: true, music: 0.5, sfx: 0.7, graphics: 'auto' },
+    settings: { testMode: true, damageNumbers: true, vibration: true, music: 0.5, sfx: 0.7, graphics: 'auto', zoom: 1 },
     stats: { runs: 0, wins: 0, kills: 0, pulls: 0 },
   };
 }

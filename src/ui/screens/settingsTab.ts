@@ -74,6 +74,12 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
       row('sound', 'Efectos de sonido', slider('sfx')),
       row('vibrate', 'Vibración', toggle('vibration'), 'Al recibir daño, si el móvil lo permite'),
       row('numbers', 'Números de daño', toggle('damageNumbers')),
+      row('quality', 'Vista de la cámara', h('input', {
+        type: 'range', min: 70, max: 140, step: 5, value: Math.round(s.zoom * 100), class: 'slider', 'data-setting': 'zoom',
+        style: `--v:${((s.zoom * 100 - 70) / 70) * 100}%`,
+        oninput: (e: Event) => { const el = e.target as HTMLInputElement; el.style.setProperty('--v', `${((Number(el.value) - 70) / 70) * 100}%`); },
+        onchange: (e: Event) => { const v = Number((e.target as HTMLInputElement).value) / 100; store.update((d) => { d.settings.zoom = v; }); },
+      }), `${s.zoom < 0.95 ? 'Más lejos' : s.zoom > 1.05 ? 'Más cerca' : 'Normal'} · ${Math.round(s.zoom * 100)} %`),
       row('quality', 'Calidad gráfica', gfxBtn, s.graphics === 'auto' ? 'Se ajusta sola si el móvil va justo' : 'Fija para el escenario 3D'),
       row('flag', 'Modo prueba', toggle('testMode'), `Gimnasio corto de ${BALANCE.rooms.testModeRooms.length} salas con más experiencia`),
     ),
