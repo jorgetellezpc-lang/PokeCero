@@ -785,3 +785,44 @@
 .pk-left { margin: 0; padding: 0; background: none !important; }
 .pk-stage { height: 168px; border-radius: 14px; overflow: hidden; background-size: cover; background-position: 50% 85%; border: 2px solid #3a5ad8; }
 .pk-sprite { margin-bottom: 18px; }
+
+/* v0.4c: portada calcada del diseño. 1 px de la ilustración = 100cqw / 941. */
+.home-art { --px: calc(100cqw / 941); }
+.hot { position: absolute; padding: 0; border: none; background: none; color: inherit; font-family: var(--m-body); }
+.hot:focus-visible { outline: 3px solid #fff; outline-offset: 2px; border-radius: 12px; }
+.medal-text { position: absolute; font: 800 calc(31 * var(--px)) / 1 var(--m-body); color: #45d4f8; white-space: nowrap; pointer-events: none; }
+.medal-bar { position: absolute; display: flex; gap: calc(3 * var(--px)); pointer-events: none; }
+.medal-bar i { flex: 1; border-radius: calc(6 * var(--px)); background: #142446; box-shadow: inset 0 0 0 calc(2 * var(--px)) #060d22; }
+.medal-bar i.on { background: linear-gradient(#8aff6a, #2fc23a); box-shadow: inset 0 0 0 calc(2 * var(--px)) #0d4a12; }
+.bdot { position: absolute; width: 6.7%; height: 6.5%; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #a8adbb, #5a6070); }
+.bdot.on { background: radial-gradient(circle at 40% 35%, #fff2a0, #f5b800); box-shadow: 0 0 calc(4 * var(--px)) #ffd23a; }
+.cta-hot .cta-t1, .cta-hot .cta-t2 { position: absolute; left: 0; right: calc(30 * var(--px)); text-align: center; pointer-events: none; }
+.cta-t1 { top: 11.9%; font: 900 calc(52 * var(--px)) / 1 var(--m-body); color: #120d00; }
+.cta-t2 { top: 57.4%; font: 600 calc(28 * var(--px)) / 1 var(--m-body); color: #1d1200; }
+.cta-hot:active { transform: translateY(calc(4 * var(--px))); }
+.drawn-lock { position: absolute; padding: 0; border: none; background: url('/ui/pin-locked.webp') center / 100% 100%; }
+.drawn-lock span { position: absolute; left: 0; right: 0; top: 60%; font: 800 calc(21 * var(--px)) / 1 var(--m-body); color: #fff; text-align: center; }
+.home-art { left: 0; transform: translateY(-50%); }
+.gym-head.art img { aspect-ratio: 941 / 390; }
+.menu .menu-content { scrollbar-width: none; }
+.menu .menu-content::-webkit-scrollbar { display: none; }
+.stop2-mon { height: 90px; display: grid; place-items: end center; }
+.stop2-mon img { width: 84px; height: 84px; filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.4)); }
+.track2-line { top: 84px; }
+/* Portada: ilustración a todo el ancho, pegada abajo; si la pantalla es más alta, sigue su cielo. */
+.home-stage { background: #0055b9 var(--home-bg) bottom center / 100% auto no-repeat; }
+.home-art { left: 0; right: 0; top: auto; bottom: 0; transform: none; width: 100cqw; height: auto; aspect-ratio: 941 / 1375; }
+
+.home-art { margin-bottom: 0; }
+.home-stage { background-position: center calc(100% - min(100cqh, 100cqw * 1375 / 941) + 1px); }
+
+/* Portada (final): columna con el cielo arriba (si sobra alto) y la ilustración abajo. */
+.home-stage { display: flex; flex-direction: column; justify-content: flex-end; background: #0055b9; }
+.home-sky { flex: 1 1 auto; min-height: 0; background-size: 100% auto; background-position: bottom center; background-repeat: no-repeat; }
+.home-art { position: relative; left: auto; right: auto; bottom: auto; top: auto; transform: none; flex: none; width: 100%; }
+/* Si sobra alto, la ilustración crece hasta un 15 % (recortando un poco los lados, nunca los gimnasios) y el resto es cielo. */
+.home-stage { align-items: center; }
+.home-art { width: clamp(100cqw, calc(100cqh * 941 / 1375), 115cqw); }
+.home-stage { align-items: flex-start; }
+.home-art { width: clamp(100cqw, calc(100cqh * 941 / 1375), 113cqw); }
+.home-sky { background-size: cover; }

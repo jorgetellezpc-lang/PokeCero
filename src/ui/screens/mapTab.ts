@@ -29,6 +29,7 @@ const PINS: Record<string, [number, number]> = {
 };
 const box = (x: number, y: number, w: number, h: number) =>
   `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%;width:${(w / ART.w) * 100}%;height:${(h / ART.h) * 100}%`;
+const dot = (cx: number, cy: number) => `left:${((cx - 6.5) / 193) * 100}%;top:${((cy - 6.5) / 200) * 100}%`;
 const at = (x: number, y: number) => `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%`;
 
 export function renderMapTab(menu: MenuScreen): HTMLElement {
@@ -52,44 +53,51 @@ function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   const medals = (store.data.medals[region.id] ?? []).length;
   const next = region.gyms.find((g) => gymStatus(store, region, g) === 'available') ?? region.gyms.find((g) => gymStatus(store, region, g) === 'completed');
 
+  // Los pines dibujados en la ilustración se quedan tal cual; encima solo hay
+  // zonas táctiles invisibles. Si un gimnasio se desbloquea, su pin dibujado
+  // (con candado) se tapa con uno abierto.
   const pins = region.gyms.map((g) => {
     const st = gymStatus(store, region, g);
     const [x, y] = PINS[g.id] ?? [g.mapPos.x * ART.w, g.mapPos.y * ART.h];
     const open = st === 'available' || st === 'completed';
-    const city = g.id === 'brock' ? g.city : g.city.replace('Ciudad ', '');
-    if (open) {
+    const go = () => menu.go('gym', g.id);
+    if (g.id === 'brock') {
+      // Pin dibujado de Brock + sus puntos de progreso (redibujados en su sitio).
       const best = store.data.bestRoom[g.id] ?? 0;
       const rooms = roomSequence(store.data.settings.testMode);
-      const done = rooms.filter((r) => r <= best).length;
-      const boss = g.bosses[BALANCE.rooms.bossRoom];
-      return h('button', { class: `gpin open ${st} ${g.id === 'brock' ? 'baked' : ''}`, style: at(x, y), 'data-gym': g.id, onclick: () => menu.go('gym', g.id) },
-        // El retrato de Brock ya está en la ilustración; para los demás, su jefe.
-        h('span', { class: 'gpin-face' }, g.id !== 'brock' && boss ? pokeImg(BOSSES[boss].dex, 64) : null),
-        h('span', { class: 'gpin-name' }, city),
-        h('span', { class: 'gpin-dots' }, ...rooms.map((_, i) => h('i', { class: i < done ? 'on' : '' }))),
+      const lit = st === 'completed' ? 6 : Math.round((rooms.filter((r) => r <= best).length / rooms.length) * 6);
+      return h('button', { class: `hot ${st}`, style: box(205, 430, 193, 200), 'data-gym': g.id, 'aria-label': g.city, onclick: go },
+        ...[235, 260, 285, 312, 337, 362].map((cx, i) => h('i', { class: `bdot ${i < lit ? 'on' : ''}`, style: dot(cx - 205, 609 - 430) })),
       );
     }
-    return h('button', { class: 'gpin locked', style: at(x, y), 'data-gym': g.id, onclick: () => menu.go('gym', g.id) },
-      icon('lock', 30), h('span', {}, city));
+    if (open) {
+      const boss = g.bosses[BALANCE.rooms.bossRoom];
+      return h('button', { class: 'gpin open', style: at(x, y), 'data-gym': g.id, onclick: go },
+        h('span', { class: 'gpin-face' }, boss ? pokeImg(BOSSES[boss].dex, 64) : null),
+        h('span', { class: 'gpin-name' }, g.city.replace('Ciudad ', '')));
+    }
+    if (g.id === 'erika') {
+      // Azulona no está dibujada: mismo pin de candado que los demás.
+      return h('button', { class: 'drawn-lock', style: `${box(x - 55, y - 55, 110, 110)};background-image:url(ui/pin-locked.webp)`, 'data-gym': g.id, onclick: go },
+        h('span', {}, g.city.replace('Ciudad ', '')));
+    }
+    return h('button', { class: 'hot', style: box(x - 53, y - 52, 106, 104), 'data-gym': g.id, 'aria-label': g.city, onclick: go });
   });
 
   return h('div', { class: 'tab tab-home' },
     h('div', { class: 'home-stage' },
+      h('div', { class: 'home-sky', style: 'background-image:url(ui/home-sky.webp)' }),
       h('div', { class: 'home-art' },
         h('img', { class: 'home-img', src: 'ui/home-kanto.webp', alt: '', draggable: 'false' }),
-        h('h1', { class: 'sr-only' }, 'Pokécero'),
+        h('h1', { class: 'sr-only' }, `Pokécero · ${region.name}`),
+        // Letrero de la región: el texto y la barra de medallas, en su sitio exacto.
+        h('span', { class: 'medal-text', style: at(137, 291) }, `Medallas ${medals}/8`),
+        h('span', { class: 'medal-bar', style: box(137, 329, 214, 16) }, ...region.gyms.map((_, i) => h('i', { class: i < medals ? 'on' : '' }))),
         ...pins,
         next
-          ? h('button', { class: 'cta home-cta', style: box(245, 1110, 452, 140), 'data-testid': 'enter', onclick: () => menu.go('gym', next.id) },
-            h('span', { class: 'cta-main' }, 'Entrar'), h('span', { class: 'cta-sub' }, `${next.order}. ${next.city}`), h('span', { class: 'cta-arrow' }, '▶'))
+          ? h('button', { class: 'hot cta-hot', style: box(245, 1110, 452, 140), 'data-testid': 'enter', onclick: () => menu.go('gym', next.id) },
+            h('span', { class: 'cta-t1' }, 'Entrar'), h('span', { class: 'cta-t2' }, `${next.order}. ${next.city}`))
           : null,
-      ),
-      // Fuera de la ilustración: así no se corta si la pantalla es estrecha
-      // (tapa el letrero dibujado, que queda en el mismo sitio).
-      h('div', { class: 'region-pill2' },
-        icon('pokeball', 54),
-        h('span', { class: 'rp-text' }, h('b', {}, region.name), h('small', {}, `Medallas ${medals}/8`),
-          h('span', { class: 'rp-bar' }, ...region.gyms.map((_, i) => h('i', { class: i < medals ? 'on' : '' })))),
       ),
     ),
   );
@@ -138,7 +146,7 @@ function renderGym(menu: MenuScreen, region: RegionDef, gym: GymDef): HTMLElemen
       const claimed = isClaimed(store, gym.id, Number(room));
       return h('div', { class: `stop2 ${best >= Number(room) ? 'beaten' : ''}` },
         h('span', { class: 'stop2-room' }, `Sala ${room}`),
-        h('span', { class: 'stop2-mon' }, animatedPokemon(def.dex, 96, { dir: 0 })),
+        h('span', { class: 'stop2-mon' }, pokeImg(def.dex, 84)),
         h('span', { class: 'stop2-name' }, def.name),
         h('span', { class: 'stop2-ped' }),
         h('span', { class: `stop2-reward ${claimed ? 'claimed' : ''}` }, h('small', {}, 'Recompensa'),
