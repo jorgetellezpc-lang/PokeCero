@@ -17,7 +17,11 @@ export interface Settings {
   vibration: boolean;
   music: number;
   sfx: number;
+  /** Calidad del escenario 3D: automática o fija. */
+  graphics: GraphicsQuality;
 }
+
+export type GraphicsQuality = 'auto' | 'high' | 'medium' | 'low';
 
 export interface SaveData {
   version: number;
@@ -51,7 +55,7 @@ export function defaultSave(): SaveData {
     claimedRewards: [],
     upgrades: {},
     pity: 0,
-    settings: { testMode: true, damageNumbers: true, vibration: true, music: 0.5, sfx: 0.7 },
+    settings: { testMode: true, damageNumbers: true, vibration: true, music: 0.5, sfx: 0.7, graphics: 'auto' },
     stats: { runs: 0, wins: 0, kills: 0, pulls: 0 },
   };
 }

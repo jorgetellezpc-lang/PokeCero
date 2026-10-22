@@ -73,6 +73,17 @@ Archero2Clone no tiene licencia, así que solo se usó como referencia funcional
   - Los obstáculos frenan a los enemigos con un radio máximo de 13, para que los grandes quepan por los puentes.
 - **Rendimiento:** como mucho hay 360 proyectiles a la vez; si se pasa, desaparecen antes los tuyos más viejos (`balance.perf`).
 
+## Menús (v0.3)
+
+Estética de juego móvil a partir del ejemplo del usuario: paneles azules con brillo, botones amarillos gruesos y tipografías Lilita One y Nunito (con fuentes de respaldo si no cargan).
+
+- **Mapa:** portada de la región con la isla ilustrada y el botón Entrar; mapa con la ruta entre gimnasios y candados; ficha del gimnasio con su jefe animado, el recorrido de jefes (salas 20, 40 y 50), las recompensas y el botón Comenzar.
+- **Pokémon:** tu Pokémon animado sobre una plataforma, su línea evolutiva, sus estadísticas y las mejoras con iconos de color.
+- **Gachapón:** máquina de cápsulas con los iniciales alrededor, probabilidades por rareza y tiradas ×1 y ×10.
+- **Ajustes:** lista con iconos. Incluye la **calidad gráfica** (automática, alta, media o baja; controla el 3D de verdad), la guía del juego y los créditos.
+- **Ilustraciones:** la isla y la cueva se generan en código (`src/render/art.ts`). No se usan imágenes de terceros.
+- **No integrado del ejemplo, a propósito:** la **energía** (rayo 30/30, "Comenzar ×5") y el **nivel de jugador**. Son sistemas nuevos de economía y progresión que el blueprint no tiene (y la energía es típica de juegos con pagos). En su lugar, la barra superior muestra tu Pokémon y tus medallas. El idioma no se incluye porque solo hay español.
+
 ## Provisional (pendiente de decisión de diseño)
 
 | Tema | Valor actual | Dónde |

@@ -74,6 +74,7 @@ export class Scene3D {
   private v = new Vector3();
   /** Calidad automática: si va lento, baja la resolución y luego quita las sombras. */
   private quality = sessionQuality;
+  private adaptive = true;
   private frameMs = 16;
   private lastFrame = 0;
   private slowFor = 0;
@@ -84,11 +85,16 @@ export class Scene3D {
   private tilt = (BALANCE.camera.elevation * Math.PI) / 180;
 
   /** Crea la escena, o null si el dispositivo no tiene WebGL. */
-  static create(glCanvas: HTMLCanvasElement, overlay: HTMLCanvasElement): Scene3D | null {
+  static create(glCanvas: HTMLCanvasElement, overlay: HTMLCanvasElement, mode: 'auto' | 'high' | 'medium' | 'low' = 'auto'): Scene3D | null {
     try {
       const probe = glCanvas.getContext('webgl2');
       if (!probe) return null;
-      return new Scene3D(glCanvas, overlay);
+      const s = new Scene3D(glCanvas, overlay);
+      if (mode !== 'auto') {
+        s.quality = mode === 'high' ? 0 : mode === 'medium' ? 2 : 4;
+        s.adaptive = false;
+      }
+      return s;
     } catch {
       return null;
     }
@@ -147,6 +153,7 @@ export class Scene3D {
   }
 
   private adaptQuality(): void {
+    if (!this.adaptive) return;
     const now = performance.now();
     if (this.lastFrame) {
       const dt = Math.min(250, now - this.lastFrame);

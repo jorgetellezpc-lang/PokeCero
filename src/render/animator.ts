@@ -251,6 +251,30 @@ export class Animator {
   }
 }
 
+/** Caja con contenido (píxeles no transparentes) del primer fotograma. */
+function bounds(img: HTMLImageElement, fw: number, fh: number): { x: number; y: number; w: number; h: number } {
+  const c = document.createElement('canvas');
+  c.width = fw;
+  c.height = fh;
+  const x = c.getContext('2d', { willReadFrequently: true })!;
+  x.drawImage(img, 0, 0, fw, fh, 0, 0, fw, fh);
+  const d = x.getImageData(0, 0, fw, fh).data;
+  let x0 = fw;
+  let y0 = fh;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < fh; y++) {
+    for (let i = 0; i < fw; i++) {
+      if (d[(y * fw + i) * 4 + 3] < 20) continue;
+      if (i < x0) x0 = i;
+      if (i > x1) x1 = i;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? { x: 0, y: 0, w: fw, h: fh } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
 /** Retrato estático (primer fotograma de Idle mirando abajo) como data URL, para la interfaz. */
 export function portrait(dex: number, size = 64, silhouette = false): Promise<string> {
   return new Promise((resolve) => {
@@ -263,10 +287,13 @@ export function portrait(dex: number, size = 64, silhouette = false): Promise<st
       c.height = size;
       const ctx = c.getContext('2d')!;
       ctx.imageSmoothingEnabled = false;
-      const k = Math.max(1, Math.floor(size / Math.max(m.w, m.h)));
-      const w = m.w * k;
-      const h = m.h * k;
-      ctx.drawImage(s.img, 0, 0, m.w, m.h, (size - w) / 2, (size - h) / 2 + (size - m.ay * k) * 0.15, w, h);
+      // Recorta el margen vacío del fotograma para que el Pokémon llene el retrato.
+      const b = bounds(s.img, m.w, m.h);
+      let k = (size * 0.88) / Math.max(b.w, b.h);
+      if (k >= 2) k = Math.floor(k);
+      const w = b.w * k;
+      const h = b.h * k;
+      ctx.drawImage(s.img, b.x, b.y, b.w, b.h, (size - w) / 2, (size - h) / 2, w, h);
       if (silhouette) {
         ctx.globalCompositeOperation = 'source-in';
         ctx.fillStyle = '#1a1a2a';

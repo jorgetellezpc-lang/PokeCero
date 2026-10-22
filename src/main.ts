@@ -1,4 +1,5 @@
 import './styles.css';
+import './ui/menu.css';
 import { browserStorage, SaveStore } from './meta/save';
 import { setSpriteResolver } from './render/animator';
 import { App } from './ui/app';

@@ -9,6 +9,12 @@ const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
 };
 
+/** Abre la ficha del gimnasio (si hace falta) y pulsa Comenzar. */
+async function startGym(page: Page) {
+  if (!(await page.getByTestId('play').isVisible())) await page.getByTestId('enter').click();
+  await page.getByTestId('play').click();
+}
+
 /** Elige cartas y objetos hasta que aparezca el resultado de la partida. */
 async function pickUntilResult(page: Page) {
   for (let i = 0; i < 120; i++) {
@@ -45,7 +51,10 @@ test('ciclo completo del prototipo', async ({ page }) => {
 
   await page.goto('/?debug');
   await expect(page.locator('.bottom-nav .nav-btn')).toHaveCount(4);
+  await expect(page.getByTestId('enter')).toContainText('Ciudad Plateada');
+  await page.getByTestId('enter').click();
   await expect(page.getByTestId('gym-detail')).toContainText('Ciudad Plateada');
+  await expect(page.getByTestId('gym-detail')).toContainText('Onix');
   await shot(page, '01-mapa');
 
   // Navegación por las cuatro pestañas
@@ -66,7 +75,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
 
   // Entrar al gimnasio
   await page.click('[data-tab="map"]');
-  await page.getByTestId('play').click();
+  await startGym(page);
   await expect(page.locator('.game-canvas').first()).toBeVisible();
   // Con WebGL 2 se juega en 3D (si no, el 2D clásico de respaldo).
   await expect(page.locator('.run')).toHaveAttribute('data-view', '3d');
@@ -135,7 +144,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   expect(goldAfterLoss).toBeGreaterThan(500);
 
   // Victoria contra el jefe final: medalla y tickets (una sola vez)
-  await page.getByTestId('play').click();
+  await startGym(page);
   await world(page, 'w.startRoom(w.rooms.length - 1);');
   await expect(page.locator('.boss-bar')).toBeVisible({ timeout: 5000 });
   await page.waitForTimeout(1200);
@@ -151,7 +160,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.locator('.topbar')).toContainText('1/8');
 
   // Repetir el jefe no vuelve a dar los tickets
-  await page.getByTestId('play').click();
+  await startGym(page);
   await world(page, 'w.startRoom(w.rooms.length - 1);');
   await expect(page.locator('.boss-bar')).toBeVisible({ timeout: 5000 });
   await world(page, 'w.debugKillAll();');
@@ -181,7 +190,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
 
 test('sin desplazamiento de página y joystick no hace scroll', async ({ page }) => {
   await page.goto('/');
-  await page.getByTestId('play').click();
+  await startGym(page);
   const scroll = await page.evaluate(() => [document.documentElement.scrollHeight, window.innerHeight]);
   expect(scroll[0]).toBeLessThanOrEqual(scroll[1]);
   const touchAction = await page.locator('.run').evaluate((el) => getComputedStyle(el).touchAction);
@@ -199,7 +208,7 @@ test('sin WebGL 2 se juega con el dibujo 2D clásico', async ({ page }) => {
     };
   });
   await page.goto('/?debug');
-  await page.getByTestId('play').click();
+  await startGym(page);
   await expect(page.locator('.run')).toHaveAttribute('data-view', '2d');
   await page.waitForTimeout(1500);
   expect(await world(page, 'return w.time;')).toBeGreaterThan(0.5);
