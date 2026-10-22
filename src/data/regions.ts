@@ -26,7 +26,7 @@ export const KANTO: RegionDef = {
       enemyPool: [],
       // PROVISIONAL — ejemplo del blueprint, pendiente de decisión de diseño.
       bosses: { 20: 'geodude-boss', 40: 'sudowoodo-boss', 50: 'onix-boss' },
-      arenas: { normal: 'brock-normal', boss: 'brock-boss' },
+      arenas: { normal: ['brock-normal', 'brock-2', 'brock-3'], boss: 'brock-boss' },
       mapPos: { x: 0.24, y: 0.2 },
       theme: theme('#6aa850', '#4c8838', '#c8a870', '#8c8478'),
     },

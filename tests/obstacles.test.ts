@@ -231,10 +231,19 @@ describe('obstáculos', () => {
     }
   });
 
-  it('el gimnasio de Brock usa sus arenas: normal en las salas y la del jefe en 20, 40 y 50', () => {
-    const w = makeWorld({ rooms: [1, 20, 50], gym: brockArt });
-    expect(w.arena?.id).toBe('brock-normal');
-    w.startRoom(1);
+  it('el gimnasio de Brock usa sus arenas: las normales turnándose y la del jefe en 20, 40 y 50', () => {
+    const normals = ['brock-normal', 'brock-2', 'brock-3'];
+    const w = makeWorld({ rooms: [1, 2, 3, 4, 5, 6, 20, 50], gym: brockArt });
+    const seen: string[] = [];
+    for (let i = 0; i < 6; i++) {
+      w.startRoom(i);
+      expect(normals).toContain(w.arena?.id);
+      expect(w.H).toBe(ARENAS[w.arena!.id].H);
+      if (i) expect(w.arena?.id, `sala ${i + 1}`).not.toBe(seen[i - 1]);
+      seen.push(w.arena!.id);
+    }
+    expect(new Set(seen).size).toBe(3);
+    w.startRoom(6);
     expect(w.arena?.id).toBe('brock-boss');
     expect(w.H).toBe(ARENAS['brock-boss'].H);
   });

@@ -2,7 +2,7 @@ import { BALANCE } from '../config/balance';
 import { ABILITIES, BASE_MODS } from '../data/abilities';
 import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '../data/enemies';
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
-import { ARENAS, arenaObstacles, type ArenaDef } from '../data/arenas';
+import { ARENAS, arenaObstacles, normalArenaFor, type ArenaDef } from '../data/arenas';
 import { layoutFor, type Obstacle } from '../data/layouts';
 import { getMove, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
 import { ATTACK_UPGRADE, attackDef, attackEvolutionReady, attackStats, signatureFor } from '../data/signatures';
@@ -233,7 +233,7 @@ export class World {
     this.scaling = scalingFor(effective);
     const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
     const arts = this.gym.arenas;
-    this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? arts.normal : arts.boss] ?? null : null;
+    this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? normalArenaFor(arts.normal, index, this.layoutSeed) : arts.boss] ?? null : null;
     this.H = this.arena ? this.arena.H : BALANCE.arena.height;
     this.obstacles = this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
     this.nav = new NavGrid(this.W, this.H, this.obstacles, this.arena ? 8 : 10);

@@ -32,6 +32,8 @@ export interface ArenaDef {
 
 const NORMAL_S = 360 / 760;
 const BOSS_S = 360 / 860;
+const S2 = 360 / 740;
+const S3 = 360 / 560;
 
 export const ARENAS: Record<string, ArenaDef> = {
   'brock-normal': {
@@ -52,6 +54,20 @@ export const ARENAS: Record<string, ArenaDef> = {
       [90, 230, 140, 1400], [805, 230, 850, 1400],
     ],
   },
+  // Explanada con seis rocas.
+  'brock-2': {
+    id: 'brock-2', image: 'arenas/arena-brock-2.webp', occluder: 'arenas/arena-brock-2-occ.webp',
+    imgW: 941, imgH: 1671, ox: 100, oy: 270, s: S2, H: Math.round((1395 - 270) * S2),
+    rocks: [[585, 478, 722, 528, 395], [300, 500, 375, 522, 485], [195, 648, 312, 702, 570], [585, 745, 790, 802, 665], [175, 1075, 392, 1132, 985], [590, 1150, 792, 1218, 1035], [140, 1340, 242, 1400, 1270], [590, 1340, 692, 1400, 1275]],
+    blockers: [],
+  },
+  // Camino entre cascadas y puentes: más estrecho y con curvas.
+  'brock-3': {
+    id: 'brock-3', image: 'arenas/arena-brock-3.webp', occluder: 'arenas/arena-brock-3-occ.webp',
+    imgW: 941, imgH: 1671, ox: 220, oy: 290, s: S3, H: Math.round((1325 - 290) * S3),
+    rocks: [[400, 480, 472, 526, 400], [632, 640, 822, 696, 555], [310, 762, 546, 834, 685], [690, 900, 792, 975, 770], [398, 1178, 472, 1206, 1150], [310, 1290, 412, 1400, 1170], [600, 1335, 702, 1400, 1290], [745, 1150, 892, 1225, 1000]],
+    blockers: [],
+  },
   'brock-boss': {
     id: 'brock-boss', image: 'arenas/arena-brock-boss.webp', occluder: 'arenas/arena-brock-boss-occ.webp',
     imgW: 941, imgH: 1672, ox: 40, oy: 400, s: BOSS_S, H: Math.round((1160 - 400) * BOSS_S),
@@ -62,6 +78,15 @@ export const ARENAS: Record<string, ArenaDef> = {
     ],
   },
 };
+
+/**
+ * Arena de una sala normal: si el gimnasio tiene varias, se van turnando
+ * (dos salas normales seguidas nunca repiten) empezando por una al azar.
+ */
+export function normalArenaFor(list: string | string[], roomIndex: number, seed: number): string {
+  const all = typeof list === 'string' ? [list] : list;
+  return all[(roomIndex + seed) % all.length];
+}
 
 /** Rectángulo en píxeles de la ilustración → mundo. */
 export function arenaRect(a: ArenaDef, x0: number, y0: number, x1: number, y1: number): { x: number; y: number; w: number; h: number } {

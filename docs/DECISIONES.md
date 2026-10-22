@@ -173,7 +173,12 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - **Colisión precisa (v0.5):** máscara generada desde la ilustración (`src/data/arenaCollision.ts`, 6 píxeles de detalle): borde del suelo trazado a mano y base real de cada roca. Rendijas y bolsas por las que no cabe un Pokémon se rellenan solas. En las arenas se choca con los pies (radio 7), no con todo el cuerpo.
 - **Cámara de arena:** más cerca (ancho visible 215) y adelantada hacia donde te mueves o apuntas.
 - **Partida más sobria:** letra Rajdhani, barras finas, paneles oscuros y cartas negras con franja de color (`src/ui/run.css`).
-- Para todas las salas normales de Brock se usa el mismo diseño. Los demás gimnasios siguen con salas generadas hasta tener sus ilustraciones.
+- **Tres arenas normales que se turnan:**
+  - Las salas normales de Brock usan tres ilustraciones: la original, `arena-brock-2` (una explanada con seis rocas) y `arena-brock-3` (un camino estrecho entre cascadas y puentes).
+  - Se turnan en orden, empezando por una al azar en cada partida. Dos salas normales seguidas nunca repiten arena, aunque haya una de jefe en medio.
+  - Cada una tiene su escala, para que el suelo jugable ocupe el ancho de la sala. En la tercera todo se ve un poco más grande.
+  - Los tests comprueban que en todas hay entrada y salida y que todo el suelo está conectado.
+- Los demás gimnasios siguen con salas generadas hasta tener sus ilustraciones.
 - Con las arenas, el bot moría mucho contra los minibosses: se rebajaron los jefes (miniboss vida ×20 y daño ×1,5; jefe ×55 y ×2). Ahora gana unas 14 de cada 32 partidas simuladas.
 
 ## Provisional (pendiente de decisión de diseño)
@@ -207,6 +212,7 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
   - Ahora (un ataque, potencia ×1,8): gana 9 de 16 y 3 de 16.
   - Bulbasaur (Enredadera Tóxica) es el más fuerte. Pikachu sigue sufriendo contra Brock por la tabla de tipos.
   - El bot elige las cartas sin criterio; hay que probarlo jugando.
+  - Con las tres arenas normales turnándose, el bot gana 13 de 16 en modo prueba y 5 de 16 de 50 salas. Las arenas nuevas son más abiertas. No se atascó en ninguna partida.
 
 ## Sin integrar todavía (de PokéSurvivor)
 
