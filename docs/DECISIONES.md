@@ -202,6 +202,12 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - Una partida de 50 salas dura unos 8–15 minutos y una en modo prueba, unos 2 minutos.
 - Con habilidades, el bot gana unas 13 de cada 16 partidas de 50 salas. Probablemente es demasiado fácil para una persona, pero hay que probarlo jugando antes de endurecerlo. Pikachu sigue cayendo a menudo ante Geodude en el modo prueba.
 
+- **Ataque característico (v0.4).** Se midió con el mismo bot y las mismas semillas, con Charmander, Squirtle, Bulbasaur y Pikachu (4 partidas de cada uno):
+  - Antes (hasta 4 movimientos): ganaba 5 de 16 partidas en modo prueba y 2 de 16 de 50 salas.
+  - Ahora (un ataque, potencia ×1,8): gana 9 de 16 y 3 de 16.
+  - Bulbasaur (Enredadera Tóxica) es el más fuerte. Pikachu sigue sufriendo contra Brock por la tabla de tipos.
+  - El bot elige las cartas sin criterio; hay que probarlo jugando.
+
 ## Sin integrar todavía (de PokéSurvivor)
 
 - Shinies: faltan sus sprites, que son otros ~8 MB.
