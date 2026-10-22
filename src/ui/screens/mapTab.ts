@@ -5,9 +5,10 @@ import type { GymDef, RegionDef } from '../../data/types';
 import { roomSequence } from '../../game/rooms';
 import { gymStatus, isClaimed, regionUnlocked, type GymStatus } from '../../meta/rewards';
 import { caveArt, islandArt } from '../../render/art';
-import { iconDataUrl } from '../../render/sprites';
 import { animatedPokemon } from '../anim';
-import { h, img, pokeImg, TYPE_COLORS, typeChip } from '../dom';
+import { artSlot } from '../art';
+import { icon } from '../icons';
+import { h, pokeImg, TYPE_COLORS, typeChip } from '../dom';
 import type { MenuScreen } from './menu';
 
 // Pestaña Mapa en tres pantallas: portada de la región (isla y botón
@@ -53,16 +54,17 @@ function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   };
   const req = REGIONS.find((r) => r.id === region.requires);
   return h('div', { class: 'tab tab-home' },
-    h('h1', { class: 'logo', 'aria-label': 'Pokécero' }, 'POKÉCER', h('span', { class: 'logo-ball' })),
+    h('h1', { class: 'logo', 'aria-label': 'Pokécero' }, h('span', { class: 'logo-text' }, 'POKÉCER', h('span', { class: 'logo-ball' })),
+      artSlot('logo', 'logo-art', undefined, () => document.querySelector('.logo')?.classList.add('has-art'))),
     h('div', { class: 'region-card' },
       h('button', { class: `island-btn ${unlocked ? '' : 'locked'}`, 'aria-label': `Ver el mapa de ${region.name}`, onclick: () => unlocked && menu.go('map') },
-        img(islandFor(region, false), 'island-img'),
-        unlocked ? null : h('div', { class: 'island-lock' }, img(iconDataUrl('lock', 3), 'lock-icon'), h('span', {}, `Consigue las 8 medallas de ${req?.name ?? ''}`)),
+        artSlot(`region-${region.id}`, 'island-img', () => islandFor(region, false)),
+        unlocked ? null : h('div', { class: 'island-lock' }, icon('lock', 56), h('span', {}, `Consigue las 8 medallas de ${req?.name ?? ''}`)),
       ),
-      h('div', { class: 'region-pill' }, h('span', { class: 'mini-ball' }),
+      h('div', { class: 'region-pill' }, icon('pokeball', 30),
         h('span', {}, h('b', {}, region.name), h('small', {}, unlocked ? `Medallas ${medals}/8` : 'Bloqueada'))),
-      REGIONS.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Región anterior', onclick: () => step(-1) }, '‹') : null,
-      REGIONS.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Región siguiente', onclick: () => step(1) }, '›') : null,
+      REGIONS.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Región anterior', onclick: () => step(-1) }, icon('back', 22)) : null,
+      REGIONS.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Región siguiente', onclick: () => step(1) }, icon('next', 22)) : null,
     ),
     h('div', { class: 'dots' }, ...REGIONS.map((_, i) => h('span', { class: i === menu.ui.region ? 'on' : '' }))),
     unlocked && next
@@ -76,7 +78,7 @@ function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
         h('div', { class: 'badge-row' }, ...[...region.gyms].sort((a, b) => a.order - b.order).map((g) => {
           const got = gymStatus(store, region, g) === 'completed';
           return h('span', { class: `badge-slot ${got ? 'got' : ''}`, title: g.badge, style: `--type:${TYPE_COLORS[g.type]}` },
-            img(iconDataUrl('badge', 2, got ? { g: '#f8d030', w: '#fff8c0', d: '#c09020' } : undefined), 'badge-ico'));
+            icon(got ? 'medalGold' : 'medal', 28, 'badge-ico'));
         })),
       )
       : null,
@@ -96,7 +98,7 @@ function renderMap(menu: MenuScreen, region: RegionDef): HTMLElement {
     const st = gymStatus(store, region, g);
     const open = st === 'available' || st === 'completed';
     const boss = g.bosses[BALANCE.rooms.bossRoom];
-    const face = open && boss ? pokeImg(BOSSES[boss].dex, 40, 'pin-face') : img(iconDataUrl('lock', 2), 'pin-lock');
+    const face = open && boss ? pokeImg(BOSSES[boss].dex, 40, 'pin-face') : icon('lock', 28, 'pin-lock');
     return h('button', {
       class: `pin ${st}`,
       style: `left:${g.mapPos.x * 100}%;top:${g.mapPos.y * 100}%;--type:${TYPE_COLORS[g.type]}`,
@@ -110,7 +112,7 @@ function renderMap(menu: MenuScreen, region: RegionDef): HTMLElement {
   return h('div', { class: 'tab tab-map' },
     subhead(menu, 'home', region.name, `Medallas ${medals}/8`),
     h('div', { class: 'map-board' },
-      img(islandFor(region, true), 'map-img'),
+      artSlot(`map-${region.id}`, 'map-img', () => islandFor(region, true)),
       svgPath(path),
       ...nodes,
     ),
@@ -132,7 +134,7 @@ function svgPath(points: string): SVGSVGElement {
 
 function subhead(menu: MenuScreen, back: 'home' | 'map', title: string, sub: string): HTMLElement {
   return h('div', { class: 'subhead' },
-    h('button', { class: 'back-btn', 'aria-label': 'Volver', 'data-testid': 'back', onclick: () => menu.go(back) }, '‹'),
+    h('button', { class: 'back-btn', 'aria-label': 'Volver', 'data-testid': 'back', onclick: () => menu.go(back) }, icon('back', 22)),
     h('div', {}, h('div', { class: 'subhead-title' }, title), h('div', { class: 'subhead-sub' }, sub)),
   );
 }
@@ -152,13 +154,14 @@ function renderGym(menu: MenuScreen, region: RegionDef, gym: GymDef): HTMLElemen
   const boss = bossId ? BOSSES[bossId] : null;
 
   const hero = h('div', { class: 'gym-hero', style: `--bg:url(${caveArt(gym.order * 13, gym.theme.rock)})` },
+    artSlot(`gym-${gym.id}`, 'gym-art', undefined, () => hero.classList.add('has-art')),
     h('div', { class: 'gym-hero-text' },
       h('div', { class: 'gym-no' }, `Gimnasio ${gym.order}`),
       h('div', { class: 'gym-city' }, gym.city),
       h('div', { class: 'gym-leader' }, `Líder: ${gym.leader}`),
       h('div', { class: 'gym-chips' }, typeChip(gym.type), h('span', { class: `status ${st}` }, STATUS_LABEL[st])),
     ),
-    boss ? animatedPokemon(boss.dex, 150, { cls: 'gym-boss', dir: 7 }) : img(iconDataUrl('lock', 4), 'gym-boss lockbig'),
+    boss ? animatedPokemon(boss.dex, 150, { cls: 'gym-boss', dir: 7 }) : icon('lock', 96, 'gym-boss lockbig'),
   );
 
   // Recorrido: los tres jefes del gimnasio, con los ya superados tachados.
@@ -192,7 +195,7 @@ function renderGym(menu: MenuScreen, region: RegionDef, gym: GymDef): HTMLElemen
     gym.playable
       ? h('section', { class: 'panel' },
         h('h3', { class: 'panel-title' }, 'Recompensas'),
-        h('div', { class: 'reward-total' }, img(iconDataUrl('ticket', 3), 'reward-icon'), h('b', {}, `+${total}`), h('small', {}, `(${rewardEntries.map(([, n]) => n).join(' + ')})`), h('span', { class: 'medal-reward' }, img(iconDataUrl('badge', 2), 'res-icon'), gym.badge)),
+        h('div', { class: 'reward-total' }, icon('ticket', 40, 'reward-icon'), h('b', {}, `+${total}`), h('small', {}, `(${rewardEntries.map(([, n]) => n).join(' + ')})`), h('span', { class: 'medal-reward' }, icon('medal', 22), gym.badge)),
         h('div', { class: 'reward-chips' }, ...rewards),
       )
       : null,

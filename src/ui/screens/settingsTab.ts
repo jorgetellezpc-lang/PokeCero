@@ -1,6 +1,7 @@
 import { BALANCE } from '../../config/balance';
 import type { GraphicsQuality, Settings } from '../../meta/save';
 import { h, toast } from '../dom';
+import { icon, type IconName } from '../icons';
 import type { MenuScreen } from './menu';
 
 // Pestaña Ajustes: lista de opciones con iconos, guía, créditos y borrar progreso.
@@ -16,9 +17,9 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
   const store = menu.app.store;
   const s = store.data.settings;
 
-  const row = (icon: string, label: string, control: HTMLElement | null, desc?: string, extra: Record<string, unknown> = {}) =>
+  const row = (ic: IconName, label: string, control: HTMLElement | null, desc?: string, extra: Record<string, unknown> = {}) =>
     h('label', { class: 'set-row', ...extra as Record<string, string> },
-      h('span', { class: 'set-ico' }, icon),
+      h('span', { class: 'set-ico' }, icon(ic, 22)),
       h('span', { class: 'set-text' }, h('b', {}, label), desc ? h('small', {}, desc) : null),
       control,
     );
@@ -64,21 +65,21 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
       store.reset();
       toast('Progreso borrado');
     },
-  }, '↺  Restablecer progreso');
+  }, icon('reset', 22), ' Restablecer progreso');
 
   return h('div', { class: 'tab tab-settings' },
-    h('h2', { class: 'page-title' }, '⚙ Ajustes'),
+    h('h2', { class: 'page-title' }, icon('gear', 30), ' Ajustes'),
     h('section', { class: 'set-list' },
-      row('♪', 'Música', slider('music')),
-      row('♫', 'Efectos de sonido', slider('sfx')),
-      row('≋', 'Vibración', toggle('vibration'), 'Al recibir daño, si el móvil lo permite'),
-      row('✦', 'Números de daño', toggle('damageNumbers')),
-      row('◈', 'Calidad gráfica', gfxBtn, s.graphics === 'auto' ? 'Se ajusta sola si el móvil va justo' : 'Fija para el escenario 3D'),
-      row('⚑', 'Modo prueba', toggle('testMode'), `Gimnasio corto de ${BALANCE.rooms.testModeRooms.length} salas con más experiencia`),
+      row('music', 'Música', slider('music')),
+      row('sound', 'Efectos de sonido', slider('sfx')),
+      row('vibrate', 'Vibración', toggle('vibration'), 'Al recibir daño, si el móvil lo permite'),
+      row('numbers', 'Números de daño', toggle('damageNumbers')),
+      row('quality', 'Calidad gráfica', gfxBtn, s.graphics === 'auto' ? 'Se ajusta sola si el móvil va justo' : 'Fija para el escenario 3D'),
+      row('flag', 'Modo prueba', toggle('testMode'), `Gimnasio corto de ${BALANCE.rooms.testModeRooms.length} salas con más experiencia`),
     ),
     h('section', { class: 'set-list' },
-      linkRow('☰', 'Guía del juego', () => openInfo('Guía del juego', GUIDE)),
-      linkRow('ℹ', 'Créditos', () => openInfo('Créditos', CREDITS)),
+      linkRow('guide', 'Guía del juego', () => openInfo('Guía del juego', GUIDE)),
+      linkRow('info', 'Créditos', () => openInfo('Créditos', CREDITS)),
     ),
     resetBtn,
     h('p', { class: 'note center' }, 'El progreso se guarda en este navegador. Restablecerlo borra oro, tickets, medallas, Pokémon y mejoras.'),
@@ -86,9 +87,9 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
   );
 }
 
-function linkRow(icon: string, label: string, onclick: () => void): HTMLElement {
+function linkRow(ic: IconName, label: string, onclick: () => void): HTMLElement {
   return h('button', { class: 'set-row link', onclick },
-    h('span', { class: 'set-ico' }, icon), h('span', { class: 'set-text' }, h('b', {}, label)), h('span', { class: 'chev' }, '›'));
+    h('span', { class: 'set-ico' }, icon(ic, 22)), h('span', { class: 'set-text' }, h('b', {}, label)), h('span', { class: 'chev' }, '›'));
 }
 
 const GUIDE = [

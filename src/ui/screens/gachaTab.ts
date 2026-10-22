@@ -2,9 +2,10 @@ import { BALANCE } from '../../config/balance';
 import { getSpecies, obtainablePokemon } from '../../data/pokemon';
 import { Rng } from '../../game/rng';
 import { pull, RARITY_COLOR, RARITY_NAME, type PullResult } from '../../meta/gacha';
-import { iconDataUrl } from '../../render/sprites';
 import { animatedPokemon } from '../anim';
-import { h, img, pokeImg, toast } from '../dom';
+import { artSlot } from '../art';
+import { icon } from '../icons';
+import { h, pokeImg, toast } from '../dom';
 import type { MenuScreen } from './menu';
 
 // Pestaña Gachapón: máquina con los iniciales alrededor, probabilidades,
@@ -66,7 +67,8 @@ export function renderGachaTab(menu: MenuScreen): HTMLElement {
   });
 
   return h('div', { class: 'tab tab-gacha' },
-    h('div', { class: 'gacha-stage' },
+    h('div', { class: 'gacha-stage', 'data-art': 'gacha' },
+      artSlot('gacha', 'stage-art', undefined, () => document.querySelector('.gacha-stage')?.classList.add('has-art')),
       h('div', { class: 'gacha-title' }, 'Gachapón de Kanto',
         h('button', { class: 'help-btn', 'aria-label': 'Cómo funciona', onclick: () => toast(`La ×10 garantiza una Épica · Legendaria segura a las ${BALANCE.gacha.pity} tiradas (llevas ${d.pity})`) }, '?')),
       h('div', { class: 'rays' }),
@@ -78,9 +80,9 @@ export function renderGachaTab(menu: MenuScreen): HTMLElement {
       h('div', { class: 'note' }, `Repetidos: se convierten en oro. Tickets: salas 20, 40 y 50 de cada gimnasio (una vez) y, a veces, los enemigos.`)),
     h('div', { class: 'gacha-buttons' },
       h('button', { class: `cta blue ${d.tickets >= 1 ? '' : 'disabled'}`, 'data-testid': 'gacha-pull', onclick: () => doPull(1) },
-        h('span', { class: 'cta-main' }, 'Tirar ×1'), h('span', { class: 'cta-sub price' }, img(iconDataUrl('ticket', 2), 'res-icon'), '1')),
+        h('span', { class: 'cta-main' }, 'Tirar ×1'), h('span', { class: 'cta-sub price' }, icon('ticket', 22), '1')),
       h('button', { class: `cta ${d.tickets >= 10 ? '' : 'disabled'}`, 'data-testid': 'gacha-pull10', onclick: () => doPull(10) },
-        h('span', { class: 'cta-main' }, 'Tirar ×10'), h('span', { class: 'cta-sub price' }, img(iconDataUrl('ticket', 2), 'res-icon'), '10')),
+        h('span', { class: 'cta-main' }, 'Tirar ×10'), h('span', { class: 'cta-sub price' }, icon('ticket', 22), '10')),
     ),
   );
 }

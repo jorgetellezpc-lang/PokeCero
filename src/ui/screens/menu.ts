@@ -1,9 +1,9 @@
 import { KANTO } from '../../data/regions';
 import { getSpecies } from '../../data/pokemon';
-import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
 import { animatedPokemon } from '../anim';
-import { h, img } from '../dom';
+import { icon, type IconName } from '../icons';
+import { h } from '../dom';
 import { renderGachaTab } from './gachaTab';
 import { renderMapTab } from './mapTab';
 import { renderPokemonTab } from './pokemonTab';
@@ -14,8 +14,8 @@ import { renderSettingsTab } from './settingsTab';
 
 export type MenuTab = 'pokemon' | 'map' | 'gacha' | 'settings';
 
-const TABS: { id: MenuTab; label: string; icon: string }[] = [
-  { id: 'pokemon', label: 'Pokémon', icon: 'pokeball' },
+const TABS: { id: MenuTab; label: string; icon: IconName }[] = [
+  { id: 'pokemon', label: 'Pokémon', icon: 'pikachu' },
   { id: 'map', label: 'Mapa', icon: 'map' },
   { id: 'gacha', label: 'Gachapón', icon: 'gacha' },
   { id: 'settings', label: 'Ajustes', icon: 'gear' },
@@ -69,13 +69,13 @@ export class MenuScreen implements Screen {
       h('button', { class: 'tb-avatar', 'aria-label': 'Tu Pokémon', onclick: () => this.setTab('pokemon') },
         h('span', { class: 'tb-face' }, animatedPokemon(sp.dex, 40)),
         h('span', { class: 'tb-medals' },
-          h('span', { class: 'tb-medals-num' }, img(iconDataUrl('badge', 2), 'tb-badge'), `${medals}/8`),
+          h('span', { class: 'tb-medals-num' }, icon('medal', 18, 'tb-badge'), `${medals}/8`),
           h('span', { class: 'tb-bar' }, h('span', { style: `width:${(medals / 8) * 100}%` })),
         ),
       ),
-      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, img(iconDataUrl('coin', 2), 'res-icon'), compact(d.gold)),
-      h('div', { class: 'pill', 'data-testid': 'tickets' }, img(iconDataUrl('ticket', 2), 'res-icon'), String(d.tickets)),
-      h('button', { class: 'tb-gear', 'aria-label': 'Ajustes', onclick: () => this.setTab('settings') }, img(iconDataUrl('gear', 2), 'res-icon')),
+      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, icon('coin', 24), compact(d.gold)),
+      h('div', { class: 'pill', 'data-testid': 'tickets' }, icon('ticket', 24), String(d.tickets)),
+      h('button', { class: 'tb-gear', 'aria-label': 'Ajustes', onclick: () => this.setTab('settings') }, icon('gear', 26)),
     );
 
     this.nav.replaceChildren(
@@ -84,7 +84,7 @@ export class MenuScreen implements Screen {
           class: `nav-btn ${t.id === this.tab ? 'active' : ''}`,
           'data-tab': t.id,
           onclick: () => this.setTab(t.id),
-        }, h('span', { class: 'nav-ico' }, img(iconDataUrl(t.icon, 2), 'nav-icon')), h('span', { class: 'nav-label' }, t.label)),
+        }, h('span', { class: 'nav-ico' }, icon(t.icon, 36, 'nav-icon')), h('span', { class: 'nav-label' }, t.label)),
       ),
     );
 

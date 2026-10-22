@@ -81,7 +81,8 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - **Pokémon:** tu Pokémon animado sobre una plataforma, su línea evolutiva, sus estadísticas y las mejoras con iconos de color.
 - **Gachapón:** máquina de cápsulas con los iniciales alrededor, probabilidades por rareza y tiradas ×1 y ×10.
 - **Ajustes:** lista con iconos. Incluye la **calidad gráfica** (automática, alta, media o baja; controla el 3D de verdad), la guía del juego y los créditos.
-- **Ilustraciones:** la isla y la cueva se generan en código (`src/render/art.ts`). No se usan imágenes de terceros.
+- **Sin pixel art en los menús:** todos los iconos están dibujados en SVG (`src/ui/icons.ts`).
+- **Ilustraciones:** las pone el usuario en `public/ui/` (nombres y tamaños en `public/ui/README.md`) y aparecen solas. Mientras falten, se usan provisionales generadas en código (isla suavizada y cueva) o la máquina de CSS.
 - **No integrado del ejemplo, a propósito:** la **energía** (rayo 30/30, "Comenzar ×5") y el **nivel de jugador**. Son sistemas nuevos de economía y progresión que el blueprint no tiene (y la energía es típica de juegos con pagos). En su lugar, la barra superior muestra tu Pokémon y tus medallas. El idioma no se incluye porque solo hay español.
 
 ## Provisional (pendiente de decisión de diseño)

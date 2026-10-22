@@ -4,19 +4,19 @@ import { getSpecies, obtainablePokemon, sideOf, type PokemonSpecies } from '../.
 import { passiveOf } from '../../game/abilities';
 import { RARITY_COLOR, RARITY_NAME } from '../../meta/gacha';
 import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
-import { iconDataUrl } from '../../render/sprites';
 import { animatedPokemon } from '../anim';
-import { h, img, pokeImg, toast, typeChip } from '../dom';
+import { icon, type IconName } from '../icons';
+import { h, pokeImg, toast, typeChip } from '../dom';
 import type { MenuScreen } from './menu';
 
 // Pestaña Pokémon: tu Pokémon en grande (animado), su línea evolutiva, sus
 // estadísticas y las mejoras permanentes que se compran con oro.
 
-const STAT_ICON: Record<PermanentUpgradeDef['id'], { icon: string; color: string }> = {
-  hp: { icon: '♥', color: '#ff5a8a' }, atk: { icon: '⚔', color: '#ffb02e' }, spd: { icon: '➤', color: '#3ad0a0' },
-  cd: { icon: '◷', color: '#4aa8ff' }, def: { icon: '⛨', color: '#8fa4ff' }, regen: { icon: '❦', color: '#6ad04a' },
-  magnet: { icon: '∪', color: '#c47bff' }, xp: { icon: '✎', color: '#5fd8ff' }, coins: { icon: '¤', color: '#ffd23f' },
-  crit: { icon: '✶', color: '#ff7a4a' },
+const STAT_ICON: Record<PermanentUpgradeDef['id'], { icon: IconName; color: string }> = {
+  hp: { icon: 'heart', color: '#ff5a8a' }, atk: { icon: 'sword', color: '#ffb02e' }, spd: { icon: 'boot', color: '#3ab0ff' },
+  cd: { icon: 'clock', color: '#4a8aff' }, def: { icon: 'shield', color: '#8fa4ff' }, regen: { icon: 'leaf', color: '#4ad06a' },
+  magnet: { icon: 'magnet', color: '#ff5a6a' }, xp: { icon: 'book', color: '#3ac8ff' }, coins: { icon: 'bag', color: '#ffc83a' },
+  crit: { icon: 'star', color: '#ff9a2a' },
 };
 
 /** Línea evolutiva (desde la forma base, siguiendo las evoluciones por nivel). */
@@ -42,7 +42,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   const atk = side === 'special' ? sp.stats.sa : sp.stats.pa;
 
   const head = h('div', { class: 'poke-head' },
-    h('span', { class: 'play-tile' }, '▶'),
+    h('span', { class: 'play-tile' }, icon('play', 24)),
     h('div', { class: 'poke-head-text' },
       h('div', { class: 'hero-name' }, sp.name, h('span', { class: 'dex-no' }, ` #${String(sp.dex).padStart(3, '0')}`)),
       h('div', { class: 'chips' }, ...sp.types.map(typeChip)),
@@ -50,10 +50,10 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   );
 
   const stage = h('div', { class: 'poke-stage' },
-    owned.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Anterior', onclick: () => cycle(-1) }, '‹') : null,
+    owned.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Anterior', onclick: () => cycle(-1) }, icon('back', 22)) : null,
     h('div', { class: 'stage-platform' }),
     animatedPokemon(sp.dex, 170, { cls: 'stage-sprite' }),
-    owned.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Siguiente', onclick: () => cycle(1) }, '›') : null,
+    owned.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Siguiente', onclick: () => cycle(1) }, icon('next', 22)) : null,
   );
 
   const line = evoLine(sp);
@@ -62,9 +62,9 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     : null;
 
   const stats = h('div', { class: 'stat-boxes' },
-    statBox('⚔', side === 'special' ? 'At. Esp.' : 'Ataque', Math.round(atk * 100 * perks.atkMul), '#ffb02e'),
-    statBox('♥', 'Vida', Math.round(sp.stats.hp + perks.hp), '#ff5a8a'),
-    statBox('➤', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul), '#3ad0a0'),
+    statBox('sword', side === 'special' ? 'At. Esp.' : 'Ataque', Math.round(atk * 100 * perks.atkMul)),
+    statBox('heart', 'Vida', Math.round(sp.stats.hp + perks.hp)),
+    statBox('boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul)),
   );
 
   const rows = PERMANENT_UPGRADES.map((u) => {
@@ -81,9 +81,9 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
         else if (r === 'max') toast('Nivel máximo');
         else menu.app.audio.sfx('confirm');
       },
-    }, state === 'max' ? 'MÁX' : h('span', { class: 'price' }, h('span', { class: 'up-arrow' }, '⇧'), img(iconDataUrl('coin', 2), 'res-icon'), String(cost)));
+    }, state === 'max' ? 'MÁX' : h('span', { class: 'price' }, icon('up', 16, 'up-arrow'), icon('coin', 20), String(cost)));
     return h('div', { class: 'upgrade-row', style: `--c:${ic.color}` },
-      h('div', { class: 'up-icon' }, ic.icon),
+      h('div', { class: 'up-icon' }, icon(ic.icon, 40)),
       h('div', { class: 'up-body' },
         h('div', { class: 'up-name' }, u.name),
         h('div', { class: 'up-lv' }, `Nv ${lv}/${u.maxLevel}`),
@@ -105,15 +105,15 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
       h('button', { class: 'cta', 'data-testid': 'select-pokemon', onclick: () => openSelector(menu) }, h('span', { class: 'cta-main' }, 'Cambiar Pokémon')),
     ),
     h('div', { class: 'section-card' },
-      h('span', { class: 'section-ico' }, '⬆'),
+      h('span', { class: 'section-ico' }, icon('up', 28)),
       h('div', {}, h('div', { class: 'section-card-title' }, 'Mejoras permanentes'), h('div', { class: 'section-card-sub' }, `De ${sp.name}. Se compran con oro y se conservan entre partidas.`)),
     ),
     ...rows,
   );
 }
 
-function statBox(icon: string, label: string, value: number, color: string): HTMLElement {
-  return h('div', { class: 'stat-box', style: `--c:${color}` }, h('span', { class: 'stat-ico' }, icon), h('small', {}, label), h('b', {}, String(value)));
+function statBox(name: IconName, label: string, value: number): HTMLElement {
+  return h('div', { class: 'stat-box' }, h('span', { class: 'stat-head' }, icon(name, 24), h('small', {}, label)), h('b', {}, String(value)));
 }
 
 function openSelector(menu: MenuScreen): void {

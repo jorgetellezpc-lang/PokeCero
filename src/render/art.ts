@@ -87,7 +87,7 @@ export function islandArt(o: IslandOpts): string {
       } else if (e < 0.02) col = P.sand;
       else if (e < 0.5) {
         col = m(x / 9, y / 9) > 0.56 ? P.forest : (x + y) % 7 === 0 && m(x / 3, y / 3) > 0.6 ? P.grass2 : P.grass;
-      } else if (e < 0.8) col = shade > 0.004 ? P.rock : P.rock2;
+      } else if (e < 0.92) col = shade > 0.004 ? P.rock : P.rock2;
       else col = P.snow;
       put(i, col);
     }
@@ -142,7 +142,17 @@ export function islandArt(o: IslandOpts): string {
       ctx.fillRect(x, y - 1, 3, 1);
     }
   }
-  const url = c.toDataURL();
+  // Suavizado: se amplía con interpolación y un leve desenfoque (aspecto
+  // dibujado, no pixel art) mientras no haya ilustración propia.
+  const big = document.createElement('canvas');
+  big.width = w * 4;
+  big.height = h * 4;
+  const bctx = big.getContext('2d')!;
+  bctx.imageSmoothingEnabled = true;
+  bctx.imageSmoothingQuality = 'high';
+  bctx.filter = 'blur(3px) saturate(1.2)';
+  bctx.drawImage(c, 0, 0, big.width, big.height);
+  const url = big.toDataURL();
   cache.set(key, url);
   return url;
 }
