@@ -1,19 +1,18 @@
 import { BALANCE } from '../../config/balance';
-import { BOSSES } from '../../data/enemies';
+import { BOSSES, tierCandidates } from '../../data/enemies';
 import { REGIONS } from '../../data/regions';
 import type { GymDef, RegionDef } from '../../data/types';
 import { roomSequence } from '../../game/rooms';
-import { gymStatus, isClaimed, regionUnlocked, type GymStatus } from '../../meta/rewards';
-import { caveArt, islandArt } from '../../render/art';
+import { gymStatus, isClaimed, type GymStatus } from '../../meta/rewards';
+import { caveArt } from '../../render/art';
 import { animatedPokemon } from '../anim';
-import { artSlot } from '../art';
+import { h, pokeImg, typeChip } from '../dom';
 import { icon } from '../icons';
-import { h, pokeImg, TYPE_COLORS, typeChip } from '../dom';
 import type { MenuScreen } from './menu';
 
-// Pestaña Mapa en tres pantallas: portada de la región (isla y botón
-// Entrar), mapa con los gimnasios y ficha del gimnasio (jefes, recompensas y
-// Comenzar).
+// Pestaña Mapa: la ilustración de la región con los gimnasios encima (y el
+// botón Entrar), y la ficha de cada gimnasio. Las ilustraciones son las del
+// diseño (public/ui); lo que va encima es la interfaz real del juego.
 
 const STATUS_LABEL: Record<GymStatus, string> = {
   completed: 'Completado',
@@ -22,8 +21,18 @@ const STATUS_LABEL: Record<GymStatus, string> = {
   soon: 'Próximamente',
 };
 
+/** Tamaño de la ilustración de la región (px) y dónde va cada cosa en ella. */
+const ART = { w: 941, h: 1375 };
+const PINS: Record<string, [number, number]> = {
+  brock: [301, 530], misty: [752, 425], surge: [647, 769], erika: [560, 470],
+  koga: [503, 933], sabrina: [691, 570], blaine: [181, 862], giovanni: [369, 709],
+};
+const box = (x: number, y: number, w: number, h: number) =>
+  `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%;width:${(w / ART.w) * 100}%;height:${(h / ART.h) * 100}%`;
+const at = (x: number, y: number) => `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%`;
+
 export function renderMapTab(menu: MenuScreen): HTMLElement {
-  const region = REGIONS[Math.min(menu.ui.region, REGIONS.length - 1)];
+  const region = REGIONS[0];
   const store = menu.app.store;
   if (!menu.ui.selectedGym || !region.gyms.some((g) => g.id === menu.ui.selectedGym)) {
     const next = region.gyms.find((g) => gymStatus(store, region, g) === 'available') ?? region.gyms[0];
@@ -31,111 +40,58 @@ export function renderMapTab(menu: MenuScreen): HTMLElement {
   }
   const gym = region.gyms.find((g) => g.id === menu.ui.selectedGym);
   if (menu.ui.mapView === 'gym' && gym) return renderGym(menu, region, gym);
-  if (menu.ui.mapView === 'map' && regionUnlocked(store, region) && region.gyms.length) return renderMap(menu, region);
   return renderHome(menu, region);
 }
 
-const islandFor = (region: RegionDef, tall: boolean) =>
-  islandArt({ seed: region.id.length * 97 + region.name.charCodeAt(0), w: 120, h: tall ? 132 : 104, towns: region.gyms.map((g) => g.mapPos) });
-
 // ----------------------------------------------------------------------------
-// Portada de la región
+// Portada: mapa de la región
 // ----------------------------------------------------------------------------
 
 function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   const store = menu.app.store;
-  const unlocked = regionUnlocked(store, region);
   const medals = (store.data.medals[region.id] ?? []).length;
   const next = region.gyms.find((g) => gymStatus(store, region, g) === 'available') ?? region.gyms.find((g) => gymStatus(store, region, g) === 'completed');
-  const step = (d: number) => {
-    menu.ui.region = (menu.ui.region + d + REGIONS.length) % REGIONS.length;
-    menu.ui.selectedGym = undefined;
-    menu.render();
-  };
-  const req = REGIONS.find((r) => r.id === region.requires);
-  return h('div', { class: 'tab tab-home' },
-    h('h1', { class: 'logo', 'aria-label': 'Pokécero' }, h('span', { class: 'logo-text' }, 'POKÉCER', h('span', { class: 'logo-ball' })),
-      artSlot('logo', 'logo-art', undefined, () => document.querySelector('.logo')?.classList.add('has-art'))),
-    h('div', { class: 'region-card' },
-      h('button', { class: `island-btn ${unlocked ? '' : 'locked'}`, 'aria-label': `Ver el mapa de ${region.name}`, onclick: () => unlocked && menu.go('map') },
-        artSlot(`region-${region.id}`, 'island-img', () => islandFor(region, false)),
-        unlocked ? null : h('div', { class: 'island-lock' }, icon('lock', 56), h('span', {}, `Consigue las 8 medallas de ${req?.name ?? ''}`)),
-      ),
-      h('div', { class: 'region-pill' }, icon('pokeball', 30),
-        h('span', {}, h('b', {}, region.name), h('small', {}, unlocked ? `Medallas ${medals}/8` : 'Bloqueada'))),
-      REGIONS.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Región anterior', onclick: () => step(-1) }, icon('back', 22)) : null,
-      REGIONS.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Región siguiente', onclick: () => step(1) }, icon('next', 22)) : null,
-    ),
-    h('div', { class: 'dots' }, ...REGIONS.map((_, i) => h('span', { class: i === menu.ui.region ? 'on' : '' }))),
-    unlocked && next
-      ? h('button', { class: 'cta', 'data-testid': 'enter', onclick: () => menu.go('gym', next.id) },
-        h('span', { class: 'cta-main' }, 'Entrar'), h('span', { class: 'cta-sub' }, `${next.order}. ${next.city}`))
-      : h('button', { class: 'cta disabled', disabled: true }, h('span', { class: 'cta-main' }, unlocked ? 'Próximamente' : 'Bloqueada')),
-    unlocked && region.gyms.length ? h('button', { class: 'link-btn', 'data-testid': 'open-map', onclick: () => menu.go('map') }, `Ver el mapa de ${region.name}`) : null,
-    unlocked && region.gyms.length
-      ? h('section', { class: 'panel' },
-        h('h3', { class: 'panel-title' }, `Medallas de ${region.name}`),
-        h('div', { class: 'badge-row' }, ...[...region.gyms].sort((a, b) => a.order - b.order).map((g) => {
-          const got = gymStatus(store, region, g) === 'completed';
-          return h('span', { class: `badge-slot ${got ? 'got' : ''}`, title: g.badge, style: `--type:${TYPE_COLORS[g.type]}` },
-            icon(got ? 'medalGold' : 'medal', 28, 'badge-ico'));
-        })),
-      )
-      : null,
-  );
-}
 
-// ----------------------------------------------------------------------------
-// Mapa de la región
-// ----------------------------------------------------------------------------
-
-function renderMap(menu: MenuScreen, region: RegionDef): HTMLElement {
-  const store = menu.app.store;
-  const medals = (store.data.medals[region.id] ?? []).length;
-  const gyms = [...region.gyms].sort((a, b) => a.order - b.order);
-  const path = gyms.map((g) => `${(g.mapPos.x * 100).toFixed(1)},${(g.mapPos.y * 100).toFixed(1)}`).join(' ');
-  const nodes = gyms.map((g) => {
+  const pins = region.gyms.map((g) => {
     const st = gymStatus(store, region, g);
+    const [x, y] = PINS[g.id] ?? [g.mapPos.x * ART.w, g.mapPos.y * ART.h];
     const open = st === 'available' || st === 'completed';
-    const boss = g.bosses[BALANCE.rooms.bossRoom];
-    const face = open && boss ? pokeImg(BOSSES[boss].dex, 40, 'pin-face') : icon('lock', 28, 'pin-lock');
-    return h('button', {
-      class: `pin ${st}`,
-      style: `left:${g.mapPos.x * 100}%;top:${g.mapPos.y * 100}%;--type:${TYPE_COLORS[g.type]}`,
-      'data-gym': g.id,
-      onclick: () => menu.go('gym', g.id),
-    },
-      h('span', { class: 'pin-head' }, face, h('span', { class: 'pin-no' }, String(g.order))),
-      h('span', { class: 'pin-label' }, g.city.replace('Ciudad ', '')),
-    );
+    const city = g.id === 'brock' ? g.city : g.city.replace('Ciudad ', '');
+    if (open) {
+      const best = store.data.bestRoom[g.id] ?? 0;
+      const rooms = roomSequence(store.data.settings.testMode);
+      const done = rooms.filter((r) => r <= best).length;
+      const boss = g.bosses[BALANCE.rooms.bossRoom];
+      return h('button', { class: `gpin open ${st} ${g.id === 'brock' ? 'baked' : ''}`, style: at(x, y), 'data-gym': g.id, onclick: () => menu.go('gym', g.id) },
+        // El retrato de Brock ya está en la ilustración; para los demás, su jefe.
+        h('span', { class: 'gpin-face' }, g.id !== 'brock' && boss ? pokeImg(BOSSES[boss].dex, 64) : null),
+        h('span', { class: 'gpin-name' }, city),
+        h('span', { class: 'gpin-dots' }, ...rooms.map((_, i) => h('i', { class: i < done ? 'on' : '' }))),
+      );
+    }
+    return h('button', { class: 'gpin locked', style: at(x, y), 'data-gym': g.id, onclick: () => menu.go('gym', g.id) },
+      icon('lock', 30), h('span', {}, city));
   });
-  return h('div', { class: 'tab tab-map' },
-    subhead(menu, 'home', region.name, `Medallas ${medals}/8`),
-    h('div', { class: 'map-board' },
-      artSlot(`map-${region.id}`, 'map-img', () => islandFor(region, true)),
-      svgPath(path),
-      ...nodes,
+
+  return h('div', { class: 'tab tab-home' },
+    h('div', { class: 'home-stage' },
+      h('div', { class: 'home-art' },
+        h('img', { class: 'home-img', src: 'ui/home-kanto.webp', alt: '', draggable: 'false' }),
+        h('h1', { class: 'sr-only' }, 'Pokécero'),
+        ...pins,
+        next
+          ? h('button', { class: 'cta home-cta', style: box(245, 1110, 452, 140), 'data-testid': 'enter', onclick: () => menu.go('gym', next.id) },
+            h('span', { class: 'cta-main' }, 'Entrar'), h('span', { class: 'cta-sub' }, `${next.order}. ${next.city}`), h('span', { class: 'cta-arrow' }, '▶'))
+          : null,
+      ),
+      // Fuera de la ilustración: así no se corta si la pantalla es estrecha
+      // (tapa el letrero dibujado, que queda en el mismo sitio).
+      h('div', { class: 'region-pill2' },
+        icon('pokeball', 54),
+        h('span', { class: 'rp-text' }, h('b', {}, region.name), h('small', {}, `Medallas ${medals}/8`),
+          h('span', { class: 'rp-bar' }, ...region.gyms.map((_, i) => h('i', { class: i < medals ? 'on' : '' })))),
+      ),
     ),
-    h('p', { class: 'note center' }, 'Toca un gimnasio para ver sus jefes y recompensas.'),
-  );
-}
-
-function svgPath(points: string): SVGSVGElement {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', '0 0 100 100');
-  svg.setAttribute('preserveAspectRatio', 'none');
-  svg.setAttribute('class', 'map-path');
-  const line = document.createElementNS(ns, 'polyline');
-  line.setAttribute('points', points);
-  svg.appendChild(line);
-  return svg;
-}
-
-function subhead(menu: MenuScreen, back: 'home' | 'map', title: string, sub: string): HTMLElement {
-  return h('div', { class: 'subhead' },
-    h('button', { class: 'back-btn', 'aria-label': 'Volver', 'data-testid': 'back', onclick: () => menu.go(back) }, icon('back', 22)),
-    h('div', {}, h('div', { class: 'subhead-title' }, title), h('div', { class: 'subhead-sub' }, sub)),
   );
 }
 
@@ -152,56 +108,96 @@ function renderGym(menu: MenuScreen, region: RegionDef, gym: GymDef): HTMLElemen
   const canPlay = (st === 'available' || st === 'completed') && gym.playable;
   const bossId = gym.bosses[BALANCE.rooms.bossRoom];
   const boss = bossId ? BOSSES[bossId] : null;
+  const back = h('button', { class: 'back-btn2', 'aria-label': 'Volver', 'data-testid': 'back', onclick: () => menu.go('home') }, icon('back', 26));
 
-  const hero = h('div', { class: 'gym-hero', style: `--bg:url(${caveArt(gym.order * 13, gym.theme.rock)})` },
-    artSlot(`gym-${gym.id}`, 'gym-art', undefined, () => hero.classList.add('has-art')),
-    h('div', { class: 'gym-hero-text' },
-      h('div', { class: 'gym-no' }, `Gimnasio ${gym.order}`),
-      h('div', { class: 'gym-city' }, gym.city),
-      h('div', { class: 'gym-leader' }, `Líder: ${gym.leader}`),
-      h('div', { class: 'gym-chips' }, typeChip(gym.type), h('span', { class: `status ${st}` }, STATUS_LABEL[st])),
-    ),
-    boss ? animatedPokemon(boss.dex, 150, { cls: 'gym-boss', dir: 7 }) : icon('lock', 96, 'gym-boss lockbig'),
+  // Cabecera: la ilustración del gimnasio si existe (Brock); si no, una provisional.
+  const hero = gym.id === 'brock'
+    ? h('div', { class: 'gym-head art' },
+      h('img', { src: 'ui/gym-brock.webp', alt: '', draggable: 'false' }),
+      back,
+      h('h2', { class: 'sr-only' }, `Gimnasio ${gym.order} · ${gym.city} · Líder: ${gym.leader} · ${STATUS_LABEL[st]}`),
+    )
+    : h('div', { class: 'gym-head', style: `--bg:url(${caveArt(gym.order * 13, gym.theme.rock)})` },
+      back,
+      h('div', { class: 'gym-head-text' },
+        h('div', { class: 'gym-no' }, `Gimnasio ${gym.order}`),
+        h('div', { class: 'gym-city' }, gym.city),
+        h('div', { class: 'gym-leader' }, `Líder: ${gym.leader}`),
+        h('div', { class: 'gym-chips' }, typeChip(gym.type), h('span', { class: `status ${st}` }, STATUS_LABEL[st])),
+      ),
+      boss ? animatedPokemon(boss.dex, 150, { cls: 'gym-boss', dir: 7 }) : icon('lock', 96, 'gym-boss lockbig'),
+    );
+
+  const entries = Object.entries(gym.bosses);
+  const reachedIdx = entries.filter(([room]) => best >= Number(room)).length;
+  const track = h('div', { class: 'track2' },
+    h('div', { class: 'track2-line' }, ...entries.map((_, i) => h('i', { class: i < reachedIdx ? 'on' : '' }))),
+    ...entries.map(([room, id]) => {
+      const def = BOSSES[id];
+      const tickets = BALANCE.rewards.ticketsByRoom[Number(room)] ?? 0;
+      const claimed = isClaimed(store, gym.id, Number(room));
+      return h('div', { class: `stop2 ${best >= Number(room) ? 'beaten' : ''}` },
+        h('span', { class: 'stop2-room' }, `Sala ${room}`),
+        h('span', { class: 'stop2-mon' }, animatedPokemon(def.dex, 96, { dir: 0 })),
+        h('span', { class: 'stop2-name' }, def.name),
+        h('span', { class: 'stop2-ped' }),
+        h('span', { class: `stop2-reward ${claimed ? 'claimed' : ''}` }, h('small', {}, 'Recompensa'),
+          h('b', {}, h('img', { src: 'ui/i-ticket.webp', alt: '', class: 'ui-ic' }), claimed ? 'Cobrado' : `+${tickets}`)),
+      );
+    }),
   );
 
-  // Recorrido: los tres jefes del gimnasio, con los ya superados tachados.
-  const stops = Object.entries(gym.bosses).map(([room, id]) => {
-    const def = BOSSES[id];
-    const beaten = best > Number(room) || (Number(room) === BALANCE.rooms.bossRoom && st === 'completed');
-    return h('div', { class: `stop ${beaten ? 'beaten' : ''}` },
-      h('span', { class: 'stop-mark' }, beaten ? '✕' : String(room)),
-      h('span', { class: 'stop-face' }, pokeImg(def.dex, 48)),
-      h('b', {}, `Sala ${room}`),
-      h('small', {}, def.name),
-    );
-  });
-  const reached = Math.min(1, best / BALANCE.rooms.perGym);
+  const info = h('div', { class: 'info4' },
+    infoCell('g-map', test ? `${rooms.length} salas` : `${BALANCE.rooms.perGym} salas`, test ? 'Modo prueba' : 'Oleadas de enemigos'),
+    infoCell('g-boss', 'Minibosses', 'Salas 20 y 40'),
+    infoCell('g-crown', 'Jefe final', `Sala ${BALANCE.rooms.bossRoom}`),
+    infoCell('g-best', 'Mejor sala', best ? String(best) : '—'),
+  );
 
-  const rewardEntries = Object.entries(BALANCE.rewards.ticketsByRoom);
-  const total = rewardEntries.reduce((a, [, n]) => a + n, 0);
-  const rewards = rewardEntries.map(([room, n]) => h('span', { class: `reward-chip ${isClaimed(store, gym.id, Number(room)) ? 'claimed' : ''}` },
-    `Sala ${room}: `, isClaimed(store, gym.id, Number(room)) ? 'cobrado' : `+${n}`));
+  // Posibles enemigos: los jefes y una muestra de los tramos de la Pokédex.
+  const sample = entries.map(([, id]) => BOSSES[id].dex);
+  for (let t = 0; t < 5 && sample.length < 7; t++) {
+    const c = tierCandidates(t).filter((p) => p.types.includes(gym.type) || p.types.includes('ground'));
+    const p = c[(gym.order * 7 + t * 3) % Math.max(1, c.length)];
+    if (p && !sample.includes(p.dex)) sample.push(p.dex);
+  }
+  const enemies = h('div', { class: 'enemy-row' },
+    ...sample.slice(0, 7).map((dex) => h('span', { class: 'enemy-slot' }, pokeImg(dex, 52))),
+    h('button', { class: 'enemy-slot more', onclick: () => openEnemies() }, icon('next', 18), h('small', {}, 'Ver todos')),
+  );
 
-  return h('div', { class: 'tab tab-gym', 'data-testid': 'gym-detail' },
-    subhead(menu, 'map', `Gimnasio ${gym.order}`, gym.city),
+  return h('div', { class: 'tab tab-gym2', 'data-testid': 'gym-detail' },
     hero,
     gym.playable
-      ? h('section', { class: 'panel' },
-        h('h3', { class: 'panel-title' }, 'Progreso del gimnasio'),
-        h('div', { class: 'track' }, h('div', { class: 'track-line' }, h('span', { style: `width:${reached * 100}%` })), ...stops),
-        h('div', { class: 'note center' }, best ? `Mejor sala: ${best} de ${BALANCE.rooms.perGym}` : `${BALANCE.rooms.perGym} salas · minibosses en la 20 y la 40 · jefe en la 50`),
-      )
-      : h('section', { class: 'panel' }, h('p', { class: 'note center' }, st === 'locked' ? 'Consigue la medalla anterior para desbloquearlo.' : 'Este gimnasio aún está en desarrollo.')),
-    gym.playable
-      ? h('section', { class: 'panel' },
-        h('h3', { class: 'panel-title' }, 'Recompensas'),
-        h('div', { class: 'reward-total' }, icon('ticket', 40, 'reward-icon'), h('b', {}, `+${total}`), h('small', {}, `(${rewardEntries.map(([, n]) => n).join(' + ')})`), h('span', { class: 'medal-reward' }, icon('medal', 22), gym.badge)),
-        h('div', { class: 'reward-chips' }, ...rewards),
-      )
-      : null,
+      ? h('section', { class: 'panel2 tabbed' }, h('h3', { class: 'panel2-tab' }, 'Progreso del gimnasio'), track)
+      : h('section', { class: 'panel2' }, h('p', { class: 'note center' }, st === 'locked' ? 'Consigue la medalla anterior para desbloquearlo.' : 'Este gimnasio aún está en desarrollo.')),
+    gym.playable ? h('section', { class: 'panel2' }, h('h3', { class: 'panel2-title' }, 'Información del gimnasio'), info) : null,
+    gym.playable ? h('section', { class: 'panel2' }, h('h3', { class: 'panel2-title' }, 'Posibles enemigos'), enemies) : null,
     canPlay
-      ? h('button', { class: 'cta', 'data-testid': 'play', onclick: () => menu.app.startRun(gym.id) },
-        h('span', { class: 'cta-main' }, 'Comenzar'), h('span', { class: 'cta-sub' }, test ? `Modo prueba · ${rooms.length} salas` : `${rooms.length} salas`))
+      ? h('div', { class: 'gym-foot', style: 'background-image:url(ui/gym-floor.webp)' },
+        h('button', { class: 'cta', 'data-testid': 'play', onclick: () => menu.app.startRun(gym.id) },
+          h('span', { class: 'cta-main' }, 'Comenzar'), h('span', { class: 'cta-sub' }, test ? `Modo prueba · ${rooms.length} salas` : `${rooms.length} salas`)))
       : null,
   );
+}
+
+function infoCell(img: string, title: string, sub: string): HTMLElement {
+  return h('div', { class: 'info4-cell' }, h('img', { src: `ui/${img}.webp`, alt: '', class: 'info4-ic' }), h('b', {}, title), h('small', {}, sub));
+}
+
+function openEnemies(): void {
+  const close = () => overlay.remove();
+  const tiers = [0, 1, 2, 3, 4].map((t) => h('div', { class: 'tier-block' },
+    h('b', {}, `Salas ${t * 10 + 1}–${t * 10 + 10}`),
+    h('div', { class: 'tier-grid' }, ...tierCandidates(t).map((p) => h('span', { class: 'enemy-slot', title: p.name }, pokeImg(p.dex, 40)))),
+  ));
+  const overlay = h('div', { class: 'modal-backdrop', onclick: (e: Event) => { if (e.target === overlay) close(); } },
+    h('div', { class: 'modal' },
+      h('h2', { class: 'modal-title' }, 'Posibles enemigos'),
+      h('p', { class: 'modal-text' }, 'En cada partida salen 7 Pokémon por tramo, sorteados entre estos (sin legendarios). Cuanto más avanzas, más fuertes.'),
+      ...tiers,
+      h('button', { class: 'cta small', onclick: close }, h('span', { class: 'cta-main' }, 'Cerrar')),
+    ),
+  );
+  document.body.appendChild(overlay);
 }

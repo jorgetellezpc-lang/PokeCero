@@ -1,22 +1,29 @@
 import { PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
+import { ITEMS, ITEM_IDS } from '../../data/items';
 import { getMove } from '../../data/moves';
 import { getSpecies, obtainablePokemon, sideOf, type PokemonSpecies } from '../../data/pokemon';
+import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
 import { passiveOf } from '../../game/abilities';
 import { RARITY_COLOR, RARITY_NAME } from '../../meta/gacha';
 import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
 import { animatedPokemon } from '../anim';
-import { icon, type IconName } from '../icons';
 import { h, pokeImg, toast, typeChip } from '../dom';
-import type { MenuScreen } from './menu';
+import { icon, type IconName } from '../icons';
+import { uiImg, type MenuScreen } from './menu';
 
-// Pestaña Pokémon: tu Pokémon en grande (animado), su línea evolutiva, sus
-// estadísticas y las mejoras permanentes que se compran con oro.
+// Pestaña Pokémon: tu Pokémon en su escenario (animado), su ficha
+// (estadísticas, habilidad y evolución) y, en pestañas, sus mejoras
+// permanentes, sus movimientos, los objetos y su información.
 
-const STAT_ICON: Record<PermanentUpgradeDef['id'], { icon: IconName; color: string }> = {
-  hp: { icon: 'heart', color: '#ff5a8a' }, atk: { icon: 'sword', color: '#ffb02e' }, spd: { icon: 'boot', color: '#3ab0ff' },
-  cd: { icon: 'clock', color: '#4a8aff' }, def: { icon: 'shield', color: '#8fa4ff' }, regen: { icon: 'leaf', color: '#4ad06a' },
-  magnet: { icon: 'magnet', color: '#ff5a6a' }, xp: { icon: 'book', color: '#3ac8ff' }, coins: { icon: 'bag', color: '#ffc83a' },
-  crit: { icon: 'star', color: '#ff9a2a' },
+type SubTab = 'stats' | 'moves' | 'items' | 'info';
+let subTab: SubTab = 'stats';
+
+/** Icono de cada mejora: recorte del diseño si lo hay; si no, icono dibujado. */
+const UP_ICON: Record<PermanentUpgradeDef['id'], { img?: string; svg?: IconName; color: string }> = {
+  hp: { img: 'u-heart', color: '#ff5a8a' }, atk: { img: 'u-sword', color: '#ffb02e' }, spd: { img: 'u-boot', color: '#3ab0ff' },
+  cd: { img: 'u-bolt', color: '#ffd23a' }, def: { img: 'u-shield', color: '#8fa4ff' }, regen: { svg: 'leaf', color: '#4ad06a' },
+  magnet: { svg: 'magnet', color: '#ff5a6a' }, xp: { svg: 'book', color: '#3ac8ff' }, coins: { img: 'u-bag', color: '#ffc83a' },
+  crit: { img: 'u-burst', color: '#ff9a2a' },
 };
 
 /** Línea evolutiva (desde la forma base, siguiendo las evoluciones por nivel). */
@@ -40,40 +47,82 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     store.update((x) => { x.selectedPokemon = next.id; });
   };
   const atk = side === 'special' ? sp.stats.sa : sp.stats.pa;
-
-  const head = h('div', { class: 'poke-head' },
-    h('span', { class: 'play-tile' }, icon('play', 24)),
-    h('div', { class: 'poke-head-text' },
-      h('div', { class: 'hero-name' }, sp.name, h('span', { class: 'dex-no' }, ` #${String(sp.dex).padStart(3, '0')}`)),
-      h('div', { class: 'chips' }, ...sp.types.map(typeChip)),
-    ),
-  );
-
-  const stage = h('div', { class: 'poke-stage' },
-    owned.length > 1 ? h('button', { class: 'arrow left', 'aria-label': 'Anterior', onclick: () => cycle(-1) }, icon('back', 22)) : null,
-    h('div', { class: 'stage-platform' }),
-    animatedPokemon(sp.dex, 170, { cls: 'stage-sprite' }),
-    owned.length > 1 ? h('button', { class: 'arrow right', 'aria-label': 'Siguiente', onclick: () => cycle(1) }, icon('next', 22)) : null,
-  );
-
   const line = evoLine(sp);
-  const evo = line.length > 1
-    ? h('div', { class: 'evo-row' }, ...line.map((p) => h('span', { class: `evo-slot ${p.id === sp.id ? 'on' : ''}` }, pokeImg(p.dex, 44, '', !d.unlockedPokemon.includes(p.id) && p.id !== sp.id))))
-    : null;
 
-  const stats = h('div', { class: 'stat-boxes' },
-    statBox('sword', side === 'special' ? 'At. Esp.' : 'Ataque', Math.round(atk * 100 * perks.atkMul)),
-    statBox('heart', 'Vida', Math.round(sp.stats.hp + perks.hp)),
-    statBox('boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul)),
+  // --- columna izquierda: nombre, escenario y línea evolutiva ---
+  const head = h('div', { class: 'pk-head' },
+    icon('pokeball', 54),
+    h('div', { class: 'pk-head-text' },
+      h('div', { class: 'hero-name' }, sp.name),
+      h('div', { class: 'pk-sub' }, h('span', { class: 'dex-no' }, `#${String(sp.dex).padStart(3, '0')}`), ...sp.types.map(typeChip)),
+    ),
+    h('button', { class: 'pk-edit', 'aria-label': 'Cambiar Pokémon', 'data-testid': 'select-pokemon', onclick: () => openSelector(menu) }, '✎'),
+  );
+  const stage = h('div', { class: 'pk-stage', style: 'background-image:url(ui/stage.webp)' },
+    animatedPokemon(sp.dex, 150, { cls: 'pk-sprite' }),
+    owned.length > 1 ? h('button', { class: 'pk-arrow left', 'aria-label': 'Anterior', onclick: () => cycle(-1) }, icon('back', 22)) : null,
+    owned.length > 1 ? h('button', { class: 'pk-arrow right', 'aria-label': 'Siguiente', onclick: () => cycle(1) }, icon('next', 22)) : null,
+  );
+  const evo = h('div', { class: 'pk-evo' }, ...line.map((p) => {
+    const known = d.unlockedPokemon.includes(p.id) || p.id === sp.id;
+    return h('button', {
+      class: `pk-evo-slot ${p.id === sp.id ? 'on' : ''}`,
+      onclick: () => { if (d.unlockedPokemon.includes(p.id)) store.update((x) => { x.selectedPokemon = p.id; }); else toast('Evoluciona en partida o consíguelo en el Gachapón'); },
+    }, pokeImg(p.dex, 56, '', !known));
+  }));
+
+  // --- columna derecha: estadísticas, habilidad y evolución ---
+  const stats = h('div', { class: 'pk-stats' },
+    statRow('u-heart', 'Vida', Math.round(sp.stats.hp + perks.hp)),
+    statRow('u-sword', side === 'special' ? 'At. Esp.' : 'Ataque', (atk * perks.atkMul).toFixed(2)),
+    statRow('u-shield', 'Defensa', side === 'special' ? sp.stats.sd : sp.stats.df),
+    statRow('u-boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul)),
+  );
+  const ability = h('div', { class: 'pk-card', 'data-testid': 'hero-passive' },
+    h('b', {}, `Habilidad: ${passive.name}`), h('small', {}, passive.description));
+  const next = sp.evolution ? getSpecies(sp.evolution.to) : null;
+  const evolution = h('div', { class: 'pk-card pk-evo-card' },
+    h('div', {}, h('b', {}, 'Evolución'), h('small', {}, next ? `Evoluciona a ${next.name} en Nv ${sp.evolution!.level} (en partida).` : 'No evoluciona por nivel.')),
+    next ? pokeImg(next.dex, 52) : null,
   );
 
+  // --- pestañas ---
+  const tabs: { id: SubTab; label: string; svg: IconName }[] = [
+    { id: 'stats', label: 'Mejoras', svg: 'up' }, { id: 'moves', label: 'Movimientos', svg: 'star' },
+    { id: 'items', label: 'Objetos', svg: 'bag' }, { id: 'info', label: 'Información', svg: 'info' },
+  ];
+  const tabBar = h('div', { class: 'pk-tabs' }, ...tabs.map((t) => h('button', {
+    class: `pk-tab ${subTab === t.id ? 'on' : ''}`, 'data-sub': t.id, onclick: () => { subTab = t.id; menu.render(); },
+  }, icon(t.svg, 26), h('span', {}, t.label))));
+
+  const body = subTab === 'stats' ? upgrades(menu, sp)
+    : subTab === 'moves' ? moves(sp)
+      : subTab === 'items' ? items()
+        : info(sp);
+
+  return h('div', { class: 'tab tab-poke2' },
+    h('div', { class: 'pk-top' },
+      h('div', { class: 'pk-left' }, head, stage, evo),
+      h('div', { class: 'pk-right' }, stats, ability, evolution),
+    ),
+    tabBar,
+    body,
+  );
+}
+
+function statRow(img: string, label: string, value: string | number): HTMLElement {
+  return h('div', { class: 'pk-stat' }, uiImg(img, 'pk-stat-ic'), h('span', {}, label), h('b', {}, String(value)));
+}
+
+function upgrades(menu: MenuScreen, sp: PokemonSpecies): HTMLElement {
+  const store = menu.app.store;
   const rows = PERMANENT_UPGRADES.map((u) => {
     const lv = upgradeLevel(store, sp.id, u.id);
     const state = canBuy(store, sp.id, u.id);
     const cost = permanentUpgradeCost(u, lv);
-    const ic = STAT_ICON[u.id];
+    const ic = UP_ICON[u.id];
     const btn = h('button', {
-      class: `buy-btn ${state === 'ok' ? '' : 'disabled'} ${state === 'max' ? 'max' : ''}`,
+      class: `buy-btn2 ${state === 'ok' ? '' : 'disabled'} ${state === 'max' ? 'max' : ''}`,
       'data-testid': `buy-${u.id}`,
       onclick: () => {
         const r = buyUpgrade(store, sp.id, u.id);
@@ -81,39 +130,56 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
         else if (r === 'max') toast('Nivel máximo');
         else menu.app.audio.sfx('confirm');
       },
-    }, state === 'max' ? 'MÁX' : h('span', { class: 'price' }, icon('up', 16, 'up-arrow'), icon('coin', 20), String(cost)));
-    return h('div', { class: 'upgrade-row', style: `--c:${ic.color}` },
-      h('div', { class: 'up-icon' }, icon(ic.icon, 40)),
-      h('div', { class: 'up-body' },
-        h('div', { class: 'up-name' }, u.name),
-        h('div', { class: 'up-lv' }, `Nv ${lv}/${u.maxLevel}`),
-        h('div', { class: 'up-desc' }, `${u.description} por nivel`),
-        h('div', { class: 'pips' }, ...Array.from({ length: u.maxLevel }, (_, i) => h('span', { class: i < lv ? 'pip on' : 'pip' }))),
+    }, state === 'max' ? 'MÁX' : h('span', { class: 'price' }, uiImg('i-coin'), String(cost)));
+    return h('div', { class: 'upgrade-row up2', style: `--c:${ic.color}` },
+      h('div', { class: 'up2-icon' }, ic.img ? uiImg(ic.img) : icon(ic.svg!, 40)),
+      h('div', { class: 'up2-body' },
+        h('div', { class: 'up2-name' }, u.name, h('span', { class: 'up2-lv' }, `Nv ${lv}/${u.maxLevel}`)),
+        h('div', { class: 'up2-desc' }, `${u.description} por nivel`),
+        h('div', { class: 'up2-bar' }, ...Array.from({ length: u.maxLevel }, (_, i) => h('i', { class: i < lv ? 'on' : '' }))),
       ),
       btn,
     );
   });
-
-  return h('div', { class: 'tab tab-pokemon' },
-    h('section', { class: 'panel hero-panel' },
-      head,
-      stage,
-      evo,
-      stats,
-      h('div', { class: 'passive', 'data-testid': 'hero-passive' }, h('b', {}, passive.name), ` — ${passive.description}`),
-      h('div', { class: 'note center' }, `Empieza con ${getMove(sp.startingAttack).name} · ${sp.learnset.length} movimientos posibles${sp.evolution ? ` · Evoluciona a ${getSpecies(sp.evolution.to).name} en Nv ${sp.evolution.level}` : ''}`),
-      h('button', { class: 'cta', 'data-testid': 'select-pokemon', onclick: () => openSelector(menu) }, h('span', { class: 'cta-main' }, 'Cambiar Pokémon')),
-    ),
-    h('div', { class: 'section-card' },
-      h('span', { class: 'section-ico' }, icon('up', 28)),
-      h('div', {}, h('div', { class: 'section-card-title' }, 'Mejoras permanentes'), h('div', { class: 'section-card-sub' }, `De ${sp.name}. Se compran con oro y se conservan entre partidas.`)),
-    ),
+  return h('section', { class: 'panel2 pk-body' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, `Mejoras de ${sp.name}`),
+      h('p', {}, 'Se compran con oro, se conservan entre partidas y solo cuentan cuando juegas con este Pokémon.')),
     ...rows,
   );
 }
 
-function statBox(name: IconName, label: string, value: number): HTMLElement {
-  return h('div', { class: 'stat-box' }, h('span', { class: 'stat-head' }, icon(name, 24), h('small', {}, label)), h('b', {}, String(value)));
+function moves(sp: PokemonSpecies): HTMLElement {
+  const start = getMove(sp.startingAttack);
+  return h('section', { class: 'panel2 pk-body' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Movimientos'),
+      h('p', {}, `Empieza con ${start.name}. En partida puede aprender estos ${sp.learnset.length} (los de su tipo y los de tipo Normal).`)),
+    h('div', { class: 'move-grid' }, ...sp.learnset.map((id) => {
+      const m = getMove(id);
+      return h('div', { class: `move-cell ${id === sp.startingAttack ? 'start' : ''}`, style: `--t:${TYPE_COLORS[m.type]}` },
+        h('b', {}, m.name), h('small', {}, `${TYPE_NAMES[m.type]} · ${m.desc}`));
+    })),
+  );
+}
+
+function items(): HTMLElement {
+  return h('section', { class: 'panel2 pk-body' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Objetos'),
+      h('p', {}, 'Los sueltan los jefes durante la partida. Llevas uno: al encontrar otro, eliges con cuál quedarte.')),
+    h('div', { class: 'move-grid' }, ...ITEM_IDS.map((id) => h('div', { class: 'move-cell', style: '--t:#ffd23a' }, h('b', {}, ITEMS[id].name), h('small', {}, ITEMS[id].desc)))),
+  );
+}
+
+function info(sp: PokemonSpecies): HTMLElement {
+  const row = (k: string, v: string) => h('div', { class: 'info-line' }, h('span', {}, k), h('b', {}, v));
+  return h('section', { class: 'panel2 pk-body' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Información')),
+    row('Pokédex', `#${String(sp.dex).padStart(3, '0')}`),
+    row('Tipo', sp.types.map((t) => TYPE_NAMES[t]).join(' / ')),
+    row('Rareza en el gachapón', RARITY_NAME[sp.rarity]),
+    row('Pega mejor con', sideOf(sp) === 'special' ? 'Ataques especiales' : 'Ataques físicos'),
+    row('Defensa / Def. Esp.', `${sp.stats.df} / ${sp.stats.sd}`),
+    row('Total de estadísticas base', String(sp.bst)),
+  );
 }
 
 function openSelector(menu: MenuScreen): void {

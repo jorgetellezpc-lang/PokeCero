@@ -1,8 +1,9 @@
 import { KANTO } from '../../data/regions';
 import { getSpecies } from '../../data/pokemon';
 import type { App, Screen } from '../app';
-import { animatedPokemon } from '../anim';
-import { icon, type IconName } from '../icons';
+import { PERMANENT_UPGRADES } from '../../config/balance';
+import { canBuy } from '../../meta/shop';
+import { icon } from '../icons';
 import { h } from '../dom';
 import { renderGachaTab } from './gachaTab';
 import { renderMapTab } from './mapTab';
@@ -14,11 +15,11 @@ import { renderSettingsTab } from './settingsTab';
 
 export type MenuTab = 'pokemon' | 'map' | 'gacha' | 'settings';
 
-const TABS: { id: MenuTab; label: string; icon: IconName }[] = [
-  { id: 'pokemon', label: 'Pokémon', icon: 'pikachu' },
-  { id: 'map', label: 'Mapa', icon: 'map' },
-  { id: 'gacha', label: 'Gachapón', icon: 'gacha' },
-  { id: 'settings', label: 'Ajustes', icon: 'gear' },
+const TABS: { id: MenuTab; label: string; img: string }[] = [
+  { id: 'pokemon', label: 'Pokémon', img: 'n-pokemon' },
+  { id: 'map', label: 'Mapa', img: 'n-map' },
+  { id: 'gacha', label: 'Gachapón', img: 'n-gacha' },
+  { id: 'settings', label: 'Ajustes', img: 'n-gear' },
 ];
 
 /** Pantalla dentro de la pestaña Mapa: portada de la región, mapa o ficha del gimnasio. */
@@ -65,17 +66,22 @@ export class MenuScreen implements Screen {
     const d = this.app.store.data;
     const medals = (d.medals[KANTO.id] ?? []).length;
     const sp = getSpecies(d.selectedPokemon);
+    // Avisos «!» con sentido: una mejora que puedes pagar o tickets para tirar.
+    const alerts: Partial<Record<MenuTab, boolean>> = {
+      pokemon: PERMANENT_UPGRADES.some((u) => canBuy(this.app.store, sp.id, u.id) === 'ok'),
+      gacha: d.tickets >= 1,
+    };
     this.topbar.replaceChildren(
-      h('button', { class: 'tb-avatar', 'aria-label': 'Tu Pokémon', onclick: () => this.setTab('pokemon') },
-        h('span', { class: 'tb-face' }, animatedPokemon(sp.dex, 40)),
+      h('button', { class: 'tb-avatar', 'aria-label': `Tu Pokémon: ${sp.name}`, onclick: () => this.setTab('pokemon') },
+        h('span', { class: 'tb-face' }, uiImg('avatar')),
         h('span', { class: 'tb-medals' },
           h('span', { class: 'tb-medals-num' }, icon('medal', 18, 'tb-badge'), `${medals}/8`),
           h('span', { class: 'tb-bar' }, h('span', { style: `width:${(medals / 8) * 100}%` })),
         ),
       ),
-      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, icon('coin', 24), compact(d.gold)),
-      h('div', { class: 'pill', 'data-testid': 'tickets' }, icon('ticket', 24), String(d.tickets)),
-      h('button', { class: 'tb-gear', 'aria-label': 'Ajustes', onclick: () => this.setTab('settings') }, icon('gear', 26)),
+      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, uiImg('i-coin'), compact(d.gold)),
+      h('div', { class: 'pill', 'data-testid': 'tickets' }, uiImg('i-ticket'), String(d.tickets)),
+      h('button', { class: 'tb-gear', 'aria-label': 'Ajustes', onclick: () => this.setTab('settings') }, uiImg('i-gear')),
     );
 
     this.nav.replaceChildren(
@@ -84,7 +90,8 @@ export class MenuScreen implements Screen {
           class: `nav-btn ${t.id === this.tab ? 'active' : ''}`,
           'data-tab': t.id,
           onclick: () => this.setTab(t.id),
-        }, h('span', { class: 'nav-ico' }, icon(t.icon, 36, 'nav-icon')), h('span', { class: 'nav-label' }, t.label)),
+        }, h('span', { class: 'nav-ico' }, uiImg(t.img, 'nav-icon')), h('span', { class: 'nav-label' }, t.label),
+        alerts[t.id] ? h('span', { class: 'nav-alert' }, '!') : null),
       ),
     );
 
@@ -94,6 +101,7 @@ export class MenuScreen implements Screen {
       this.tab === 'map' ? renderMapTab(this) :
       this.tab === 'gacha' ? renderGachaTab(this) :
       renderSettingsTab(this);
+    this.content.classList.toggle('full', this.tab === 'map' && this.ui.mapView === 'home');
     this.content.replaceChildren(body);
     this.content.scrollTop = scroll;
   }
@@ -103,4 +111,9 @@ export class MenuScreen implements Screen {
 function compact(n: number): string {
   if (n < 10000) return String(n);
   return `${(n / 1000).toFixed(n < 100000 ? 1 : 0).replace('.0', '')}K`;
+}
+
+/** Icono recortado del diseño (public/ui). */
+export function uiImg(name: string, cls = ''): HTMLImageElement {
+  return h('img', { src: `ui/${name}.webp`, alt: '', class: `ui-ic ${cls}`, draggable: 'false' });
 }

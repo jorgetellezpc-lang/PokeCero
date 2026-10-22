@@ -82,7 +82,12 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - **Gachapón:** máquina de cápsulas con los iniciales alrededor, probabilidades por rareza y tiradas ×1 y ×10.
 - **Ajustes:** lista con iconos. Incluye la **calidad gráfica** (automática, alta, media o baja; controla el 3D de verdad), la guía del juego y los créditos.
 - **Sin pixel art en los menús:** todos los iconos están dibujados en SVG (`src/ui/icons.ts`).
-- **Ilustraciones:** las pone el usuario en `public/ui/` (nombres y tamaños en `public/ui/README.md`) y aparecen solas. Mientras falten, se usan provisionales generadas en código (isla suavizada y cueva) o la máquina de CSS.
+- **Ilustraciones (v0.4):** son recortes de las pantallas de diseño del usuario (`public/ui/`, ver su README). La interfaz real se coloca encima en el mismo sitio (gimnasios, letrero de medallas, Entrar, Comenzar, tiradas…), así se ve como el diseño pero con los datos reales.
+  - Se borraron de las ilustraciones el botón «Eventos» (no existe) y el Pidgeotto del fondo de la ficha.
+  - Brock es el único gimnasio con cabecera ilustrada; los demás usan una provisional hasta tener su dibujo.
+  - En el mapa del diseño faltaba Ciudad Azulona: su pin se ha colocado sobre la ciudad central.
+- **Ficha del Pokémon:** pestañas Mejoras, Movimientos, Objetos (información de los objetos de partida) e Información. «Equipamiento» y «Restablecer» del diseño no se incluyen porque no existen esos sistemas.
+- **Avisos «!»** en la navegación: en Pokémon si puedes pagar alguna mejora, y en Gachapón si tienes tickets.
 - **No integrado del ejemplo, a propósito:** la **energía** (rayo 30/30, "Comenzar ×5") y el **nivel de jugador**. Son sistemas nuevos de economía y progresión que el blueprint no tiene (y la energía es típica de juegos con pagos). En su lugar, la barra superior muestra tu Pokémon y tus medallas. El idioma no se incluye porque solo hay español.
 
 ## Provisional (pendiente de decisión de diseño)
