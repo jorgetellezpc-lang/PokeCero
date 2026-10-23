@@ -1,5 +1,5 @@
 import { BALANCE, PERMANENT_UPGRADES, type PermanentUpgradeDef } from '../config/balance';
-import { POKEMON, STARTER_POKEMON } from '../data/pokemon';
+import { isPlayable, PLAYABLE_POKEMON, STARTER_POKEMON } from '../data/pokemon';
 
 // Persistencia del progreso PERMANENTE. Nunca guarda el estado de una partida
 // (nivel, cartas): eso vive solo en World y se pierde al morir. El esquema
@@ -50,7 +50,7 @@ export function defaultSave(): SaveData {
     version: SAVE_VERSION,
     gold: BALANCE.rewards.starterGold,
     tickets: BALANCE.rewards.starterTickets,
-    unlockedPokemon: [STARTER_POKEMON],
+    unlockedPokemon: [...PLAYABLE_POKEMON],
     selectedPokemon: STARTER_POKEMON,
     medals: {},
     bestRoom: {},
@@ -91,9 +91,10 @@ export function migrate(raw: unknown): SaveData {
     }
     delete (data as unknown as Record<string, unknown>).permanentUpgrades;
   }
-  data.unlockedPokemon = data.unlockedPokemon.filter((id) => POKEMON[id]);
-  if (!data.unlockedPokemon.length) data.unlockedPokemon = [STARTER_POKEMON];
-  if (!data.unlockedPokemon.includes(data.selectedPokemon)) data.selectedPokemon = data.unlockedPokemon[0];
+  // Solo se juega con los 4 elegibles, todos disponibles desde el principio.
+  // Las mejoras compradas para otros Pokémon se quedan guardadas, sin uso.
+  data.unlockedPokemon = [...PLAYABLE_POKEMON];
+  if (!isPlayable(data.selectedPokemon)) data.selectedPokemon = STARTER_POKEMON;
   data.gold = Math.max(0, Math.floor(Number(data.gold) || 0));
   data.tickets = Math.max(0, Math.floor(Number(data.tickets) || 0));
   data.pity = Math.max(0, Math.floor(Number(data.pity) || 0));

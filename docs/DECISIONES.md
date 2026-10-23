@@ -4,6 +4,15 @@ Este documento recoge qué está **acordado** y qué es **provisional**, es deci
 
 ## Acordado
 
+- **Personajes elegibles:**
+  - Solo se puede jugar con Bulbasaur, Charmander, Squirtle y Pikachu, los 4 disponibles desde el principio (`PLAYABLE_POKEMON` en `src/data/pokemon.ts`).
+  - Evolucionan durante la partida.
+  - El resto de Pokémon de Kanto solo aparece como enemigo.
+  - Al cargar un guardado antiguo, la selección pasa a estos 4. Las mejoras compradas para otros Pokémon se conservan en el guardado, sin uso.
+- **Gachapón:**
+  - Ya no reparte Pokémon. La pestaña sigue visible («Próximamente») con los tickets, y su aviso «!» está apagado.
+  - El código del sorteo (`src/meta/gacha.ts`) se conserva sin uso, hasta decidir qué premia.
+
 | Tema | Decisión |
 |---|---|
 | Base | Pokécero integra PokéSurvivor (sistemas, datos, sprites, efectos y música) adaptado a salas verticales estilo Archero. Por eso el proyecto es **no comercial** para siempre: lo exigen las licencias PolyForm Noncommercial y CC BY-NC (ver `THIRD_PARTY_NOTICES.md`). |
@@ -162,7 +171,7 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
   - Brock es el único gimnasio con cabecera ilustrada; los demás usan una provisional hasta tener su dibujo.
   - En el mapa del diseño faltaba Ciudad Azulona: su pin se ha colocado sobre la ciudad central.
 - **Ficha del Pokémon:** pestañas Mejoras, Movimientos, Objetos (información de los objetos de partida) e Información. «Equipamiento» y «Restablecer» del diseño no se incluyen porque no existen esos sistemas.
-- **Avisos «!»** en la navegación: en Pokémon si puedes pagar alguna mejora, y en Gachapón si tienes tickets.
+- **Avisos «!»** en la navegación: en Pokémon si puedes pagar alguna mejora. El de Gachapón está apagado mientras no reparte nada.
 - **No integrado del ejemplo, a propósito:** la **energía** (rayo 30/30, "Comenzar ×5") y el **nivel de jugador**. Son sistemas nuevos de economía y progresión que el blueprint no tiene (y la energía es típica de juegos con pagos). En su lugar, la barra superior muestra tu Pokémon y tus medallas. El idioma no se incluye porque solo hay español.
 
 ## Arenas ilustradas (gimnasio de Brock)

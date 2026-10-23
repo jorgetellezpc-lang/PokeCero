@@ -104,7 +104,8 @@ const GUIDE = [
   'Cada Pokémon tiene un único ataque que sale de sus tipos. Al subir de nivel eliges 1 de 3 cartas: mejoras de ese ataque, estadísticas y habilidades. Algunas habilidades juntas activan sinergias.',
   'Con nivel suficiente y las mejoras clave, el ataque EVOLUCIONA (carta dorada). Si tu Pokémon evoluciona, su ataque se transforma y conserva las mejoras.',
   'Cada gimnasio tiene 50 salas, con minibosses en la 20 y la 40 y el líder en la 50. Los jefes cambian de fase al perder vida.',
-  'El oro sirve para mejoras permanentes de cada Pokémon. Los tickets, para el gachapón. Al morir conservas el oro y los tickets.',
+  'Puedes jugar con Bulbasaur, Charmander, Squirtle o Pikachu, todos disponibles desde el principio; evolucionan durante la partida. El resto de Pokémon de Kanto son tus enemigos.',
+  'El oro sirve para mejoras permanentes de cada Pokémon. Guarda los tickets: pronto se canjearán en el gachapón. Al morir conservas el oro y los tickets.',
 ];
 
 const CREDITS = [

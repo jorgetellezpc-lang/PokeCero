@@ -115,6 +115,15 @@ for (const d of DEX) {
 /** Pokémon con el que empieza cualquier partida guardada nueva. */
 export const STARTER_POKEMON = 'charmander';
 
+/**
+ * Pokémon que se pueden elegir para jugar: los 3 iniciales de Kanto y
+ * Pikachu, disponibles desde el principio. Durante la partida evolucionan
+ * con normalidad; el resto de Pokémon solo aparece como enemigo.
+ */
+export const PLAYABLE_POKEMON = ['bulbasaur', 'charmander', 'squirtle', 'pikachu'];
+
+export const isPlayable = (id: string) => PLAYABLE_POKEMON.includes(id);
+
 export function getSpecies(id: string): PokemonSpecies {
   const p = POKEMON[id];
   if (!p) throw new Error(`Pokémon desconocido: ${id}`);
@@ -125,7 +134,11 @@ export function speciesByDex(dex: number): PokemonSpecies {
   return getSpecies(slug(byDex.get(dex)!.name));
 }
 
-/** Pokémon que se pueden conseguir en el gachapón: los 151 de Kanto. */
+export function playablePokemon(): PokemonSpecies[] {
+  return PLAYABLE_POKEMON.map(getSpecies);
+}
+
+/** Pokémon de Kanto del antiguo sorteo del gachapón (ahora sin uso en la interfaz). */
 export function obtainablePokemon(): PokemonSpecies[] {
   return Object.values(POKEMON).filter((p) => p.dex <= 151);
 }

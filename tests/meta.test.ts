@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost } from '../src/config/balance';
+import { PLAYABLE_POKEMON } from '../src/data/pokemon';
 import { JOHTO, KANTO } from '../src/data/regions';
+import { World } from '../src/game/world';
 import { Rng } from '../src/game/rng';
 import { pull } from '../src/meta/gacha';
 import { awardMedal, bankRunGold, claimMilestone, gymStatus, regionUnlocked } from '../src/meta/rewards';
@@ -30,6 +32,28 @@ describe('persistencia', () => {
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, '{no es json');
     expect(new SaveStore(storage).data.gold).toBe(BALANCE.rewards.starterGold);
+  });
+});
+
+describe('Pokémon elegibles', () => {
+  it('solo se juega con los 3 iniciales y Pikachu, todos desde el principio', () => {
+    expect(PLAYABLE_POKEMON).toEqual(['bulbasaur', 'charmander', 'squirtle', 'pikachu']);
+    expect(fresh().data.unlockedPokemon).toEqual(PLAYABLE_POKEMON);
+  });
+
+  it('un guardado antiguo con otros Pokémon pasa a los 4 elegibles (y conserva la elección si es válida)', () => {
+    const m = migrate({ version: 2, selectedPokemon: 'mewtwo', unlockedPokemon: ['charmander', 'mewtwo', 'pidgeotto'], upgrades: { mewtwo: { hp: 3 } } });
+    expect(m.unlockedPokemon).toEqual(PLAYABLE_POKEMON);
+    expect(m.selectedPokemon).toBe('charmander');
+    expect(m.upgrades.mewtwo).toEqual({ hp: 3 });
+    expect(migrate({ version: 2, selectedPokemon: 'pikachu', unlockedPokemon: ['charmander'] }).selectedPokemon).toBe('pikachu');
+  });
+
+  it('los demás siguen saliendo como enemigos', () => {
+    const w = new World({ speciesId: 'squirtle', gym: KANTO.gyms[0], rooms: [1, 2, 3], seed: 5 });
+    const cast = w.cast.flat().map((d) => d.dex);
+    expect(cast.length).toBeGreaterThan(10);
+    expect(cast.some((dex) => ![1, 4, 7, 25].includes(dex))).toBe(true);
   });
 });
 

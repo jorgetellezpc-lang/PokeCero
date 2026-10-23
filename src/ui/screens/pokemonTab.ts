@@ -1,10 +1,9 @@
 import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
 import { ITEMS, ITEM_IDS } from '../../data/items';
 import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
-import { getSpecies, obtainablePokemon, sideOf, type PokemonSpecies } from '../../data/pokemon';
+import { getSpecies, isPlayable, playablePokemon, sideOf, type PokemonSpecies } from '../../data/pokemon';
 import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
 import { passiveOf } from '../../game/abilities';
-import { RARITY_COLOR, RARITY_NAME } from '../../meta/gacha';
 import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
 import { animatedPokemon } from '../anim';
 import { h, pokeImg, toast, typeChip } from '../dom';
@@ -40,7 +39,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   const perks = perksFor(store, sp.id);
   const side = sideOf(sp);
   const passive = passiveOf(sp);
-  const owned = d.unlockedPokemon.map(getSpecies).sort((a, b) => a.dex - b.dex);
+  const owned = playablePokemon();
   const cycle = (k: number) => {
     const i = owned.findIndex((p) => p.id === sp.id);
     const next = owned[(i + k + owned.length) % owned.length];
@@ -64,11 +63,10 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     owned.length > 1 ? h('button', { class: 'pk-arrow right', 'aria-label': 'Siguiente', onclick: () => cycle(1) }, icon('next', 22)) : null,
   );
   const evo = h('div', { class: 'pk-evo' }, ...line.map((p) => {
-    const known = d.unlockedPokemon.includes(p.id) || p.id === sp.id;
     return h('button', {
       class: `pk-evo-slot ${p.id === sp.id ? 'on' : ''}`,
-      onclick: () => { if (d.unlockedPokemon.includes(p.id)) store.update((x) => { x.selectedPokemon = p.id; }); else toast('Evoluciona en partida o consíguelo en el Gachapón'); },
-    }, pokeImg(p.dex, 56, '', !known));
+      onclick: () => { if (isPlayable(p.id)) store.update((x) => { x.selectedPokemon = p.id; }); else toast(`${p.name}: evoluciona durante la partida`); },
+    }, pokeImg(p.dex, 56));
   }));
 
   // --- columna derecha: estadísticas, habilidad y evolución ---
@@ -194,7 +192,6 @@ function info(sp: PokemonSpecies): HTMLElement {
     h('div', { class: 'pk-body-head' }, h('h3', {}, 'Información')),
     row('Pokédex', `#${String(sp.dex).padStart(3, '0')}`),
     row('Tipo', sp.types.map((t) => TYPE_NAMES[t]).join(' / ')),
-    row('Rareza en el gachapón', RARITY_NAME[sp.rarity]),
     row('Pega mejor con', sideOf(sp) === 'special' ? 'Ataques especiales' : 'Ataques físicos'),
     row('Defensa / Def. Esp.', `${sp.stats.df} / ${sp.stats.sd}`),
     row('Total de estadísticas base', String(sp.bst)),
@@ -204,33 +201,27 @@ function info(sp: PokemonSpecies): HTMLElement {
 function openSelector(menu: MenuScreen): void {
   const store = menu.app.store;
   const close = () => overlay.remove();
-  const all = obtainablePokemon();
-  const list = all.map((p) => {
-    const owned = store.data.unlockedPokemon.includes(p.id);
+  const list = playablePokemon().map((p) => {
     const selected = store.data.selectedPokemon === p.id;
     return h('button', {
-      class: `poke-slot ${owned ? '' : 'locked'} ${selected ? 'selected' : ''}`,
-      style: `--rar:${RARITY_COLOR[p.rarity]}`,
+      class: `poke-slot ${selected ? 'selected' : ''}`,
+      style: `--rar:${TYPE_COLORS[p.types[0]]}`,
       'data-testid': `pick-${p.id}`,
-      title: owned ? `${p.name} · ${RARITY_NAME[p.rarity]}` : '???',
+      title: p.name,
       onclick: () => {
-        if (!owned) {
-          toast('Consíguelo en el Gachapón');
-          return;
-        }
         store.update((d) => { d.selectedPokemon = p.id; });
         close();
       },
     },
       h('span', { class: 'slot-no' }, String(p.dex).padStart(3, '0')),
-      pokeImg(p.dex, 48, 'slot-sprite', !owned),
-      h('span', {}, owned ? p.name : '???'),
+      pokeImg(p.dex, 48, 'slot-sprite'),
+      h('span', {}, p.name),
     );
   });
   const overlay = h('div', { class: 'modal-backdrop', onclick: (e: Event) => { if (e.target === overlay) close(); } },
-    h('div', { class: 'modal' },
+    h('div', { class: 'modal', 'data-testid': 'pokemon-selector' },
       h('h2', { class: 'modal-title' }, 'Elige tu Pokémon'),
-      h('p', { class: 'note center' }, `${store.data.unlockedPokemon.length} / ${all.length} de Kanto obtenidos`),
+      h('p', { class: 'note center' }, 'Los tres iniciales de Kanto y Pikachu. Evolucionan durante la partida.'),
       h('div', { class: 'poke-grid' }, ...list),
       h('button', { class: 'cta small', onclick: close }, h('span', { class: 'cta-main' }, 'Cerrar')),
     ),

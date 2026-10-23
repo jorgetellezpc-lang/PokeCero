@@ -69,7 +69,7 @@ export class MenuScreen implements Screen {
     // Avisos «!» con sentido: una mejora que puedes pagar o tickets para tirar.
     const alerts: Partial<Record<MenuTab, boolean>> = {
       pokemon: PERMANENT_UPGRADES.some((u) => canBuy(this.app.store, sp.id, u.id) === 'ok'),
-      gacha: d.tickets >= 1,
+      gacha: false, // sin sorteo por ahora: no hay nada que hacer allí
     };
     this.topbar.replaceChildren(
       h('button', { class: 'tb-avatar', 'aria-label': `Tu Pokémon: ${sp.name}`, onclick: () => this.setTab('pokemon') },

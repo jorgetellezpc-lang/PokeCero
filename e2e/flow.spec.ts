@@ -63,6 +63,16 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.locator('.upgrade-row')).toHaveCount(10);
   await expect(page.getByTestId('hero-passive')).toContainText('Mar Llamas');
   await shot(page, '02-pokemon');
+  // Selección: solo los 3 iniciales de Kanto y Pikachu, todos disponibles.
+  await page.getByTestId('select-pokemon').click();
+  await expect(page.getByTestId('pokemon-selector').locator('.poke-slot')).toHaveCount(4);
+  await expect(page.getByTestId('pokemon-selector').locator('.poke-slot.locked')).toHaveCount(0);
+  await shot(page, '02a-seleccion');
+  await page.getByTestId('pick-pikachu').click();
+  await expect(page.locator('.hero-name')).toContainText('Pikachu');
+  await page.getByTestId('select-pokemon').click();
+  await page.getByTestId('pick-charmander').click();
+  await expect(page.locator('.hero-name')).toContainText('Charmander');
   // Ataque característico: uno por Pokémon, con su evolución y sus mejoras posibles.
   await page.click('[data-sub="moves"]');
   await expect(page.getByTestId('signature-attack')).toContainText('Ascuas');
@@ -74,9 +84,9 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await shot(page, '03-ajustes');
   await page.click('[data-tab="gacha"]');
   await expect(page.getByTestId('tickets')).toHaveText('10');
-  await page.getByTestId('gacha-pull').click();
-  await expect(page.getByTestId('gacha-result')).toBeVisible();
-  await expect(page.getByTestId('tickets')).toHaveText('9');
+  // El gachapón ya no reparte Pokémon: queda visible, sin tiradas.
+  await expect(page.getByTestId('gacha-soon')).toBeVisible();
+  await expect(page.getByTestId('gacha-pull')).toHaveCount(0);
   await shot(page, '04-gachapon');
 
   // Entrar al gimnasio
