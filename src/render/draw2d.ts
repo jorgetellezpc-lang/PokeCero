@@ -501,3 +501,17 @@ export function buildBackground(gym: GymDef, W: number, H: number, border = true
   }
   return c;
 }
+
+/** Aro dorado de un punto de interacción del pueblo (capa de suelo). */
+export function drawSpotHint(ctx: CanvasRenderingContext2D, x: number, y: number, t: number): void {
+  const k = (Math.sin(t * 4 + x * 0.05) + 1) / 2;
+  ctx.save();
+  ctx.strokeStyle = `rgba(255, 210, 58, ${0.45 + 0.4 * k})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.ellipse(x, y, 13 + 3 * k, 8 + 2 * k, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(255, 220, 90, ${0.12 + 0.12 * k})`;
+  ctx.fill();
+  ctx.restore();
+}

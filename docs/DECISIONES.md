@@ -164,17 +164,29 @@ Cada Pokémon tiene **un solo ataque**, generado a partir de sus tipos. Todas la
   - El fondo es su escenario, sin interfaz y sin Pikachu.
   - Contenido: selector, tu Pokémon sobre la roca, ficha, PS/Defensa/Velocidad, radar, Entrenamiento y Evolución. La barra de navegación queda encima del escenario, como en el diseño.
   - Lo que el diseño no muestra, pero sigue accesible:
-    - **Entrenar** abre las 10 mejoras de oro.
+    - **Entrenar** ya no abre las mejoras: avisa de que se compran en la tienda de los pueblos (ver *Aventura*).
     - **Al tocar tu Pokémon** se abre su ficha completa: habilidad, ataque característico, objetos e información.
   - El «Nv.» es el **nivel de entrenamiento** (las mejoras compradas). Los Pokémon no tienen nivel permanente.
   - **Ilustraciones 3D:** de momento solo hay la de Pikachu, recortada del diseño. Charmander, Bulbasaur y Squirtle usan su sprite animado hasta tener la suya: basta añadir `public/ui/pk-3d-<especie>.webp` y su id en `HERO_ART` (`pokemonTab.ts`).
-- **Mapa:**
-  - La ilustración de Kanto, con las etiquetas de las ciudades dibujadas, ocupa la pantalla manteniendo su proporción; lo que sobra a los lados se rellena con el mapa desenfocado.
-  - Al tocar una ciudad, la tarjeta de abajo muestra su gimnasio: miniatura, tipo, descripción y medalla con 5 puntos de progreso. **Entrar** lleva a la ficha del gimnasio.
-  - Los gimnasios bloqueados o en desarrollo se pueden consultar, pero no se entra en ellos.
-  - Los 6 puntos de Plateada se redibujan con el progreso (mejor sala) y se encienden todos al conseguir la medalla.
+- **Mapa (rediseño v3):**
+  - La ilustración ocupa todo el ancho y se desliza en vertical; la tarjeta queda fija sobre la barra de navegación. Sin avisos flotantes encima de las etiquetas.
+  - Debajo de cada nombre: candado si aún no lo has visitado, 6 puntos de medalla si tiene gimnasio, o «✓ Visitado» si no lo tiene. Los pueblos sin gimnasio **no muestran medallas**.
+  - La tarjeta muestra el lugar elegido (al abrir, donde estás). **Entrar** lleva al pueblo; los no visitados dicen cómo llegar.
 - **Barra superior nueva:** avatar, «Kanto», «Medallas x/8» con 8 puntos, oro, tickets y ajustes, sobre un cristal oscuro.
 - **Adaptable:** tamaños relativos al ancho real del menú (unidades de contenedor). En móviles muy estrechos el selector pasa a una fila. El juego sigue siendo una columna de hasta 480 px centrada en pantallas grandes.
+
+## Aventura por Kanto (versión jugable provisional)
+
+Decidido con el usuario:
+
+- **Recorrido:** Pueblo Paleta → Ruta 1 → Ciudad Verde → Ruta 2 → Ciudad Plateada. Los pueblos se desbloquean en orden, al llegar por su ruta.
+- **Pueblos:** se recorren a pie con el joystick, sin combate, en el mismo escenario 3D. Edificios, carteles y Pokémon con los que hablar; al acercarse aparece un botón para interactuar. La salida norte lleva a la siguiente ruta.
+  - Diseño **generado** (casas de colores, caminos, agua); se sustituirá por ilustraciones de cada pueblo.
+  - El gimnasio es un edificio dentro de la ciudad (Plateada → Brock). El de Ciudad Verde está cerrado.
+- **Rutas:** 5 salas de combate estilo Archero con los salvajes de la ruta; el más fuerte aparece en la última sala. Cada ruta empieza de cero (nivel y cartas). Si caes, vuelves al pueblo anterior; el oro ganado se queda.
+- **Tienda:** las mejoras permanentes (el entrenamiento) se compran en la tienda de los pueblos (Verde y Plateada). En la pestaña Pokémon solo se ve el nivel.
+- **Partidas guardadas:** todas empiezan en Pueblo Paleta, aunque ya tengan la medalla de Brock (la conservan).
+- Datos en `src/data/adventure.ts`; progreso en `src/meta/adventure.ts`; pantalla del pueblo en `src/ui/screens/town.ts`.
 
 ## Menús (v0.3)
 

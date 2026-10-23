@@ -1,4 +1,5 @@
 import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
+import { TOWNS } from '../../data/adventure';
 import { ITEMS, ITEM_IDS } from '../../data/items';
 import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
 import { getSpecies, obtainablePokemon, PLAYABLE_BLURB, sideOf, type PokemonSpecies } from '../../data/pokemon';
@@ -9,6 +10,7 @@ import { animatedPokemon } from '../anim';
 import { h, pokeImg, toast } from '../dom';
 import { icon, type IconName } from '../icons';
 import { typeGlyph } from '../typeGlyph';
+import type { App } from '../app';
 import { uiImg, type MenuScreen } from './menu';
 
 // Pestaña Pokémon: calcada del diseño del usuario (selector, tu Pokémon sobre
@@ -110,16 +112,20 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     { id: 'def', img: 'u-shield', label: 'Defensa' }, { id: 'spd', img: 'u-boot', label: 'Velocidad' },
   ];
   const canTrain = PERMANENT_UPGRADES.some((u) => canBuy(store, sp.id, u.id) === 'ok');
+  const shopOpen = d.adventure.visited.some((id) => TOWNS[id]?.spots.some((x) => x.kind === 'shop'));
   const SLOT_X = [494, 573, 653, 732];
   els.push(h('section', { class: 'pk4-card', style: at(467, 920, 827, 1317) }),
     h('h3', { class: 'pk4-title', style: at(497, 940, 820, 990) }, 'Entrenamiento'),
-    h('p', { class: 'pk4-desc', style: at(497, 996, 815, 1062) }, 'Mejora sus atributos con el oro de tus partidas.'),
+    h('p', { class: 'pk4-desc', style: at(497, 996, 815, 1062) }, 'Mejora sus atributos con oro en la tienda de los pueblos.'),
     ...TRAIN.map((t, i) => h('div', { class: 'pk4-slot', style: at(SLOT_X[i], 1081, SLOT_X[i] + 71, 1182), title: t.label },
       uiImg(t.img), h('b', {}, String(upgradeLevel(store, sp.id, t.id))))),
+    // El entrenamiento se compra en la tienda de los pueblos (Ciudad Verde, Ciudad Plateada).
     h('button', {
-      class: `pk4-train ${canTrain ? 'ready' : ''}`, style: at(488, 1203, 806, 1288), 'data-testid': 'train',
-      onclick: () => openSheet(menu, `Entrenar a ${sp.name}`, () => upgrades(menu, sp)),
-    }, upArrow(), 'Entrenar'));
+      class: `pk4-train ${canTrain && shopOpen ? 'ready' : ''}`, style: at(488, 1203, 806, 1288), 'data-testid': 'train',
+      onclick: () => toast(shopOpen
+        ? 'Entrena en la tienda de un pueblo: Ciudad Verde o Ciudad Plateada.'
+        : 'La primera tienda está en Ciudad Verde: llega por la Ruta 1 desde Pueblo Paleta.'),
+    }, upArrow(), 'Ir a la tienda'));
 
   // --- evolución ---
   const chain: PokemonSpecies[] = [sp];
@@ -147,6 +153,9 @@ function upArrow(): HTMLElement {
   box.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 12h6v10h6V12h6z" fill="currentColor"/></svg>';
   return box;
 }
+
+/** Quien abre una hoja: el menú o la pantalla del pueblo (la tienda). */
+type Host = { app: App };
 
 /** Pokémon con ilustración 3D grande (recortada del diseño); el resto usa su sprite animado. */
 const HERO_ART = new Set(['pikachu']);
@@ -187,7 +196,7 @@ function radarChart(sp: PokemonSpecies): HTMLElement {
 }
 
 /** Hoja a pantalla completa con un apartado (entrenar, ataque, objetos, información). */
-function openSheet(menu: MenuScreen, title: string, body: () => HTMLElement): void {
+export function openSheet(menu: Host, title: string, body: () => HTMLElement): void {
   const close = () => { overlay.remove(); unsub(); };
   const content = h('div', { class: 'pk3-sheet-body' }, body());
   // Si compras algo, se rehace el contenido sin cerrar la hoja.
@@ -202,7 +211,7 @@ function openSheet(menu: MenuScreen, title: string, body: () => HTMLElement): vo
   document.body.appendChild(overlay);
 }
 
-function upgrades(menu: MenuScreen, sp: PokemonSpecies): HTMLElement {
+export function upgrades(menu: Host, sp: PokemonSpecies): HTMLElement {
   const store = menu.app.store;
   const rows = PERMANENT_UPGRADES.map((u) => {
     const lv = upgradeLevel(store, sp.id, u.id);

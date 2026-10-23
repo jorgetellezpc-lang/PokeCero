@@ -5,7 +5,7 @@ import { drawShadow } from './animator';
 import {
   buildBackground, drawAirField, drawBeam, drawBossRing, drawEnemyBar, drawEnemyMarks, drawExit, drawGroundField,
   drawGuardian, drawHazard, drawMarker, drawMound, drawOrb, drawParticle, drawPickup, drawPickupShadow,
-  drawPlayerAura, drawProjectile, drawRing, drawRock, drawSlash, drawText, drawWater, fallback,
+  drawPlayerAura, drawProjectile, drawRing, drawRock, drawSlash, drawSpotHint, drawText, drawWater, fallback,
 } from './draw2d';
 
 // Dibujo 2D clásico (vista cenital) del estado de World. Es el respaldo si el
@@ -97,6 +97,9 @@ export class Renderer {
       },
     });
     if (!w.arena) for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => drawRock(ctx, o) });
+    for (const o of w.obstacles) if (o.kind === 'house') list.push({ y: o.y + o.h, fn: () => drawHouse(ctx, o) });
+    for (const sp of w.town?.spots ?? []) drawSpotHint(ctx, sp.x, sp.y, w.time);
+    for (const n of w.npcs) list.push({ y: n.y, fn: () => { drawShadow(ctx, n.dex, n.x, n.y, n.anim.scale); if (!n.anim.draw(ctx, n.x, n.y)) fallback(ctx, n.x, n.y, '#c0c0c0'); } });
     list.sort((a, b) => a.y - b.y);
     for (const d of list) d.fn();
 
@@ -111,4 +114,16 @@ export class Renderer {
     for (const e of w.enemies) drawEnemyBar(ctx, e);
     if (this.showDamageNumbers) for (const t of w.texts) drawText(ctx, t);
   }
+}
+
+/** Casa de pueblo vista desde arriba (dibujo 2D de respaldo). */
+function drawHouse(ctx: CanvasRenderingContext2D, o: { x: number; y: number; w: number; h: number; wall?: string; roof?: string }): void {
+  ctx.fillStyle = o.wall ?? '#efe6d6';
+  ctx.fillRect(o.x, o.y + o.h * 0.45, o.w, o.h * 0.55);
+  ctx.fillStyle = o.roof ?? '#c84a3a';
+  ctx.fillRect(o.x - 4, o.y, o.w + 8, o.h * 0.5);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fillRect(o.x - 4, o.y + o.h * 0.25, o.w + 8, o.h * 0.25);
+  ctx.fillStyle = '#5a3a22';
+  ctx.fillRect(o.x + o.w / 2 - 8, o.y + o.h - 22, 16, 22);
 }

@@ -469,54 +469,37 @@
    ========================================================================= */
 .menu[data-tab="map"] { background-color: #0a1a3a; background-size: cover; background-position: center; }
 .menu[data-tab="map"] .menu-content.full { background: none; display: flex; align-items: flex-start; justify-content: center; }
-.map2 { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: flex-start; }
+
 .menu[data-tab="map"] .menu-content.full { container-type: size; }
 /* Cabe entera: el ancho disponible o, si la pantalla es baja, lo que permita el alto. */
-.map2-art {
-  position: relative; container-type: inline-size; aspect-ratio: 853 / 1545; width: min(100cqw, calc(100cqh * 853 / 1545));
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
-}
-.map2-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none; }
-.map2-hot { position: absolute; padding: 0; border: 0; background: none; border-radius: 99px; cursor: pointer; }
-.map2-hot:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
-.map2-hot.on:not([data-gym="brock"]) { box-shadow: 0 0 0 2px #ffd23a, 0 0 18px rgba(255, 210, 58, 0.7); }
-.map2-hot[data-gym="brock"] { animation: map2-glow 2s ease-in-out infinite; }
-@keyframes map2-glow { 50% { box-shadow: 0 0 22px rgba(255, 210, 58, 0.55); } }
-.map2-dot {
-  position: absolute; border-radius: 50%; pointer-events: none; background: #0a1c40; border: 0.25cqi solid rgba(220, 230, 255, 0.45);
-}
-.map2-dot.on { background: radial-gradient(circle at 40% 35%, #fff2a0, #f5b800 70%); border-color: #ffd23a; box-shadow: 0 0 1.4cqi rgba(255, 210, 58, 0.8); }
 
-.map2-card {
-  position: absolute; display: grid; grid-template-columns: 32% 1fr 28%; grid-template-rows: 1fr auto; gap: 2cqi 2.4cqi;
-  padding: 2.3cqi; border-radius: 3cqi; background: rgba(9, 15, 36, 0.92); border: 1px solid rgba(130, 160, 255, 0.3);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px); box-sizing: border-box;
-}
-.map2-thumb { grid-row: 1 / 3; border-radius: 2cqi; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
-.map2-info { min-width: 0; }
-.map2-info h2 { margin: 0; font: 900 3.7cqi/1.1 var(--m-body); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.map2-sub { display: block; color: #3ad0ff; font: 800 2.3cqi/1.5 var(--m-body); }
-.map2-info p { margin: 0.4cqi 0 0; color: #c9d4f5; font: 600 1.95cqi/1.45 var(--m-body); }
-.map2-medal {
-  display: flex; align-items: center; gap: 1.2cqi; padding: 1.4cqi 1.2cqi; min-width: 0; overflow: hidden; border-radius: 2cqi; align-self: start;
-  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(130, 160, 255, 0.18);
-}
-.map2-medal b { display: block; font: 800 2cqi/1.2 var(--m-body); white-space: nowrap; color: #fff; margin-bottom: 0.8cqi; }
-.map2-medal-ic { width: 7.4cqi; height: 7.4cqi; flex: 0 0 auto; }
-.map2-medal-ic.type { border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--t) 70%, #fff), var(--t)); }
-.map2-medal-ic.type svg { width: 4cqi; height: 4cqi; }
-.map2-medal-dots { display: flex; gap: 0.6cqi; }
-.map2-medal-dots i { width: 2.1cqi; height: 2.1cqi; flex: 0 0 auto; border-radius: 50%; border: 0.25cqi solid rgba(220, 230, 255, 0.45); }
-.map2-medal-dots i.on { background: radial-gradient(circle at 40% 35%, #fff2a0, #f5b800 70%); border-color: #ffd23a; box-shadow: 0 0 1cqi rgba(255, 210, 58, 0.8); }
-.map2-enter {
-  grid-column: 2 / 4; display: flex; align-items: center; justify-content: center; position: relative; min-height: 8cqi;
-  border: 0; border-radius: 1.8cqi; background: linear-gradient(#ffe066, #ffc21a); color: #1b1300; font: 900 4.2cqi/1 var(--m-body) !important;
-  box-shadow: 0 0.7cqi 0 #b07600; transition: transform 0.08s, box-shadow 0.08s;
-}
-.map2-enter:active { transform: translateY(0.6cqi); box-shadow: 0 0.1cqi 0 #b07600; }
-.map2-enter-arrow { position: absolute; right: 3cqi; font-size: 3cqi; }
-.map2-enter.off { background: linear-gradient(#5a6488, #3c4466); color: #d8def5; box-shadow: 0 0.7cqi 0 #23283f; gap: 1.6cqi; }
-.map2-enter.off svg { width: 3.8cqi; height: 3.8cqi; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 @media (max-width: 380px) {
   .menu .topbar { gap: 6px; padding-left: 8px; padding-right: 8px; }
@@ -623,3 +606,53 @@
   background: linear-gradient(#2a56e0, #1a3aa8); color: #fff;
   box-shadow: inset 0 0 0 2px #6a9cff, 0 0 18px rgba(80, 140, 255, 0.55);
 }
+
+/* ============================================================================
+   Mapa v3: a todo el ancho y deslizable; tarjeta fija encima de la barra.
+   ========================================================================= */
+.map3 { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0; }
+.map3-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+.map3-scroll::-webkit-scrollbar { display: none; }
+.map3-art { position: relative; width: 100%; aspect-ratio: 853 / 1290; container-type: inline-size; }
+.map3-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; user-select: none; -webkit-user-drag: none; }
+.map3-hot { position: absolute; padding: 0; border: 0; background: none; border-radius: 99px; cursor: pointer; }
+.map3-hot.on { box-shadow: 0 0 0 0.45cqi #ffd23a, 0 0 2.6cqi rgba(255, 210, 58, 0.75); }
+.map3-hot:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+.map3-row { position: absolute; display: flex; align-items: center; gap: 0.75cqi; pointer-events: none; color: #e6ecff; }
+.map3-row svg { width: 2.6cqi; height: 2.6cqi; flex: 0 0 auto; }
+.map3-dot { width: 2.15cqi; height: 2.15cqi; flex: 0 0 auto; border-radius: 50%; border: 0.25cqi solid rgba(220, 230, 255, 0.5); }
+.map3-dot.on { background: radial-gradient(circle at 40% 35%, #fff2a0, #f5b800 70%); border-color: #ffd23a; box-shadow: 0 0 1.2cqi rgba(255, 210, 58, 0.8); }
+.map3-visited { font: 800 2.3cqi/1 var(--m-body); color: #6be38a; }
+.map3-soon { font: 700 2.1cqi/1 var(--m-body); color: #aab6d8; }
+
+.map3-card {
+  flex: 0 0 auto; display: grid; grid-template-columns: 30% 1fr; grid-template-rows: 1fr auto; gap: 8px 10px;
+  margin: 0 8px 8px; padding: 10px; border-radius: 16px; background: rgba(9, 15, 36, 0.95); border: 1px solid rgba(130, 160, 255, 0.3);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45); color: #fff;
+}
+.map3-thumb { grid-row: 1 / 3; border-radius: 12px; min-height: 96px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15); }
+.map3-info { min-width: 0; }
+.map3-info h2 { margin: 0; font: 900 19px/1.15 var(--m-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map3-sub { display: block; color: #3ad0ff; font: 800 12.5px/1.5 var(--m-body); }
+.map3-info p { margin: 2px 0 0; color: #c9d4f5; font: 600 11.5px/1.4 var(--m-body); }
+.map3-medal {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; margin-top: 6px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(130, 160, 255, 0.18);
+}
+.map3-medal b { display: block; font: 800 11.5px/1.2 var(--m-body); white-space: nowrap; margin-bottom: 4px; }
+.map3-medal.visit b { margin: 0; color: #aab6d8; }
+.map3-medal.visit.on b { color: #6be38a; }
+.map3-medal-ic { width: 28px; height: 28px; flex: 0 0 auto; }
+.map3-medal-ic.type { border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--t) 70%, #fff), var(--t)); }
+.map3-medal-dots { display: flex; gap: 3px; }
+.map3-medal-dots i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid rgba(220, 230, 255, 0.45); }
+.map3-medal-dots i.on { background: radial-gradient(circle at 40% 35%, #fff2a0, #f5b800 70%); border-color: #ffd23a; }
+.map3-enter {
+  grid-column: 2; display: flex; align-items: center; justify-content: center; gap: 8px; position: relative; min-height: 46px;
+  border: 0; border-radius: 12px; background: linear-gradient(#ffe066, #ffc21a); color: #1b1300; font: 900 21px/1 var(--m-body) !important;
+  box-shadow: 0 4px 0 #b07600;
+}
+.map3-enter:active { transform: translateY(3px); box-shadow: 0 1px 0 #b07600; }
+.map3-enter-arrow { position: absolute; right: 16px; font-size: 15px; }
+.map3-enter.off { background: linear-gradient(#5a6488, #3c4466); color: #d8def5; box-shadow: 0 4px 0 #23283f; }
+.map3-enter.off svg { width: 18px; height: 18px; }

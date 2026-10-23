@@ -1,5 +1,5 @@
 import {
-  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, Points, PointsMaterial, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, IcosahedronGeometry,
+  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, Points, PointsMaterial, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DirectionalLight, ExtrudeGeometry, Shape, Fog, Group, HemisphereLight, IcosahedronGeometry,
   InstancedMesh, LinearFilter, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial, NearestFilter, Object3D,
   PCFShadowMap, PerspectiveCamera, PlaneGeometry, RepeatWrapping, Scene, SRGBColorSpace, Texture, Vector3,
   WebGLRenderer,
@@ -19,7 +19,7 @@ import type { ModelInstance, ModelLibrary } from './models';
 import {
   buildBackground, drawAirField, drawBossRing, drawEnemyBar, drawEnemyMarks, drawExitArrow, drawGroundField, drawGuardian,
   drawHazard, drawMarker, drawMound, drawOrb, drawParticle, drawPickup, drawPickupShadow, drawPlayerAura, drawProjectile,
-  drawRing, drawSlash, drawText, PIXEL,
+  drawRing, drawSlash, drawSpotHint, drawText, PIXEL,
 } from './draw2d';
 
 // ============================================================================
@@ -591,7 +591,7 @@ export class Scene3D {
     g.add(forest(W, H, w.gym.order));
 
     // Obstáculos.
-    for (const o of w.obstacles) g.add(o.kind === 'rock' ? rockMesh(o, theme.rock) : this.waterMesh(o));
+    for (const o of w.obstacles) g.add(o.kind === 'rock' ? rockMesh(o, theme.rock) : o.kind === 'house' ? houseMesh(o) : this.waterMesh(o));
 
     // Capa de suelo para avisos, sombras y zonas.
     this.decal.width = Math.ceil(W * DECAL_RES);
@@ -653,8 +653,11 @@ export class Scene3D {
     for (const g of w.pickups) { drawPickupShadow(ctx, g, true); n++; }
     for (const s of w.slashes) { drawSlash(ctx, s); n++; }
     for (const r of w.rings) { drawRing(ctx, r, true); n++; }
+    // Pueblo: un aro dorado que late en cada sitio con el que se puede interactuar.
+    for (const sp of w.town?.spots ?? []) { drawSpotHint(ctx, sp.x, sp.y, w.time); n++; }
     const p = w.player;
     drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale, true);
+    for (const n of w.npcs) drawShadow(ctx, n.dex, n.x, n.y, n.anim.scale, true);
     for (const e of w.enemies) {
       const lift = jumpHeight(e);
       if (e.hidden) drawMound(ctx, e, true);
@@ -688,6 +691,7 @@ export class Scene3D {
       draw(e, models ? speciesByDex(e.def.dex).id : null, e.anim, e.x + shake, e.y, jumpHeight(e), { flash: e.flash > 0 ? (e.boss ? 0.55 : 1) : 0, alpha: 1 });
     }
     for (const c of w.corpses) this.sprite(c, c.anim, c.x, c.y, 0, { flash: 0, alpha: Math.min(1, c.fade * 1.6) });
+    for (const n of w.npcs) this.sprite(n, n.anim, n.x, n.y, 0, { flash: 0, alpha: 1 });
     for (const [key, v] of this.views) {
       if (v.used) continue;
       this.scene.remove(v.group);
@@ -1031,6 +1035,42 @@ function forest(W: number, H: number, seed: number): Object3D {
   crowns.forEach((x, i) => { cm.setMatrixAt(i, x.m); cm.setColorAt(i, x.c); });
   tm.castShadow = cm.castShadow = true;
   g.add(tm, cm);
+  return g;
+}
+
+/** Casa de pueblo: paredes, tejado a dos aguas, puerta y ventanas, del tamaño de su colisión. */
+function houseMesh(o: Obstacle): Object3D {
+  const g = new Group();
+  const wallH = Math.min(46, 22 + o.h * 0.2);
+  const wall = new Mesh(new BoxGeometry(o.w, wallH, o.h), new MeshLambertMaterial({ color: new Color(o.wall ?? '#efe6d6') }));
+  wall.position.set(o.x + o.w / 2, wallH / 2, o.y + o.h / 2);
+  wall.castShadow = wall.receiveShadow = true;
+  g.add(wall);
+  // Tejado: prisma triangular a lo largo del ancho, que sobresale un poco.
+  const roofH = Math.min(36, o.h * 0.4);
+  const d = o.h + 14;
+  const tri = new Shape();
+  tri.moveTo(-d / 2, 0);
+  tri.lineTo(d / 2, 0);
+  tri.lineTo(0, roofH);
+  tri.closePath();
+  const roof = new Mesh(new ExtrudeGeometry(tri, { depth: o.w + 12, bevelEnabled: false }), new MeshLambertMaterial({ color: new Color(o.roof ?? '#c84a3a'), flatShading: true }));
+  // La extrusión va en +z; girada 90° queda a lo largo de +x.
+  roof.rotation.y = Math.PI / 2;
+  roof.position.set(o.x - 6, wallH, o.y + o.h / 2);
+  roof.castShadow = true;
+  g.add(roof);
+  // Puerta y ventanas en la fachada de abajo (la que mira a la cámara).
+  const front = o.y + o.h + 0.6;
+  const door = new Mesh(new PlaneGeometry(16, 24), new MeshLambertMaterial({ color: 0x5a3a22 }));
+  door.position.set(o.x + o.w / 2, 12, front);
+  g.add(door);
+  const winMat = new MeshLambertMaterial({ color: 0x8ad0ff, emissive: 0x1a3a5a });
+  for (const fx of [0.2, 0.8]) {
+    const win = new Mesh(new PlaneGeometry(14, 12), winMat);
+    win.position.set(o.x + o.w * fx, wallH * 0.6, front);
+    g.add(win);
+  }
   return g;
 }
 

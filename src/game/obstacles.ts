@@ -5,7 +5,7 @@ import type { Vec } from './entities';
 // que los enemigos los rodeen en vez de atascarse. Sin DOM.
 
 /** ¿Este obstáculo bloquea a quien levita? (el agua no). */
-export const blocks = (o: Obstacle, flyer: boolean) => o.kind === 'rock' || !flyer;
+export const blocks = (o: Obstacle, flyer: boolean) => o.kind !== 'water' || !flyer;
 
 /** Saca un círculo de los obstáculos que lo bloquean. Devuelve true si chocó. */
 export function pushOut(c: Vec, r: number, obstacles: Obstacle[], flyer = false): boolean {
@@ -52,7 +52,7 @@ function pushOnce(c: Vec, r: number, obstacles: Obstacle[], flyer: boolean): boo
 /** Obstáculo (que para proyectiles) en el que está el punto, si hay. */
 export function rockAt(x: number, y: number, obstacles: Obstacle[], pad = 0): Obstacle | null {
   for (const o of obstacles) {
-    if (o.kind !== 'rock') continue;
+    if (o.kind === 'water') continue;
     if (x > o.x - pad && x < o.x + o.w + pad && y > o.y - pad && y < o.y + o.h + pad) return o;
   }
   return null;

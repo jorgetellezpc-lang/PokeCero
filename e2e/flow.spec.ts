@@ -9,10 +9,16 @@ const shot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: `${shots}/${name}.png` });
 };
 
-/** Abre la ficha del gimnasio (si hace falta) y pulsa Comenzar. */
+/** Abre la ficha del gimnasio de Brock (la puerta del gimnasio de Plateada) y pulsa Comenzar. */
 async function startGym(page: Page) {
-  if (!(await page.getByTestId('play').isVisible())) await page.getByTestId('enter').click();
+  await page.evaluate(() => (window as any).__pokecero.app.showGym('brock'));
   await page.getByTestId('play').click();
+}
+
+/** Lleva al Pokémon junto a un punto del pueblo y pulsa el botón de interactuar. */
+async function actAt(page: Page, x: number, y: number) {
+  await page.evaluate(([x, y]) => { const p = (window as any).__pokecero.app.town.world.player; p.x = x; p.y = y; }, [x, y]);
+  await page.getByTestId('town-act').click();
 }
 
 /** Elige cartas y objetos hasta que aparezca el resultado de la partida. */
@@ -51,19 +57,18 @@ test('ciclo completo del prototipo', async ({ page }) => {
 
   await page.goto('/?debug');
   await expect(page.locator('.bottom-nav .nav-btn')).toHaveCount(4);
-  // Mapa: la tarjeta de abajo es la del gimnasio elegido (Plateada al empezar).
+  // Mapa: la aventura empieza en Pueblo Paleta; sin medallas en los pueblos sin gimnasio.
+  await expect(page.getByTestId('gym-card')).toContainText('Pueblo Paleta');
+  await expect(page.getByTestId('gym-card')).toContainText('Visitado');
+  await expect(page.getByTestId('gym-card')).not.toContainText('Medalla');
+  await shot(page, '00-mapa');
+  // Un lugar sin visitar se puede consultar, pero no se entra.
+  await page.click('.map3-hot[data-place="plateada"]');
   await expect(page.getByTestId('gym-card')).toContainText('Ciudad Plateada');
   await expect(page.getByTestId('gym-card')).toContainText('Medalla Roca');
-  await shot(page, '00-mapa');
-  // Un gimnasio bloqueado se puede consultar, pero no se entra.
-  await page.click('.map2-hot[data-gym="misty"]');
-  await expect(page.getByTestId('gym-card')).toContainText('Ciudad Celeste');
   await expect(page.getByTestId('enter')).toContainText('Bloqueado');
-  await page.click('.map2-hot[data-gym="brock"]');
+  await page.click('.map3-hot[data-place="paleta"]');
   await expect(page.getByTestId('enter')).toContainText('Entrar');
-  await page.getByTestId('enter').click();
-  await expect(page.getByTestId('gym-detail')).toContainText('Ciudad Plateada');
-  await expect(page.getByTestId('gym-detail')).toContainText('Onix');
   await shot(page, '01-mapa');
 
   // Navegación por las cuatro pestañas
@@ -76,10 +81,9 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
   await shot(page, '02b-ataque');
   await page.getByTestId('sheet-close').click();
-  // Entrenar abre la hoja con las 10 mejoras permanentes.
+  // El entrenamiento se compra en la tienda de los pueblos: el botón lo indica.
   await page.getByTestId('train').click();
-  await expect(page.locator('.upgrade-row')).toHaveCount(10);
-  await page.getByTestId('sheet-close').click();
+  await expect(page.locator('.toast').last()).toContainText('Ciudad Verde');
   await shot(page, '02-pokemon');
   // Selección: solo los 3 iniciales de Kanto y Pikachu, todos disponibles.
   await expect(page.locator('.pk4-face')).toHaveCount(4);
@@ -195,28 +199,29 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await page.getByTestId('result-continue').click();
   expect(Number(await page.getByTestId('tickets').textContent())).toBeLessThan(ticketsAfterWin + 10);
 
-  // Comprar una mejora permanente con oro
-  await page.click('[data-tab="pokemon"]');
-  const goldBefore = Number(await page.getByTestId('gold').textContent());
-  await page.getByTestId('train').click();
+  // Comprar una mejora permanente con oro en la tienda de Ciudad Verde
+  await page.evaluate(() => { const a = (window as any).__pokecero.app; a.store.update((d: any) => { d.adventure.visited.push('verde'); }); a.showTown('verde'); });
+  await expect(page.getByTestId('town-name')).toContainText('Ciudad Verde');
+  const gold = () => page.evaluate(() => (window as any).__pokecero.app.store.data.gold as number);
+  const goldBefore = await gold();
+  await actAt(page, 270, 418);
   await page.getByTestId('buy-spd').click();
-  const goldAfter = Number(await page.getByTestId('gold').textContent());
+  const goldAfter = await gold();
   expect(goldAfter).toBeLessThan(goldBefore);
   await shot(page, '13-mejora');
+  await page.getByTestId('sheet-close').click();
 
   // El progreso permanente sobrevive a recargar la página
   await page.reload();
   await expect(page.getByTestId('gold')).toHaveText(String(goldAfter));
   await expect(page.locator('.topbar')).toContainText('1/8');
-  await page.click('[data-tab="pokemon"]');
-  await page.getByTestId('train').click();
-  await expect(page.locator('.upgrade-row').nth(2)).toContainText('Nv 1');
+  expect(await page.evaluate(() => (window as any).__pokecero.app.store.data.upgrades.charmander?.spd)).toBe(1);
 
   expect(errors).toEqual([]);
 });
 
 test('sin desplazamiento de página y joystick no hace scroll', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?debug');
   await startGym(page);
   const scroll = await page.evaluate(() => [document.documentElement.scrollHeight, window.innerHeight]);
   expect(scroll[0]).toBeLessThanOrEqual(scroll[1]);
@@ -239,5 +244,53 @@ test('sin WebGL 2 se juega con el dibujo 2D clásico', async ({ page }) => {
   await expect(page.locator('.run')).toHaveAttribute('data-view', '2d');
   await page.waitForTimeout(1500);
   expect(await world(page, 'return w.time;')).toBeGreaterThan(0.5);
+  expect(errors).toEqual([]);
+});
+
+test('aventura: Pueblo Paleta → Ruta 1 → Ciudad Verde', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto('/?debug');
+  // Ciudad Verde aún no se puede visitar.
+  await page.click('.map3-hot[data-place="verde"]');
+  await expect(page.getByTestId('enter')).toContainText('Bloqueado');
+  await page.click('.map3-hot[data-place="paleta"]');
+  await page.getByTestId('enter').click();
+  await expect(page.getByTestId('town-name')).toContainText('Pueblo Paleta');
+  await page.waitForTimeout(800);
+  await shot(page, '20-paleta');
+  // Cartel
+  await actAt(page, 180, 316);
+  await expect(page.getByTestId('town-line')).toContainText('PUEBLO PALETA');
+  await page.getByTestId('town-next').click();
+  await page.getByTestId('town-close').click();
+  // Salida norte → Ruta 1
+  await actAt(page, 180, 60);
+  await page.getByTestId('town-next').click();
+  await shot(page, '20b-salida');
+  await page.getByTestId('town-go').click();
+  await expect(page.getByTestId('room')).toContainText('1/5');
+  for (let room = 0; room < 5; room++) {
+    await world(page, 'w.player.hp = w.player.maxHp = 1e6;');
+    for (let i = 0; i < 40; i++) {
+      const st = await world(page, `w.debugKillAll(); if (w.exitOpen) { w.player.x = w.exit.x; w.player.y = w.exit.y; } return w.phase + ':' + w.roomIndex;`) as string;
+      if (st.startsWith('levelup')) await page.getByTestId('card-0').click();
+      else if (st.startsWith('item')) await page.getByTestId('item-new').click();
+      if (await page.getByTestId('result').isVisible()) break;
+      if (Number(st.split(':')[1]) > room) break;
+      await page.waitForTimeout(250);
+    }
+  }
+  await pickUntilResult(page);
+  await expect(page.getByTestId('result')).toContainText('Ruta 1');
+  await page.getByTestId('result-continue').click();
+  await expect(page.getByTestId('town-name')).toContainText('Ciudad Verde');
+  await page.waitForTimeout(800);
+  await shot(page, '21-verde');
+  // De vuelta al mapa, Verde ya está visitada.
+  await page.getByTestId('town-map').click();
+  await page.click('.map3-hot[data-place="verde"]');
+  await expect(page.getByTestId('enter')).toContainText('Entrar');
   expect(errors).toEqual([]);
 });

@@ -3,11 +3,13 @@ import { BOSSES, tierCandidates } from '../../data/enemies';
 import { REGIONS } from '../../data/regions';
 import type { GymDef, RegionDef } from '../../data/types';
 import { roomSequence } from '../../game/rooms';
+import { TOWNS } from '../../data/adventure';
+import { howToReach } from '../../meta/adventure';
 import { gymStatus, isClaimed, type GymStatus } from '../../meta/rewards';
 import { caveArt } from '../../render/art';
 import { animatedPokemon } from '../anim';
 import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
-import { h, pokeImg, toast, typeChip } from '../dom';
+import { h, pokeImg, typeChip } from '../dom';
 import { typeGlyph } from '../typeGlyph';
 import { icon } from '../icons';
 import type { MenuScreen } from './menu';
@@ -24,41 +26,49 @@ const STATUS_LABEL: Record<GymStatus, string> = {
 };
 
 /**
- * Mapa de Kanto (diseño del usuario, public/ui/map-kanto.webp, 853 × 1545).
- * Las etiquetas de las ciudades vienen dibujadas; encima solo hay zonas
- * táctiles en su sitio exacto y, en Plateada, sus puntos de progreso
- * redibujados. Coordenadas en píxeles de la ilustración.
+ * Mapa de Kanto (diseño del usuario, public/ui/map-kanto.webp, 853 × 1290).
+ * Los nombres de los lugares vienen dibujados; debajo de cada uno se pinta su
+ * estado real (medallas en las ciudades con gimnasio, «Visitado» o candado en
+ * el resto). Coordenadas en píxeles de la ilustración.
  */
-const MAP = { w: 853, h: 1545 };
+const MAP = { w: 853, h: 1290 };
 const pct = (x: number, y: number, w: number, hh: number) =>
   `left:${(x / MAP.w) * 100}%;top:${(y / MAP.h) * 100}%;width:${(w / MAP.w) * 100}%;height:${(hh / MAP.h) * 100}%`;
 
-interface MapLabel { pill: [number, number, number, number]; city: [number, number]; gym?: string; name?: string; note?: string }
-const LABELS: MapLabel[] = [
-  { pill: [145, 117, 345, 175], city: [170, 60], name: 'Meseta Añil', note: 'La Liga Pokémon: hacen falta las 8 medallas.' },
-  { pill: [572, 230, 783, 292], city: [620, 320], gym: 'misty' },
-  { pill: [92, 342, 338, 415], city: [210, 270], gym: 'brock' },
-  { pill: [606, 415, 815, 477], city: [700, 550], name: 'Pueblo Lavanda', note: 'Pueblo Lavanda no tiene gimnasio.' },
-  { pill: [378, 495, 588, 555], city: [470, 600], gym: 'sabrina' },
-  { pill: [40, 578, 268, 640], city: [90, 650], gym: 'erika' },
-  { pill: [606, 675, 823, 737], city: [690, 790], gym: 'surge' },
-  { pill: [183, 740, 400, 802], city: [290, 840], gym: 'giovanni' },
-  { pill: [422, 875, 640, 937], city: [520, 970], gym: 'koga' },
-  { pill: [103, 1067, 322, 1128], city: [180, 1010], gym: 'blaine' },
-  { pill: [572, 1123, 790, 1185], city: [640, 1210], name: 'Pueblo Paleta', note: 'Pueblo Paleta: aquí empezó tu aventura.' },
+interface MapPlace {
+  id: string;
+  name: string;
+  /** Etiqueta dibujada (zona táctil) y fila de estado bajo el nombre: [x0, y0, x1, y1]. */
+  pill: [number, number, number, number];
+  row: [number, number, number, number];
+  /** Centro del lugar en la ilustración (miniatura de la tarjeta). */
+  city: [number, number];
+  /** Pueblo de la aventura (se puede entrar) y gimnasio, si los tiene. */
+  town?: string;
+  gym?: string;
+  note?: string;
+}
+const PLACES: MapPlace[] = [
+  { id: 'meseta', name: 'Meseta Añil', pill: [145, 117, 345, 175], row: [212, 144, 332, 170], city: [170, 60], note: 'La Liga Pokémon. Hacen falta las 8 medallas.' },
+  { id: 'celeste', name: 'Ciudad Celeste', pill: [572, 230, 783, 292], row: [644, 264, 770, 288], city: [620, 320], gym: 'misty' },
+  { id: 'plateada', name: 'Ciudad Plateada', pill: [92, 342, 338, 415], row: [172, 380, 320, 406], city: [210, 270], town: 'plateada', gym: 'brock' },
+  { id: 'lavanda', name: 'Pueblo Lavanda', pill: [606, 415, 815, 477], row: [678, 446, 802, 470], city: [700, 550], note: 'Un pueblo tranquilo y misterioso.' },
+  { id: 'azafran', name: 'Ciudad Azafrán', pill: [378, 495, 588, 555], row: [450, 525, 574, 549], city: [470, 600], gym: 'sabrina' },
+  { id: 'azulona', name: 'Ciudad Azulona', pill: [40, 578, 268, 640], row: [116, 611, 254, 635], city: [90, 650], gym: 'erika' },
+  { id: 'carmin', name: 'Ciudad Carmín', pill: [606, 675, 823, 737], row: [680, 708, 807, 732], city: [690, 790], gym: 'surge' },
+  { id: 'verde', name: 'Ciudad Verde', pill: [183, 740, 400, 802], row: [257, 772, 384, 796], city: [290, 840], town: 'verde', gym: 'giovanni' },
+  { id: 'fucsia', name: 'Ciudad Fucsia', pill: [422, 875, 640, 937], row: [497, 905, 624, 929], city: [520, 970], gym: 'koga' },
+  { id: 'canela', name: 'Isla Canela', pill: [103, 1067, 322, 1128], row: [177, 1100, 305, 1124], city: [180, 1010], gym: 'blaine' },
+  { id: 'paleta', name: 'Pueblo Paleta', pill: [572, 1123, 790, 1185], row: [646, 1154, 774, 1178], city: [640, 1120], town: 'paleta' },
 ];
-/** Centro de los 6 puntos dibujados bajo «Ciudad Plateada». */
-const BROCK_DOTS = [184, 208, 232, 256, 280, 305].map((x) => [x, 393] as const);
 
 const GYM_TEXT: Record<string, string> = {
-  brock: 'Una ciudad en lo alto de la montaña, con un gimnasio de gran tradición.',
   misty: 'Ciudad junto al mar, con un gimnasio de piscinas y una líder experta en el agua.',
   surge: 'El gran puerto de Kanto. Su líder domina la electricidad.',
   erika: 'La ciudad más grande de la región, con un gimnasio lleno de plantas.',
   koga: 'Ciudad del sur con un gimnasio de trampas y venenos.',
   sabrina: 'En el centro de Kanto, sede de una líder con poderes psíquicos.',
   blaine: 'Isla volcánica con un gimnasio que arde.',
-  giovanni: 'El último gimnasio de Kanto. Pocos lo han visto abierto.',
 };
 
 export function renderMapTab(menu: MenuScreen): HTMLElement {
@@ -74,7 +84,7 @@ export function renderMapTab(menu: MenuScreen): HTMLElement {
 }
 
 // ----------------------------------------------------------------------------
-// Portada: mapa de la región y tarjeta del gimnasio elegido
+// Portada: mapa de la región (deslizable) y tarjeta del lugar elegido
 // ----------------------------------------------------------------------------
 
 /** Progreso de un gimnasio de 0 a 1 (mejor sala alcanzada; completado = 1). */
@@ -86,60 +96,80 @@ function progressOf(menu: MenuScreen, region: RegionDef, g: GymDef): number {
   return rooms.filter((r) => r <= best).length / rooms.length;
 }
 
+/** Lugar elegido en el mapa (por defecto, donde estás). */
+let selectedPlace = '';
+
 function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   const store = menu.app.store;
-  const gym = region.gyms.find((g) => g.id === menu.ui.selectedGym) ?? region.gyms[0];
-  const select = (id: string) => { menu.ui.selectedGym = id; menu.app.audio.sfx('click'); menu.render(); };
+  const adv = store.data.adventure;
+  if (!PLACES.some((p) => p.id === selectedPlace)) selectedPlace = adv.at;
+  const place = PLACES.find((p) => p.id === selectedPlace) ?? PLACES[PLACES.length - 1];
+  const gymOf = (p: MapPlace) => (p.gym ? region.gyms.find((g) => g.id === p.gym) : undefined);
+  const visited = (p: MapPlace) => !!p.town && adv.visited.includes(p.town);
 
-  const hot = LABELS.map((l) => {
-    const [x0, y0, x1, y1] = l.pill;
-    const g = l.gym ? region.gyms.find((x) => x.id === l.gym) : undefined;
+  // Estado bajo cada nombre: medallas solo donde hay gimnasio.
+  const rows = PLACES.map((p) => {
+    const g = gymOf(p);
+    const [x0, y0, x1, y1] = p.row;
+    const open = visited(p);
+    const content: (HTMLElement | SVGSVGElement)[] = [];
+    if (!open) content.push(icon('lock', 14));
+    if (g) {
+      const lit = Math.round(progressOf(menu, region, g) * 6);
+      for (let i = 0; i < 6; i++) content.push(h('i', { class: `map3-dot ${i < lit ? 'on' : ''}` }));
+    } else if (open) {
+      content.push(h('span', { class: 'map3-visited' }, '✓ Visitado'));
+    } else if (p.town) {
+      content.push(h('span', { class: 'map3-soon' }, 'Sin visitar'));
+    }
+    return h('div', { class: 'map3-row', style: pct(x0 - 4, y0, x1 - x0 + 8, y1 - y0) }, ...content);
+  });
+  const hot = PLACES.map((p) => {
+    const [x0, y0, x1, y1] = p.pill;
     return h('button', {
-      class: `map2-hot ${g && g.id === gym.id ? 'on' : ''}`, style: pct(x0, y0, x1 - x0, y1 - y0),
-      'data-gym': g?.id ?? '', 'aria-label': g ? g.city : l.name ?? '',
-      onclick: () => (g ? select(g.id) : toast(l.note ?? '')),
+      class: `map3-hot ${p.id === place.id ? 'on' : ''} ${p.town && adv.at === p.town ? 'here' : ''}`, style: pct(x0, y0, x1 - x0, y1 - y0),
+      'data-place': p.id, 'aria-label': p.name,
+      onclick: () => { selectedPlace = p.id; menu.app.audio.sfx('click'); menu.render(); },
     });
   });
-  const lit = Math.round(progressOf(menu, region, region.gyms[0]) * BROCK_DOTS.length);
-  const dots = BROCK_DOTS.map(([x, y], i) => h('i', { class: `map2-dot ${i < lit ? 'on' : ''}`, style: pct(x - 10, y - 10, 20, 20) }));
 
-  // --- tarjeta del gimnasio elegido ---
-  const st = gymStatus(store, region, gym);
-  const canPlay = (st === 'available' || st === 'completed') && gym.playable;
-  const label = LABELS.find((l) => l.gym === gym.id);
-  const [cx, cy] = label?.city ?? [426, 700];
-  const thumb = gym.id === 'brock'
-    ? h('div', { class: 'map2-thumb', style: 'background-image:url(ui/city-plateada.webp)' })
-    : h('div', { class: 'map2-thumb', style: `background-image:url(ui/map-kanto.webp);background-size:330%;background-position:${Math.max(0, Math.min(100, ((cx - 129) / (MAP.w - 258)) * 100))}% ${Math.max(0, Math.min(100, ((cy - 98) / (MAP.h - 197)) * 100))}%` });
-  const pr = progressOf(menu, region, gym);
-  const medal = h('div', { class: 'map2-medal' },
-    gym.id === 'brock' ? h('img', { src: 'ui/medal-roca.webp', alt: '', class: 'map2-medal-ic' }) : h('span', { class: 'map2-medal-ic type', style: `--t:${TYPE_COLORS[gym.type]}` }, typeGlyph(gym.type, 26)),
-    h('div', {}, h('b', {}, gym.badge),
-      h('span', { class: 'map2-medal-dots' }, ...Array.from({ length: 5 }, (_, i) => h('i', { class: i < Math.round(pr * 5) ? 'on' : '' })))),
-  );
+  // --- tarjeta del lugar elegido ---
+  const g = gymOf(place);
+  const town = place.town ? TOWNS[place.town] : undefined;
+  const open = visited(place);
+  const [cx, cy] = place.city;
+  const thumb = place.id === 'plateada'
+    ? h('div', { class: 'map3-thumb', style: 'background-image:url(ui/city-plateada.webp)' })
+    : h('div', { class: 'map3-thumb', style: `background-image:url(ui/map-kanto.webp);background-size:330%;background-position:${Math.max(0, Math.min(100, ((cx - 129) / (MAP.w - 258)) * 100))}% ${Math.max(0, Math.min(100, ((cy - 98) / (MAP.h - 197)) * 100))}%` });
+  const sub = g
+    ? `${town ? 'Ciudad · ' : ''}Gimnasio de ${TYPE_NAMES[g.type]}${g.playable ? '' : town ? ' (cerrado)' : ''}`
+    : town ? (town.id === 'paleta' ? 'Pueblo · Inicio de la aventura' : 'Pueblo') : 'Lugar';
+  const desc = town ? (open ? town.blurb : howToReach(town.id)) : g ? GYM_TEXT[g.id] ?? '' : place.note ?? '';
+  const side = g
+    ? h('div', { class: 'map3-medal' },
+      g.id === 'brock' ? h('img', { src: 'ui/medal-roca.webp', alt: '', class: 'map3-medal-ic' }) : h('span', { class: 'map3-medal-ic type', style: `--t:${TYPE_COLORS[g.type]}` }, typeGlyph(g.type, 22)),
+      h('div', {}, h('b', {}, g.badge),
+        h('span', { class: 'map3-medal-dots' }, ...Array.from({ length: 5 }, (_, i) => h('i', { class: i < Math.round(progressOf(menu, region, g) * 5) ? 'on' : '' })))))
+    : h('div', { class: `map3-medal visit ${open ? 'on' : ''}` }, h('b', {}, open ? '✓ Visitado' : place.town ? 'Sin visitar' : 'Próximamente'));
   const enter = h('button', {
-    class: `map2-enter ${canPlay ? '' : 'off'}`, 'data-testid': 'enter', 'aria-label': `Entrar: ${gym.city}`,
-    onclick: () => (canPlay ? menu.go('gym', gym.id) : toast(st === 'locked' ? `Consigue antes la medalla de ${region.gyms[gym.order - 2]?.city ?? 'el gimnasio anterior'}.` : 'Este gimnasio aún está en desarrollo.')),
-  }, h('span', {}, canPlay ? 'Entrar' : st === 'locked' ? 'Bloqueado' : 'Próximamente'), canPlay ? h('span', { class: 'map2-enter-arrow' }, '▶') : icon('lock', 20));
-  const card = h('section', { class: 'map2-card', 'data-testid': 'gym-card', style: pct(22, 1293, 808, 237) },
+    class: `map3-enter ${open ? '' : 'off'}`, 'data-testid': 'enter', 'aria-label': `Entrar: ${place.name}`,
+    onclick: () => { if (open && town) menu.app.showTown(town.id); },
+  }, h('span', {}, open ? 'Entrar' : town ? 'Bloqueado' : 'Próximamente'), open ? h('span', { class: 'map3-enter-arrow' }, '▶') : icon('lock', 18));
+  const card = h('section', { class: 'map3-card', 'data-testid': 'gym-card' },
     thumb,
-    h('div', { class: 'map2-info' },
-      h('h2', {}, gym.city),
-      h('b', { class: 'map2-sub' }, `Gimnasio de ${TYPE_NAMES[gym.type]}`),
-      h('p', {}, GYM_TEXT[gym.id] ?? ''),
-    ),
-    medal,
+    h('div', { class: 'map3-info' }, h('h2', {}, place.name), h('b', { class: 'map3-sub' }, sub), h('p', { 'data-testid': 'place-desc' }, desc), side),
     enter,
   );
 
-  return h('div', { class: 'tab map2' },
+  return h('div', { class: 'tab map3' },
     h('h1', { class: 'sr-only' }, `Pokécero · ${region.name}`),
-    h('div', { class: 'map2-art' },
-      h('img', { class: 'map2-img', src: 'ui/map-kanto.webp', alt: `Mapa de ${region.name}`, draggable: 'false' }),
-      ...dots,
-      ...hot,
-      card,
+    h('div', { class: 'map3-scroll' },
+      h('div', { class: 'map3-art' },
+        h('img', { class: 'map3-img', src: 'ui/map-kanto.webp', alt: `Mapa de ${region.name}`, draggable: 'false' }),
+        ...rows, ...hot,
+      ),
     ),
+    card,
   );
 }
 

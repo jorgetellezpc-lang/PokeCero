@@ -18,6 +18,8 @@ import { Scene3D } from '../../render/scene3d';
 import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
 import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
+import { placeGym, ROUTES, TOWNS, type RouteDef } from '../../data/adventure';
+import { arriveAt } from '../../meta/adventure';
 import { ATTACK_UPGRADE } from '../../data/signatures';
 
 // Pantalla de partida: conecta World (lógica), Renderer (dibujo), entrada
@@ -61,18 +63,32 @@ export class RunScreen implements Screen {
   private resizeObs: ResizeObserver;
   private safeProbe: HTMLElement;
 
-  constructor(private app: App, private gymId: string) {
-    const { gym } = findGym(gymId);
+  /** Ruta de la aventura que se está jugando (si no, es un gimnasio). */
+  private readonly route: RouteDef | null;
+
+  constructor(private app: App, private gymId: string, isRoute = false) {
     const store = app.store;
     const test = store.data.settings.testMode;
     const speciesId = store.data.selectedPokemon;
-    this.world = new World({
-      speciesId, gym,
-      rooms: roomSequence(test),
-      perks: perksFor(store, speciesId),
-      xpMult: test ? BALANCE.rooms.testModeXpMult : 1,
-      scalingFactor: test ? BALANCE.rooms.testModeScalingFactor : 1,
-    });
+    this.route = isRoute ? ROUTES[gymId] : null;
+    if (this.route) {
+      const r = this.route;
+      this.world = new World({
+        speciesId, gym: placeGym(r), route: r,
+        rooms: Array.from({ length: r.rooms }, (_, i) => i + 1),
+        perks: perksFor(store, speciesId),
+        xpMult: BALANCE.rooms.testModeXpMult,
+      });
+    } else {
+      const { gym } = findGym(gymId);
+      this.world = new World({
+        speciesId, gym,
+        rooms: roomSequence(test),
+        perks: perksFor(store, speciesId),
+        xpMult: test ? BALANCE.rooms.testModeXpMult : 1,
+        scalingFactor: test ? BALANCE.rooms.testModeScalingFactor : 1,
+      });
+    }
     store.update((d) => { d.stats.runs++; });
     // Precarga de las hojas de sprites que van a salir (evita parpadeos).
     const w = this.world;
@@ -157,7 +173,7 @@ export class RunScreen implements Screen {
     const maxed = p.level >= BALANCE.experience.maxLevel;
     H.xpFill.style.width = maxed ? '100%' : `${(100 * p.xp) / w.xpNeeded}%`;
     H.level.textContent = `Nv ${p.level}`;
-    H.room.textContent = `Sala ${w.room}/${BALANCE.rooms.perGym}`;
+    H.room.textContent = this.route ? `Sala ${w.room}/${w.rooms.length}` : `Sala ${w.room}/${BALANCE.rooms.perGym}`;
     H.gold.textContent = String(Math.floor(w.runGold + w.bonusGold));
     const key = p.moves.map((m) => `${m.def.id}${m.level}${m.evolved}`).join() + (p.item ?? '');
     if (H.attacks.dataset.key !== key) {
@@ -231,14 +247,15 @@ export class RunScreen implements Screen {
     for (const ev of events) {
       switch (ev.type) {
         case 'roomStart':
-          recordBestRoom(store, this.gymId, ev.room);
+          if (!this.route) recordBestRoom(store, this.gymId, ev.room);
           audio.music(songForRoom(ev.room, ev.kind));
-          this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!' : `Sala ${ev.room}`, ev.kind === 'normal' ? '' : 'danger');
+          this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!'
+            : this.route ? (ev.index === 0 ? `${this.route.name} · Sala 1` : ev.index === ev.total - 1 ? '¡Un Pokémon fuerte!' : `Sala ${ev.room}`) : `Sala ${ev.room}`, ev.kind === 'normal' ? '' : 'danger');
           if (ev.index === 0) setTimeout(() => toast('Muévete para esquivar · Quédate quieto para atacar'), 900);
           break;
         case 'roomCleared': {
-          // Los tickets de hito se guardan al momento y solo una vez.
-          const t = claimMilestone(store, this.gymId, ev.room);
+          // Los tickets de hito se guardan al momento y solo una vez (solo en gimnasios).
+          const t = this.route ? 0 : claimMilestone(store, this.gymId, ev.room);
           if (t) {
             this.ticketsEarned += t;
             toast(`+${t} tickets del gachapón`);
@@ -445,6 +462,7 @@ export class RunScreen implements Screen {
     this.input.enabled = false;
     const w = this.world;
     const store = this.app.store;
+    if (this.route) return this.finishRoute(victory, abandoned);
     const { region, gym } = findGym(this.gymId);
     const p = w.player;
     const amulet = p.item ? ITEMS[p.item].mods?.coins ?? 1 : 1;
@@ -473,6 +491,36 @@ export class RunScreen implements Screen {
         ? `Has derrotado al jefe del gimnasio de ${gym.leader}.`
         : 'El nivel, los movimientos y el objeto de la partida se pierden. El oro, los tickets y las mejoras permanentes se conservan.'),
       h('button', { class: 'btn btn-play', 'data-testid': 'result-continue', onclick: () => this.app.showMenu('map') }, 'Continuar'),
+    ));
+  }
+
+  /** Fin de una ruta: si la superas, llegas al siguiente pueblo; si caes, vuelves al anterior. */
+  private finishRoute(victory: boolean, abandoned: boolean): void {
+    const r = this.route!;
+    const w = this.world;
+    const store = this.app.store;
+    const p = w.player;
+    const amulet = p.item ? ITEMS[p.item].mods?.coins ?? 1 : 1;
+    const gold = Math.floor((w.runGold + w.bonusGold) * p.coinMul * amulet);
+    bankRunGold(store, gold);
+    store.update((d) => { d.stats.kills += w.kills; });
+    const dest = victory ? TOWNS[r.to] : TOWNS[r.from];
+    if (victory) {
+      arriveAt(store, dest.id);
+      this.app.audio.sfx('legend');
+    }
+    this.showOverlay(h('div', { class: `panel result ${victory ? 'win' : 'lose'}`, 'data-testid': 'result' },
+      h('div', { class: 'levelup-title' }, victory ? `¡${r.name} superada!` : abandoned ? 'Ruta abandonada' : 'Derrota'),
+      pokeImg(p.species.dex, 96, 'gacha-sprite'),
+      h('div', { class: 'result-lines' },
+        line('Sala alcanzada', `${w.room} / ${w.rooms.length}`),
+        line('Enemigos derrotados', String(w.kills)),
+        line('Oro ganado', `+${gold}`),
+      ),
+      h('p', { class: 'note' }, victory
+        ? `Has llegado a ${dest.name}. ¡Ya puedes visitarla desde el mapa!`
+        : `Vuelves a ${dest.name}. Conservas el oro; la ruta se repite desde el principio.`),
+      h('button', { class: 'btn btn-play', 'data-testid': 'result-continue', onclick: () => this.app.showTown(dest.id) }, `Ir a ${dest.name}`),
     ));
   }
 }

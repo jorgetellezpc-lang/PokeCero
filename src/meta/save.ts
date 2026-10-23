@@ -1,4 +1,5 @@
 import { BALANCE, PERMANENT_UPGRADES, type PermanentUpgradeDef } from '../config/balance';
+import { ADVENTURE, TOWNS } from '../data/adventure';
 import { isPlayable, PLAYABLE_POKEMON, STARTER_POKEMON } from '../data/pokemon';
 
 // Persistencia del progreso PERMANENTE. Nunca guarda el estado de una partida
@@ -43,6 +44,8 @@ export interface SaveData {
   pity: number;
   settings: Settings;
   stats: { runs: number; wins: number; kills: number; pulls: number };
+  /** Aventura: lugares a los que ya has llegado y dónde estás (data/adventure.ts). */
+  adventure: { visited: string[]; at: string };
 }
 
 export function defaultSave(): SaveData {
@@ -59,6 +62,7 @@ export function defaultSave(): SaveData {
     pity: 0,
     settings: { testMode: true, damageNumbers: true, vibration: true, music: 0.5, sfx: 0.7, graphics: 'auto', zoom: 1 },
     stats: { runs: 0, wins: 0, kills: 0, pulls: 0 },
+    adventure: { visited: ['paleta'], at: 'paleta' },
   };
 }
 
@@ -91,6 +95,12 @@ export function migrate(raw: unknown): SaveData {
     }
     delete (data as unknown as Record<string, unknown>).permanentUpgrades;
   }
+  // Aventura: todos empiezan en Pueblo Paleta (también quien ya tenía progreso en Brock).
+  const adv = (r as Partial<SaveData>).adventure;
+  const known = new Set(ADVENTURE);
+  const visited = Array.isArray(adv?.visited) ? adv!.visited.filter((id) => known.has(id) && TOWNS[id]) : [];
+  if (!visited.includes('paleta')) visited.unshift('paleta');
+  data.adventure = { visited, at: adv && visited.includes(adv.at) ? adv.at : 'paleta' };
   // Solo se juega con los 4 elegibles, todos disponibles desde el principio.
   // Las mejoras compradas para otros Pokémon se quedan guardadas, sin uso.
   data.unlockedPokemon = [...PLAYABLE_POKEMON];

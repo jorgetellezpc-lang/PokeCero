@@ -14,7 +14,7 @@ const run = (page: Page, fn: string) =>
   page.evaluate(`(() => { const r = window.__pokecero.app.run; const w = r.world; const s = r.scene3d; ${fn} })()`);
 
 async function startGym(page: Page) {
-  if (!(await page.getByTestId('play').isVisible())) await page.getByTestId('enter').click();
+  await page.evaluate(() => (window as any).__pokecero.app.showGym('brock'));
   await page.getByTestId('play').click();
   await expect(page.locator('.run')).toHaveAttribute('data-view', '3d');
 }

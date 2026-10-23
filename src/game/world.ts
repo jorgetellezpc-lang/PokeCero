@@ -2,6 +2,7 @@ import { BALANCE } from '../config/balance';
 import { ABILITIES, BASE_MODS } from '../data/abilities';
 import { bossDefFor, castForTier, enemyFor, type BossDef, type EnemyDef } from '../data/enemies';
 import { ITEMS, ITEM_IDS, type ItemId } from '../data/items';
+import type { RouteDef, TownDef } from '../data/adventure';
 import { ARENAS, arenaObstacles, normalArenaFor, type ArenaDef } from '../data/arenas';
 import { layoutFor, type Obstacle } from '../data/layouts';
 import { getMove, moveStats, type BuffStat, type MoveCategory } from '../data/moves';
@@ -11,7 +12,7 @@ import { RUN_STAT_UPGRADES, type RunStatId } from '../data/runUpgrades';
 import { typeMultiplier } from '../data/typeChart';
 import { TYPE_COLORS } from '../data/typeColors';
 import type { ElementType, GymDef } from '../data/types';
-import { Animator, bodyHeight, bodyRadius, hovers, playerScale } from '../render/animator';
+import { Animator, bodyHeight, bodyRadius, dirFromAngle, hovers, playerScale } from '../render/animator';
 import { recomputeMods } from './abilities';
 import { updateBoss } from './bossAI';
 import { updateCombat, updateFields, updateProjectiles } from './combat';
@@ -79,7 +80,14 @@ export interface WorldOptions {
   /** La sala N escala como la sala N*factor (modo prueba). */
   scalingFactor?: number;
   seed?: number;
+  /** Pueblo que se recorre a pie: sin enemigos, con casas y Pokémon (data/adventure.ts). */
+  town?: TownDef;
+  /** Ruta de combate: sus salvajes en todas las salas y uno más fuerte en la última. */
+  route?: RouteDef;
 }
+
+/** Pokémon que está en un pueblo (no se le puede atravesar). */
+export interface TownNpcState { x: number; y: number; dex: number; anim: Animator; r: number }
 
 /** Defensa base → multiplicador del daño recibido (PokéSurvivor: suave, 0,78..1,25). */
 export function guard(def: number): number {
@@ -128,6 +136,10 @@ export class World {
   plan!: RoomPlan;
   scaling!: RoomScaling;
   pendingWaves: EnemyDef[][] = [];
+  /** Pueblo o ruta de la aventura, si lo es. */
+  readonly town: TownDef | null;
+  readonly route: RouteDef | null;
+  npcs: TownNpcState[] = [];
   roomCleared = false;
   exitOpen = false;
   readonly exit: Vec & { r: number };
@@ -161,7 +173,13 @@ export class World {
       while (out.length < n && copy.length) out.push(copy.splice(Math.floor(this.rng.next() * copy.length), 1)[0]);
       return out;
     };
-    this.cast = [0, 1, 2, 3, 4].map((t) => castForTier(t, pick));
+    this.town = opts.town ?? null;
+    this.route = opts.route ?? null;
+    const route = this.route;
+    // En una ruta salen sus salvajes (del tramo más fácil) en todas las salas.
+    this.cast = route
+      ? [0, 1, 2, 3, 4].map(() => route.wild.map((dex) => enemyFor(DEX.find((d) => d.dex === dex)!, 0)))
+      : [0, 1, 2, 3, 4].map((t) => castForTier(t, pick));
 
     const species = getSpecies(opts.speciesId);
     const perk = this.perks;
@@ -229,13 +247,21 @@ export class World {
     this.roomIndex = index;
     const room = this.room;
     const effective = Math.max(1, Math.round(room * this.scalingFactor));
-    this.plan = planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
+    this.plan = this.town
+      ? { room, kind: 'normal', scaling: scalingFor(1), waves: [] }
+      : planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
+    // Ruta: en la última sala aparece además el más fuerte.
+    if (this.route && this.isLastRoom && this.plan.waves.length) {
+      const strong = enemyFor(DEX.find((d) => d.dex === this.route!.strong)!, 1);
+      this.plan.waves[this.plan.waves.length - 1].push(strong);
+    }
     this.scaling = scalingFor(effective);
     const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
     const arts = this.gym.arenas;
     this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? normalArenaFor(arts.normal, index, this.layoutSeed) : arts.boss] ?? null : null;
     this.H = this.arena ? this.arena.H : BALANCE.arena.height;
-    this.obstacles = this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
+    this.obstacles = this.town ? this.town.obstacles.map((o) => ({ ...o }))
+      : this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
     this.nav = new NavGrid(this.W, this.H, this.obstacles, this.arena ? 8 : 10);
     this.enemies = [];
     this.corpses = [];
@@ -249,11 +275,17 @@ export class World {
     this.boss = null;
     this.target = null;
     this.roomCleared = false;
-    this.exitOpen = false;
+    // En un pueblo la puerta del norte está abierta (lleva a la ruta).
+    this.exitOpen = !!this.town;
     const p = this.player;
-    p.x = this.W / 2;
-    p.y = this.H - 70;
+    p.x = this.town ? this.town.start.x : this.W / 2;
+    p.y = this.town ? this.town.start.y : this.H - 70;
     p.invuln = 1;
+    this.npcs = (this.town?.npcs ?? []).map((n) => {
+      const anim = new Animator(n.dex, playerScale(n.dex));
+      anim.dir = n.dir ?? 0;
+      return { x: n.x, y: n.y, dex: n.dex, anim, r: 11 };
+    });
     p.lastPatch = null;
     p.sturdyLeft = p.mods.sturdy;
     this.pendingWaves = this.plan.waves.map((w) => [...w]);
@@ -337,7 +369,8 @@ export class World {
   }
 
   private checkRoomProgress(): void {
-    if (this.roomCleared || this.markers.length) return;
+    // En un pueblo no hay nada que despejar: se sale por los puntos del pueblo.
+    if (this.town || this.roomCleared || this.markers.length) return;
     if (this.plan.kind === 'normal') {
       if (this.pendingWaves.length && this.enemies.length <= 1) this.spawnNextWave();
       if (this.enemies.length || this.pendingWaves.length || this.markers.length) return;
@@ -397,7 +430,19 @@ export class World {
     this.checkRoomProgress();
 
     const p = this.player;
-    if (this.exitOpen && dist(p, this.exit) < this.exit.r + p.r && this.pickups.length === 0) {
+    if (this.town) {
+      // Los Pokémon del pueblo no se dejan atravesar, y te miran al acercarte.
+      for (const n of this.npcs) {
+        n.anim.update(dt);
+        const dx = p.x - n.x;
+        const dy = p.y - n.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const min = n.r + this.footR(p.r);
+        if (d < min) { p.x = n.x + (dx / d) * min; p.y = n.y + (dy / d) * min; }
+        if (d < 70) n.anim.dir = dirFromAngle(Math.atan2(dy, dx));
+      }
+    }
+    if (!this.town && this.exitOpen && dist(p, this.exit) < this.exit.r + p.r && this.pickups.length === 0) {
       this.startRoom(this.roomIndex + 1);
       return;
     }

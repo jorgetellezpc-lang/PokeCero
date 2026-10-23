@@ -31,6 +31,10 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 
 `.github/workflows/deploy.yml` publica en GitHub Pages cada push a `main`. Hay que activarlo una vez en el repositorio: *Settings → Pages → Source: GitHub Actions*. El juego quedará en `https://<usuario>.github.io/PokeCero/`.
 
+## Aventura
+
+La partida empieza en **Pueblo Paleta**: se pasea por el pueblo, se habla con sus Pokémon y se sale por el norte a la **Ruta 1** (5 salas de combate) hasta **Ciudad Verde**, y de ahí por la **Ruta 2** a **Ciudad Plateada**, donde está el gimnasio de Brock. Las mejoras permanentes se compran en la tienda de los pueblos.
+
 ## Controles
 
 - **Móvil:** toca y arrastra en cualquier punto de la pantalla para mover el joystick. Al soltar el dedo y quedarte **quieto**, atacas solo (estilo Archero); al moverte, esquivas. La cámara te sigue por la sala en 3D.
@@ -52,7 +56,7 @@ src/
     rooms.ts            Oleadas, tramos y curva de dificultad
     upgradeGenerator.ts Las 3 cartas de subida de nivel
     abilities.ts        Pasiva + habilidades + sinergias → modificadores de combate
-  meta/                 Progreso permanente: guardado, mejoras por Pokémon, recompensas, gachapón
+  meta/                 Progreso permanente: guardado, aventura (pueblos visitados), mejoras por Pokémon, recompensas, gachapón
   render/               Escenario 3D (scene3d.ts, Three.js), modelos 3D glTF con respaldo al sprite (models.ts),
                         dibujo 2D de respaldo (renderer.ts, draw2d.ts), sprites animados (animator.ts)
                         y efectos pixel art (vfx.ts)
