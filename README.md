@@ -4,7 +4,7 @@ Juego web Pokémon de supervivencia y acción 2D (roguelite), pensado para móvi
 
 Integra **PokéSurvivor** (© 2026 JPTER78, PolyForm Noncommercial) adaptado a salas estilo Archero, con sprites de PMD SpriteCollab (CC BY-NC 4.0). Por eso Pokécero es un proyecto **sin ánimo de lucro**: no se puede vender, cobrar por él ni ponerle anuncios. Detalles en [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-La especificación de diseño está en el *Blueprint maestro*. En [`docs/DECISIONES.md`](docs/DECISIONES.md) se recogen las decisiones tomadas y los valores provisionales.
+La especificación de diseño está en el *Blueprint maestro*. El plan de la transformación a 3D estilizado (auditoría, incrementos, cómo añadir modelos 3D) está en [`docs/3D.md`](docs/3D.md). En [`docs/DECISIONES.md`](docs/DECISIONES.md) se recogen las decisiones tomadas y los valores provisionales.
 
 ## Ejecutar
 
@@ -53,8 +53,9 @@ src/
     upgradeGenerator.ts Las 3 cartas de subida de nivel
     abilities.ts        Pasiva + habilidades + sinergias → modificadores de combate
   meta/                 Progreso permanente: guardado, mejoras por Pokémon, recompensas, gachapón
-  render/               Escenario 3D (scene3d.ts, Three.js), dibujo 2D de respaldo (renderer.ts, draw2d.ts),
-                        sprites animados (animator.ts) y efectos pixel art (vfx.ts)
+  render/               Escenario 3D (scene3d.ts, Three.js), modelos 3D glTF con respaldo al sprite (models.ts),
+                        dibujo 2D de respaldo (renderer.ts, draw2d.ts), sprites animados (animator.ts)
+                        y efectos pixel art (vfx.ts)
   audio/                Sintetizador Web Audio y partituras
   input/                Joystick táctil y teclado
   ui/                   Menú principal (4 pestañas) y pantalla de partida

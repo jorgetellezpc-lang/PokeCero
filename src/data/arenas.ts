@@ -28,6 +28,8 @@ export interface ArenaDef {
   rocks: [number, number, number, number, number][];
   /** Zonas sin suelo (muros, antorchas, esquinas) que no se ven como rocas. */
   blockers: [number, number, number, number][];
+  /** Llamas de las antorchas dibujadas (píxeles de la ilustración): solo decorado, no chocan. */
+  lights?: [number, number][];
 }
 
 const NORMAL_S = 360 / 760;
@@ -46,6 +48,7 @@ export const ARENAS: Record<string, ArenaDef> = {
       [95, 330, 170, 430, 320], [95, 490, 230, 580, 490], [760, 330, 850, 440, 330], [760, 450, 850, 590, 445],
       [820, 670, 850, 790, 660],
     ],
+    lights: [[385, 205], [565, 205], [190, 228], [745, 228], [125, 355], [800, 362], [850, 470], [65, 565], [915, 565], [128, 688], [865, 688], [58, 870], [125, 1050], [885, 1105], [320, 1330], [618, 1330]],
     blockers: [
       [90, 230, 405, 288], [555, 230, 850, 288],
       [90, 1188, 330, 1400], [630, 1188, 850, 1400], [90, 1300, 375, 1400], [558, 1300, 850, 1400],
@@ -59,6 +62,7 @@ export const ARENAS: Record<string, ArenaDef> = {
     id: 'brock-2', image: 'arenas/arena-brock-2.webp', occluder: 'arenas/arena-brock-2-occ.webp',
     imgW: 941, imgH: 1671, ox: 100, oy: 270, s: S2, H: Math.round((1395 - 270) * S2),
     rocks: [[585, 478, 722, 528, 395], [300, 500, 375, 522, 485], [195, 648, 312, 702, 570], [585, 745, 790, 802, 665], [175, 1075, 392, 1132, 985], [590, 1150, 792, 1218, 1035], [140, 1340, 242, 1400, 1270], [590, 1340, 692, 1400, 1275]],
+    lights: [[360, 270], [590, 270], [197, 325], [760, 325], [170, 430], [785, 430], [85, 830], [865, 830], [245, 1310], [700, 1310]],
     blockers: [],
   },
   // Camino entre cascadas y puentes: más estrecho y con curvas.
@@ -66,12 +70,14 @@ export const ARENAS: Record<string, ArenaDef> = {
     id: 'brock-3', image: 'arenas/arena-brock-3.webp', occluder: 'arenas/arena-brock-3-occ.webp',
     imgW: 941, imgH: 1671, ox: 220, oy: 290, s: S3, H: Math.round((1325 - 290) * S3),
     rocks: [[400, 480, 472, 526, 400], [632, 640, 822, 696, 555], [310, 762, 546, 834, 685], [690, 900, 792, 975, 770], [398, 1178, 472, 1206, 1150], [310, 1290, 412, 1400, 1170], [600, 1335, 702, 1400, 1290], [745, 1150, 892, 1225, 1000]],
+    lights: [[385, 235], [588, 235], [762, 295], [325, 420], [198, 535], [735, 790], [98, 905], [350, 1275], [652, 1325]],
     blockers: [],
   },
   'brock-boss': {
     id: 'brock-boss', image: 'arenas/arena-brock-boss.webp', occluder: 'arenas/arena-brock-boss-occ.webp',
     imgW: 941, imgH: 1672, ox: 40, oy: 400, s: BOSS_S, H: Math.round((1160 - 400) * BOSS_S),
     rocks: [[235, 560, 375, 620, 500], [685, 680, 810, 740, 625], [145, 860, 285, 930, 800], [595, 1000, 795, 1100, 895]],
+    lights: [[355, 280], [590, 280], [245, 340], [700, 340], [110, 428], [828, 428], [350, 418], [598, 418], [40, 500], [900, 500], [15, 720], [925, 720], [25, 1050], [918, 1050], [215, 1175], [722, 1175], [300, 1515], [628, 1515]],
     blockers: [
       [40, 400, 385, 465], [580, 400, 900, 465], [40, 430, 150, 560], [800, 430, 900, 560],
       [40, 1140, 355, 1400], [590, 1140, 900, 1400], [40, 1000, 130, 1140], [840, 1000, 900, 1140],

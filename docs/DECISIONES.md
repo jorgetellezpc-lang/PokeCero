@@ -181,6 +181,15 @@ Estética de juego móvil a partir del ejemplo del usuario: paneles azules con b
 - Los demás gimnasios siguen con salas generadas hasta tener sus ilustraciones.
 - Con las arenas, el bot moría mucho contra los minibosses: se rebajaron los jefes (miniboss vida ×20 y daño ×1,5; jefe ×55 y ×2). Ahora gana unas 14 de cada 32 partidas simuladas.
 
+## Transformación a 3D estilizado (incremento 1)
+
+Detalle en [`3D.md`](3D.md). En resumen:
+
+- Las antorchas dibujadas dan luz y chispas, y los Pokémon tienen contorno de silueta.
+- Al salir de la partida se liberan todos los recursos de la GPU.
+- Hay una ruta para personajes glTF/GLB: si el modelo no está o no carga, se usa el sprite.
+- Pidgeotto sigue bloqueado: no hay un modelo con licencia verificable.
+
 ## Provisional (pendiente de decisión de diseño)
 
 | Tema | Valor actual | Dónde |

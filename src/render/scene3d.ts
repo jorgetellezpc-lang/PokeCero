@@ -1,17 +1,21 @@
 import {
-  AdditiveBlending, BoxGeometry, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, IcosahedronGeometry,
+  AdditiveBlending, BoxGeometry, BufferAttribute, BufferGeometry, Points, PointsMaterial, CanvasTexture, Color, ConeGeometry, CylinderGeometry, DirectionalLight, Fog, Group, HemisphereLight, IcosahedronGeometry,
   InstancedMesh, LinearFilter, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshStandardMaterial, NearestFilter, Object3D,
   PCFShadowMap, PerspectiveCamera, PlaneGeometry, RepeatWrapping, Scene, SRGBColorSpace, Texture, Vector3,
-  WebGLRenderer, type Material,
+  WebGLRenderer,
 } from 'three';
 import { BALANCE } from '../config/balance';
 import type { ArenaDef } from '../data/arenas';
 import type { Obstacle } from '../data/layouts';
+import { hasModels, modelFor, type ModelAnim } from '../data/models3d';
+import { speciesByDex } from '../data/pokemon';
 import { guardianPositions, orbitPositions } from '../game/combat';
 import { jumpHeight } from '../game/enemyAI';
 import { Rng } from '../game/rng';
 import type { World } from '../game/world';
-import { drawShadow, type Animator } from './animator';
+import { drawShadow, type AnimName, type Animator } from './animator';
+import { disposeObject } from './dispose';
+import type { ModelInstance, ModelLibrary } from './models';
 import {
   buildBackground, drawAirField, drawBossRing, drawEnemyBar, drawEnemyMarks, drawExitArrow, drawGroundField, drawGuardian,
   drawHazard, drawMarker, drawMound, drawOrb, drawParticle, drawPickup, drawPickupShadow, drawPlayerAura, drawProjectile,
@@ -36,6 +40,15 @@ const WALL_IN = 10;
 const WALL_T = 30;
 const WALL_H = 36;
 const DECAL_RES = 1; // píxeles de la capa de suelo por unidad de mundo
+/** Contorno de silueta en los sprites de los Pokémon. */
+const OUTLINE = true;
+/** En las arenas (cámara cenital) los modelos 3D se inclinan hacia la cámara para verse desde esta altura. */
+const ARENA_MODEL_ELEV = (50 * Math.PI) / 180;
+/** Vida que pierde una chispa por segundo (dura ~1,8 s). */
+const EMBER_FADE = 0.55;
+const MODEL_ANIM: Record<AnimName, ModelAnim> = {
+  Idle: 'idle', Walk: 'walk', Attack: 'attack', Shoot: 'attack', Charge: 'attack', Hurt: 'hurt', Faint: 'faint',
+};
 
 /** Calidad aprendida en esta sesión: la siguiente partida empieza ya ahí. */
 let sessionQuality = 0;
@@ -44,6 +57,8 @@ interface SpriteView {
   group: Group;
   mesh: Mesh<PlaneGeometry, MeshBasicMaterial>;
   flash: { value: number };
+  /** Tamaño de un píxel de la hoja (x, y) y si se dibuja el contorno (z). */
+  texel: { value: Vector3 };
   used: boolean;
 }
 
@@ -77,6 +92,19 @@ export class Scene3D {
   private decalDirty = true;
   private sun: DirectionalLight;
   private v = new Vector3();
+  /** Luz de las antorchas de la arena (una malla instanciada) y chispas que suben de ellas. */
+  private torches: { mesh: InstancedMesh; spots: { x: number; z: number; size: number; ph: number }[] } | null = null;
+  private embers: { pts: Points; spots: { x: number; z: number }[]; life: Float32Array; vel: Float32Array } | null = null;
+  private tmpM = new Matrix4();
+  /**
+   * Modelos 3D (si una especie tiene; si no, o si falla la carga, sprite).
+   * El módulo se trae solo cuando hay algún modelo configurado.
+   */
+  models: ModelLibrary | null = null;
+  private modelsMod: typeof import('./models') | null = null;
+  private modelsLoading = false;
+  private modelViews = new Map<object, ModelInstance>();
+  private tmpC = new Color();
   /** Calidad automática: si va lento, baja la resolución y luego quita las sombras. */
   private quality = sessionQuality;
   private adaptive = true;
@@ -181,8 +209,39 @@ export class Scene3D {
     this.lastFrame = now;
   }
 
+  /** Libera todo lo que la escena ha subido a la GPU (al salir de la partida). */
   dispose(): void {
+    if (this.room) {
+      this.scene.remove(this.room);
+      disposeObject(this.room);
+      this.room = null;
+    }
+    for (const v of this.views.values()) {
+      v.mesh.geometry.dispose();
+      v.mesh.material.dispose();
+    }
+    this.views.clear();
+    for (const m of this.modelViews.values()) m.dispose();
+    this.modelViews.clear();
+    this.models?.dispose();
+    for (const t of this.sheets.values()) t.dispose();
+    this.sheets.clear();
+    this.decalTex.dispose();
+    this.decalMesh.geometry.dispose();
+    (this.decalMesh.material as MeshBasicMaterial).dispose();
+    // El mapa de sombras del sol es una textura de la GPU más.
+    this.sun.dispose();
+    this.gl.renderLists.dispose();
     this.gl.dispose();
+    // El lienzo de la partida se tira: soltar el contexto libera también lo
+    // interno de Three.js (p. ej. la tabla DFG compartida de los materiales PBR).
+    this.gl.forceContextLoss();
+  }
+
+  /** Recursos vivos en la GPU (depuración y pruebas de fugas). */
+  get memory(): { geometries: number; textures: number; calls: number; contextLost: boolean } {
+    const i = this.gl.info;
+    return { geometries: i.memory.geometries, textures: i.memory.textures, calls: i.render.calls, contextLost: this.gl.getContext().isContextLost() };
   }
 
   draw(w: World): void {
@@ -192,8 +251,9 @@ export class Scene3D {
     if (this.roomKey !== w.obstacles || !this.room) this.buildRoom(w);
     this.updateCamera(w, dt);
     this.updateRoom(w);
+    this.updateTorches(w.time, dt);
     this.drawDecals(w);
-    this.updateSprites(w);
+    this.updateSprites(w, dt);
     this.gl.render(this.scene, this.camera);
     this.drawOverlay(w);
   }
@@ -328,22 +388,103 @@ export class Scene3D {
       m.position.set(((rx0 + rx1) / 2 - a.ox) * s, depthY(((y0 + y1) / 2 - a.oy) * s), ((ry0 + ry1) / 2 - a.oy) * s);
       g.add(m);
     }
-    void w;
+    this.buildTorches(a, g);
+    // Luz para los modelos 3D (la ilustración ya trae la suya): desde arriba a la izquierda, como en el dibujo.
+    this.sun.position.set(w.W / 2 - 260, 520, w.H / 2 - 220);
+    this.sun.target.position.set(w.W / 2, 0, w.H / 2);
+  }
+
+  /**
+   * Luz de las antorchas dibujadas: un halo cálido que parpadea (aditivo, una
+   * sola llamada de dibujo) y chispas que suben. Solo decorado: no toca la
+   * simulación ni tapa a nadie (es luz que se suma, no un objeto opaco).
+   */
+  private buildTorches(a: ArenaDef, g: Group): void {
+    const lights = a.lights ?? [];
+    if (!lights.length) return;
+    const glow = glowTexture();
+    const s = a.s;
+    const spots = lights.map(([x, y], i) => ({ x: (x - a.ox) * s, z: (y - a.oy) * s, size: 230 * s, ph: i * 1.7 }));
+    const mesh = new InstancedMesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({
+      map: glow, color: 0xff8a30, transparent: true, depthWrite: false, depthTest: false, blending: AdditiveBlending,
+    }), spots.length);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.renderOrder = 5;
+    mesh.frustumCulled = false;
+    g.add(mesh);
+    this.torches = { mesh, spots };
+    // Chispas: un puñado por antorcha, en un único Points.
+    const n = Math.min(64, spots.length * 5);
+    const geo = new BufferGeometry();
+    geo.setAttribute('position', new BufferAttribute(new Float32Array(n * 3), 3));
+    geo.setAttribute('color', new BufferAttribute(new Float32Array(n * 3), 3));
+    const pts = new Points(geo, new PointsMaterial({
+      map: glow, size: 9, vertexColors: true, transparent: true, depthWrite: false, depthTest: false, blending: AdditiveBlending,
+    }));
+    pts.renderOrder = 6;
+    pts.frustumCulled = false;
+    g.add(pts);
+    this.embers = { pts, spots, life: new Float32Array(n), vel: new Float32Array(n * 2) };
+    // Cada chispa empieza ya en vuelo desde una antorcha (no todas a la vez ni en el origen).
+    for (let i = 0; i < n; i++) this.spawnEmber(i, Math.random());
+  }
+
+  private spawnEmber(i: number, life: number): void {
+    const E = this.embers!;
+    const pos = E.pts.geometry.attributes.position as BufferAttribute;
+    const sp = E.spots[Math.floor(Math.random() * E.spots.length)];
+    const vx = (Math.random() - 0.5) * 10;
+    const vz = -(14 + Math.random() * 16);
+    const age = (1 - life) / EMBER_FADE;
+    E.life[i] = life;
+    E.vel[i * 2] = vx;
+    E.vel[i * 2 + 1] = vz;
+    pos.setXYZ(i, sp.x + (Math.random() - 0.5) * 6 + vx * age, 6, sp.z - 4 + vz * age);
+  }
+
+  /** Parpadeo de las antorchas y vuelo de las chispas. */
+  private updateTorches(t: number, dt: number): void {
+    const T = this.torches;
+    if (T) {
+      const m = this.tmpM;
+      T.spots.forEach((sp, i) => {
+        const f = 0.82 + 0.1 * Math.sin(t * 9 + sp.ph) + 0.08 * Math.sin(t * 23 + sp.ph * 3);
+        m.makeScale(sp.size * f, sp.size * f, 1);
+        // La malla está girada -90° en X: (x, y local) → (x, -z del mundo).
+        m.setPosition(sp.x, -sp.z, 6);
+        T.mesh.setMatrixAt(i, m);
+        T.mesh.setColorAt(i, this.tmpC.setRGB(0.85 * f, 0.85 * f, 0.85 * f));
+      });
+      T.mesh.instanceMatrix.needsUpdate = true;
+      if (T.mesh.instanceColor) T.mesh.instanceColor.needsUpdate = true;
+    }
+    const E = this.embers;
+    if (!E) return;
+    E.pts.visible = this.quality < this.levels.length - 1;
+    if (!E.pts.visible) return;
+    const pos = E.pts.geometry.attributes.position as BufferAttribute;
+    const col = E.pts.geometry.attributes.color as BufferAttribute;
+    const n = E.life.length;
+    for (let i = 0; i < n; i++) {
+      E.life[i] -= dt * EMBER_FADE;
+      if (E.life[i] <= 0) {
+        // Renace en una antorcha al azar y sube (hacia arriba de la pantalla) con algo de deriva.
+        this.spawnEmber(i, 1);
+      } else {
+        pos.setX(i, pos.getX(i) + E.vel[i * 2] * dt);
+        pos.setZ(i, pos.getZ(i) + E.vel[i * 2 + 1] * dt);
+      }
+      const k = Math.min(1, E.life[i] * 1.6) * E.life[i];
+      col.setXYZ(i, k, 0.55 * k, 0.15 * k);
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
   }
 
   private buildRoom(w: World): void {
     if (this.room) {
       this.scene.remove(this.room);
-      this.room.traverse((o) => {
-        const m = o as Mesh;
-        if (m.geometry) m.geometry.dispose();
-        const mat = m.material as Material | Material[] | undefined;
-        for (const x of Array.isArray(mat) ? mat : mat ? [mat] : []) {
-          const map = (x as MeshLambertMaterial).map;
-          if (map) map.dispose();
-          x.dispose();
-        }
-      });
+      disposeObject(this.room);
     }
     this.roomKey = w.obstacles;
     this.camReady = false;
@@ -352,6 +493,8 @@ export class Scene3D {
     this.waterTex = [];
     this.bars = null;
     this.glow = null;
+    this.torches = null;
+    this.embers = null;
     this.art = w.arena;
     if (w.arena) {
       this.buildArena(w, w.arena, g);
@@ -528,15 +671,21 @@ export class Scene3D {
   // Pokémon (sprites de pie)
   // --------------------------------------------------------------------------
 
-  private updateSprites(w: World): void {
+  private updateSprites(w: World, dt: number): void {
     for (const v of this.views.values()) v.used = false;
+    const usedModels = new Set<object>();
+    const models = hasModels() && this.ensureModels();
     const p = w.player;
     const blink = p.invuln > 0 && w.phase === 'playing' && Math.floor(w.time * 20) % 2 === 0;
-    this.sprite(p, p.anim, p.x, p.y, 0, { flash: p.hitFlash > 0 ? 0.55 : 0, alpha: blink ? 0.45 : 1 });
+    const draw = (key: object, id: string | null, anim: Animator, x: number, z: number, lift: number, o: { flash: number; alpha: number }) => {
+      if (models && id && this.model(key, id, anim, x, z, lift, o, dt)) usedModels.add(key);
+      else this.sprite(key, anim, x, z, lift, o);
+    };
+    draw(p, p.species.id, p.anim, p.x, p.y, 0, { flash: p.hitFlash > 0 ? 0.55 : 0, alpha: blink ? 0.45 : 1 });
     for (const e of w.enemies) {
       if (e.hidden) continue;
       const shake = e.phase === 'aim' || e.phase === 'fuse' ? Math.sin(w.time * 60) * 1.2 : 0;
-      this.sprite(e, e.anim, e.x + shake, e.y, jumpHeight(e), { flash: e.flash > 0 ? (e.boss ? 0.55 : 1) : 0, alpha: 1 });
+      draw(e, models ? speciesByDex(e.def.dex).id : null, e.anim, e.x + shake, e.y, jumpHeight(e), { flash: e.flash > 0 ? (e.boss ? 0.55 : 1) : 0, alpha: 1 });
     }
     for (const c of w.corpses) this.sprite(c, c.anim, c.x, c.y, 0, { flash: 0, alpha: Math.min(1, c.fade * 1.6) });
     for (const [key, v] of this.views) {
@@ -546,6 +695,58 @@ export class Scene3D {
       v.mesh.material.dispose();
       this.views.delete(key);
     }
+    for (const [key, m] of this.modelViews) {
+      if (usedModels.has(key)) continue;
+      m.dispose();
+      this.modelViews.delete(key);
+    }
+  }
+
+  /** Trae el módulo de modelos la primera vez (mientras, sprites). */
+  private ensureModels(): boolean {
+    if (this.models) return true;
+    if (!this.modelsLoading) {
+      this.modelsLoading = true;
+      import('./models').then(
+        (mod) => { this.modelsMod = mod; this.models = new mod.ModelLibrary(); },
+        (e: unknown) => console.warn('[modelos 3D] No se pudo cargar el módulo; se usan sprites.', e),
+      );
+    }
+    return false;
+  }
+
+  /** Dibuja con su modelo 3D si lo hay y ya cargó. Devuelve false para usar el sprite. */
+  private model(key: object, id: string, anim: Animator, x: number, z: number, lift: number, o: { flash: number; alpha: number }, dt: number): boolean {
+    const def = modelFor(id);
+    const tpl = def && this.models ? this.models.get(def) : null;
+    if (!tpl || !this.modelsMod) return false;
+    let m = this.modelViews.get(key);
+    if (m && m.template !== tpl) {
+      m.dispose();
+      m = undefined;
+    }
+    if (!m) {
+      m = new this.modelsMod.ModelInstance(tpl);
+      this.scene.add(m.root);
+      this.modelViews.set(key, m);
+    }
+    // Fila de dirección del sprite (0 = hacia abajo) → ángulo en el suelo.
+    const facing = Math.PI / 2 - anim.dir * (Math.PI / 4);
+    m.update(dt, MODEL_ANIM[anim.cur] ?? 'idle', facing, o);
+    m.root.visible = o.alpha > 0;
+    if (this.art) {
+      m.root.rotation.x = -(Math.PI / 2 - ARENA_MODEL_ELEV);
+      m.root.position.set(x, depthY(z) + 0.001, z - lift);
+    } else {
+      m.root.rotation.x = 0;
+      m.root.position.set(x, lift, z);
+    }
+    return true;
+  }
+
+  /** Estado de los modelos 3D en uso (depuración y pruebas). */
+  modelDebug(): { instances: { anim: string | null }[] } {
+    return { instances: [...this.modelViews.values()].map((m) => ({ anim: m.anim })) };
   }
 
   private sheetTexture(img: HTMLImageElement): Texture {
@@ -567,19 +768,28 @@ export class Scene3D {
     let v = this.views.get(key);
     if (!v) {
       const flash = { value: 0 };
+      const texel = { value: new Vector3(0, 0, 0) };
       const mat = new MeshBasicMaterial({ transparent: true, alphaTest: 0.35 });
-      // Destello blanco al recibir un golpe (como el 2D).
+      // Destello blanco al recibir un golpe (como el 2D) y contorno oscuro de
+      // 1 píxel alrededor de la silueta, para leerla sobre la ilustración.
       mat.onBeforeCompile = (sh) => {
         sh.uniforms.uFlash = flash;
+        sh.uniforms.uTexel = texel;
         sh.fragmentShader = sh.fragmentShader
-          .replace('void main() {', 'uniform float uFlash;\nvoid main() {')
+          .replace('void main() {', 'uniform float uFlash;\nuniform vec3 uTexel;\nvoid main() {')
+          .replace('#include <map_fragment>', `#include <map_fragment>
+\tif (uTexel.z > 0.5 && diffuseColor.a < 0.35) {
+\t\tfloat n = max(max(texture2D(map, vMapUv + vec2(uTexel.x, 0.0)).a, texture2D(map, vMapUv - vec2(uTexel.x, 0.0)).a),
+\t\t\tmax(texture2D(map, vMapUv + vec2(0.0, uTexel.y)).a, texture2D(map, vMapUv - vec2(0.0, uTexel.y)).a));
+\t\tif (n > 0.35) diffuseColor = vec4(0.09, 0.06, 0.05, 0.85 * opacity);
+\t}`)
           .replace('#include <opaque_fragment>', '#include <opaque_fragment>\n\tgl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0), uFlash);');
       };
       const mesh = new Mesh(new PlaneGeometry(1, 1), mat);
       const group = new Group();
       group.add(mesh);
       this.scene.add(group);
-      v = { group, mesh, flash, used: true };
+      v = { group, mesh, flash, texel, used: true };
       this.views.set(key, v);
     }
     v.used = true;
@@ -593,6 +803,7 @@ export class Scene3D {
     if (mat.map !== tex) {
       mat.map = tex;
       mat.needsUpdate = true;
+      v.texel.value.set(1 / info.img.width, 1 / info.img.height, OUTLINE ? 1 : 0);
     }
     mat.opacity = o.alpha;
     v.flash.value = o.flash;
@@ -707,6 +918,23 @@ export class Scene3D {
 /** Altura a la que se dibuja algo plano en la arena, según su profundidad (más abajo = delante). */
 function depthY(z: number): number {
   return 2 + z * 0.004;
+}
+
+/** Halo radial suave (luz de antorcha y chispas). */
+function glowTexture(): CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d')!;
+  const gr = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.25, 'rgba(255,255,255,0.55)');
+  gr.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gr;
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new CanvasTexture(c);
+  t.colorSpace = SRGBColorSpace;
+  return t;
 }
 
 function pixelTexture(c: HTMLCanvasElement): CanvasTexture {
