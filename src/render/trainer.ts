@@ -25,7 +25,7 @@ function img(): HTMLImageElement | null {
   return sheet.complete && sheet.naturalWidth ? sheet : null;
 }
 /** Empieza a cargar la hoja del entrenador. */
-export const preloadTrainer = () => void img();
+export const preloadTrainer = () => { img(); walkImg(); };
 
 /** Dibuja un recorte con los pies en (x, y). */
 function frame(ctx: CanvasRenderingContext2D, f: TrainerFrame, x: number, y: number, o: { flip?: boolean; alpha?: number; scale?: number } = {}): void {
@@ -54,15 +54,39 @@ export function trainerShadow(ctx: CanvasRenderingContext2D, x: number, y: numbe
 
 type Dir = 'down' | 'up' | 'right' | 'left';
 
-const IDLE: Record<Dir, TrainerFrame> = { down: 'w0', up: 'w3', right: 'w7', left: 'w7' };
-const WALK: Record<Dir, TrainerFrame[]> = {
-  down: ['w10', 'w11', 'w12', 'w11'],
-  up: ['r5', 'r6', 'r7', 'r6'],
-  right: ['r0', 'r1', 'r2', 'r1'],
-  left: ['r0', 'r1', 'r2', 'r1'],
-};
+// Hoja de andar del entrenador (del usuario, limpiada: sin placas de sombra ni
+// huecos en el pelo): 6 fotogramas × 4 filas (abajo, izquierda, derecha,
+// arriba), celdas de 128 px. Ver public/ui/trainer-walk.webp.
+const WALK_CELL = 128;
+const WALK_ROW: Record<Dir, number> = { down: 0, left: 1, right: 2, up: 3 };
+/** Línea de los pies (px desde arriba) de cada celda, para apoyarlos en el suelo. */
+const WALK_FEET = [126, 126, 126, 126, 126, 126, 122, 122, 122, 122, 122, 122, 124, 122, 122, 121, 124, 124, 120, 119, 120, 121, 121, 121];
+/** Unidades del mundo por píxel de la hoja de andar (el entrenador mide ~116 px). */
+const KW = TRAINER_H / 116;
 
-/** El entrenador andando por el pueblo: mira hacia donde va y anima al moverse. */
+let walkSheet: HTMLImageElement | null = null;
+function walkImg(): HTMLImageElement | null {
+  if (typeof Image === 'undefined') return null;
+  if (!walkSheet) walkSheet = Object.assign(new Image(), { src: 'ui/trainer-walk.webp' });
+  return walkSheet.complete && walkSheet.naturalWidth ? walkSheet : null;
+}
+
+/** Fotograma de andar con los pies en (x, y). */
+function walkFrame(ctx: CanvasRenderingContext2D, dir: Dir, i: number, x: number, y: number, alpha = 1): void {
+  const im = walkImg();
+  if (!im) return;
+  const row = WALK_ROW[dir];
+  const col = i % 6;
+  const foot = WALK_FEET[row * 6 + col];
+  const w = WALK_CELL * KW;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(im, col * WALK_CELL, row * WALK_CELL, WALK_CELL, WALK_CELL, x - w / 2, y - foot * KW, w, w);
+  ctx.restore();
+}
+
+/** El entrenador andando por el pueblo: mira hacia donde va y anima al moverse (6 pasos por dirección). */
 export class Trainer {
   dir: Dir = 'up';
   moving = false;
@@ -74,18 +98,13 @@ export class Trainer {
       const c = Math.cos(angle);
       const s = Math.sin(angle);
       this.dir = Math.abs(c) > Math.abs(s) * 0.9 ? (c > 0 ? 'right' : 'left') : s > 0 ? 'down' : 'up';
-      this.t += dt * Math.max(6, speed / 14);
+      // Unos 10 pasos por segundo, más rápido cuanto más corre.
+      this.t += dt * Math.max(8, Math.min(16, speed / 11));
     } else this.t = 0;
   }
 
   draw(ctx: CanvasRenderingContext2D, x: number, y: number, alpha = 1): void {
-    const flip = this.dir === 'left';
-    if (!this.moving) return frame(ctx, IDLE[this.dir], x, y, { flip, alpha });
-    const seq = WALK[this.dir];
-    const i = Math.floor(this.t) % seq.length;
-    // Al correr de frente se mece un poco y alterna el lado.
-    const bob = i % 2 ? -1 : 0;
-    frame(ctx, seq[i], x, y + bob, { flip: this.dir === 'down' ? Math.floor(this.t / seq.length) % 2 === 1 : flip, alpha });
+    walkFrame(ctx, this.dir, this.moving ? Math.floor(this.t) : 0, x, y, alpha);
   }
 }
 
@@ -173,7 +192,7 @@ export function drawThrow(ctx: CanvasRenderingContext2D, s: ThrowState): void {
 export function drawWatcher(ctx: CanvasRenderingContext2D, x: number, y: number, time: number): void {
   trainerShadow(ctx, x, y);
   // Respira: sube y baja un píxel de vez en cuando.
-  frame(ctx, 'w3', x, y - (Math.floor(time * 1.6) % 2));
+  walkFrame(ctx, 'up', 0, x, y - (Math.floor(time * 1.6) % 2));
 }
 
 function ball(ctx: CanvasRenderingContext2D, x: number, y: number, spin: number): void {
