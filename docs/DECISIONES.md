@@ -197,6 +197,7 @@ Decidido con el usuario:
 - Venían sobre una losa isométrica y los pueblos no son isométricos: se quitó el lateral de la losa y se fundió su cara de arriba con el suelo. Las hojas de bloques tenían el fondo de cuadros pintado y se recortó automáticamente.
 - Dónde se usan: los bosques mezclan robles y pinos (más pinos en los bordes); los arbustos y plantas del decorado eligen una variante fija por posición (o una concreta con `v`); la hierba alta son matas de pie que tapan las piernas al cruzarla; las rocas de Ciudad Plateada son montones de rocas.
 - Los colores del suelo (hierba, tierra y piedra) se reajustaron con los de las hojas de bloques para que todo case.
+- **También en las rutas de combate** (escenario 3D): los bosques de alrededor son tus robles y pinos, de pie e inclinados hacia la cámara como los Pokémon (una malla instanciada por dibujo: unas 39 llamadas de dibujo por sala); los lados de la sala son una hilera de árboles y abajo una de arbustos con flores (en lugar de muros; solo queda la puerta de piedra); las rocas son tus montones de rocas; y junto a los bordes hay arbustos, plantas y matas de hierba alta sueltos. El dibujo 2D de respaldo también usa tus rocas.
 - No se usaron los bloques enteros (suelos isométricos) ni los matorrales de las hojas de bloques, porque traen un rombo de hierba demasiado grande para la vista de los pueblos.
 
 ## Entrenador y lanzamiento de la Poké Ball

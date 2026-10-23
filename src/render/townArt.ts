@@ -1,6 +1,7 @@
 import type { Decor, TownDef } from '../data/adventure';
 import type { Obstacle } from '../data/layouts';
 import { NATURE_ATLAS, NATURE_PX, type NatureSprite } from '../data/natureAtlas';
+import { NATURE_IMG } from './natureImg';
 
 // ============================================================================
 // Pixel art de los pueblos, generado a partir de los datos (data/adventure.ts).
@@ -90,19 +91,19 @@ const whole = (img: HTMLCanvasElement, x: number, y: number, base: number): Spri
 
 // --- naturaleza del usuario (atlas) -----------------------------------------------
 
-const NATURE: HTMLImageElement | null = typeof Image === 'undefined' ? null : Object.assign(new Image(), { src: 'ui/nature.webp' });
+const NATURE = NATURE_IMG;
 
 /** Árbol, arbusto, mata o roca del atlas con los pies en (x, y). */
-function nature(name: NatureSprite, x: number, y: number, scale = 1): Sprite {
+export function nature(name: NatureSprite, x: number, y: number, scale = 1): Sprite {
   const [sx, sy, sw, sh, foot] = NATURE_ATLAS[name];
   const k = scale / NATURE_PX;
   return { img: NATURE!, src: [sx, sy, sw, sh], x: Math.round(x - (sw * k) / 2), y: Math.round(y - foot * k), w: sw * k, h: sh * k, base: y };
 }
 
 /** Arbustos que quedan bien sueltos (sin setos, tocón ni la roca). */
-const BUSHES: NatureSprite[] = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b13', 'b14', 'b15', 'b16', 'b17', 'b18', 'b20', 'b21', 'b24', 'b25', 'b26', 'b27', 'b28'];
-const PLANTS: NatureSprite[] = ['b11', 'b12', 'b19', 'b29', 'b30'];
-const ROCKS: NatureSprite[] = ['rock0', 'rock1', 'rock2', 'rock3', 'rock4', 'rock5'];
+export const BUSHES: NatureSprite[] = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b13', 'b14', 'b15', 'b16', 'b17', 'b18', 'b20', 'b21', 'b24', 'b25', 'b26', 'b27', 'b28'];
+export const PLANTS: NatureSprite[] = ['b11', 'b12', 'b19', 'b29', 'b30'];
+export const ROCKS: NatureSprite[] = ['rock0', 'rock1', 'rock2', 'rock3', 'rock4', 'rock5'];
 
 /** Edificio en 3/4: tejado de tejas, fachada con puerta y ventanas encendidas. */
 function buildingSprite(o: Obstacle): { img: HTMLCanvasElement; ox: number; oy: number } {

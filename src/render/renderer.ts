@@ -2,6 +2,9 @@ import { guardianPositions, orbitPositions } from '../game/combat';
 import { jumpHeight } from '../game/enemyAI';
 import type { World } from '../game/world';
 import { drawShadow } from './animator';
+import { NATURE_ATLAS, NATURE_PX } from '../data/natureAtlas';
+import { natureReady } from './natureImg';
+import { drawSprite, nature, ROCKS } from './townArt';
 import {
   buildBackground, drawAirField, drawBeam, drawBossRing, drawEnemyBar, drawEnemyMarks, drawExit, drawGroundField,
   drawGuardian, drawHazard, drawMarker, drawMound, drawOrb, drawParticle, drawPickup, drawPickupShadow,
@@ -98,7 +101,15 @@ export class Renderer {
         if (!appearing) drawPlayerAura(ctx, p);
       },
     });
-    if (!w.arena) for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => drawRock(ctx, o) });
+    if (!w.arena) {
+      for (const o of w.obstacles) {
+        if (o.kind !== 'rock') continue;
+        // Montón de rocas del usuario (o la roca dibujada si su imagen aún no ha cargado).
+        const name = ROCKS[Math.abs(Math.round(o.x * 7 + o.y * 13)) % ROCKS.length];
+        const sp = nature(name, o.x + o.w / 2, o.y + o.h - 2, Math.max(0.6, (o.w * 1.45) / (NATURE_ATLAS[name][2] / NATURE_PX)));
+        list.push({ y: o.y + o.h, fn: () => (natureReady() ? drawSprite(ctx, sp) : drawRock(ctx, o)) });
+      }
+    }
     for (const o of w.obstacles) if (o.kind === 'house') list.push({ y: o.y + o.h, fn: () => drawHouse(ctx, o) });
     for (const sp of w.town?.spots ?? []) drawSpotHint(ctx, sp.x, sp.y, w.time);
     for (const n of w.npcs) list.push({ y: n.y, fn: () => { drawShadow(ctx, n.dex, n.x, n.y, n.anim.scale); if (!n.anim.draw(ctx, n.x, n.y)) fallback(ctx, n.x, n.y, '#c0c0c0'); } });

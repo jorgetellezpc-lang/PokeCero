@@ -5,6 +5,9 @@ import {
   WebGLRenderer,
 } from 'three';
 import { BALANCE } from '../config/balance';
+import { NATURE_ATLAS, NATURE_H, NATURE_PX, NATURE_W, type NatureSprite } from '../data/natureAtlas';
+import { NATURE_IMG } from './natureImg';
+import { BUSHES, PLANTS, ROCKS } from './townArt';
 import type { ArenaDef } from '../data/arenas';
 import type { Obstacle } from '../data/layouts';
 import { hasModels, modelFor, type ModelAnim } from '../data/models3d';
@@ -529,8 +532,10 @@ export class Scene3D {
     }
     for (const o of w.obstacles) {
       if (o.kind !== 'rock') continue;
-      bctx.fillStyle = 'rgba(40, 30, 20, 0.35)';
-      bctx.fillRect(Math.floor(o.x / PIXEL), Math.floor(o.y / PIXEL), Math.ceil(o.w / PIXEL), Math.ceil(o.h / PIXEL));
+      bctx.fillStyle = 'rgba(30, 24, 16, 0.32)';
+      bctx.beginPath();
+      bctx.ellipse((o.x + o.w / 2 + 4) / PIXEL, (o.y + o.h - 2) / PIXEL, (o.w * 0.62) / PIXEL, (o.h * 0.32) / PIXEL, 0, 0, Math.PI * 2);
+      bctx.fill();
     }
     const groundTex = pixelTexture(bg);
     const ground = new Mesh(new PlaneGeometry(W, H), new MeshLambertMaterial({ map: groundTex }));
@@ -563,11 +568,17 @@ export class Scene3D {
     };
     const gapL = w.exit.x - w.exit.r - 6;
     const gapR = w.exit.x + w.exit.r + 6;
-    box(WALL_IN - WALL_T, WALL_IN, WALL_IN - WALL_T, H - WALL_IN + WALL_T, WALL_H);
-    box(W - WALL_IN, W - WALL_IN + WALL_T, WALL_IN - WALL_T, H - WALL_IN + WALL_T, WALL_H);
-    box(WALL_IN, gapL, WALL_IN - WALL_T, WALL_IN, WALL_H);
-    box(gapR, W - WALL_IN, WALL_IN - WALL_T, WALL_IN, WALL_H);
-    box(WALL_IN, W - WALL_IN, H - WALL_IN, H - WALL_IN + WALL_T, 14);
+    // En las rutas la sala es un claro del bosque: árboles y arbustos en lugar de muros (solo queda la puerta).
+    const natural = !!w.route;
+    const boards = this.natureBoards(g);
+    const board = boards?.add ?? null;
+    if (!natural) {
+      box(WALL_IN - WALL_T, WALL_IN, WALL_IN - WALL_T, H - WALL_IN + WALL_T, WALL_H);
+      box(W - WALL_IN, W - WALL_IN + WALL_T, WALL_IN - WALL_T, H - WALL_IN + WALL_T, WALL_H);
+      box(WALL_IN, gapL, WALL_IN - WALL_T, WALL_IN, WALL_H);
+      box(gapR, W - WALL_IN, WALL_IN - WALL_T, WALL_IN, WALL_H);
+      box(WALL_IN, W - WALL_IN, H - WALL_IN, H - WALL_IN + WALL_T, 14);
+    }
     // Puerta: pilares, dintel, barrotes y luz cuando se abre.
     box(gapL - 8, gapL + 2, WALL_IN - WALL_T - 2, WALL_IN + 2, WALL_H + 18);
     box(gapR - 2, gapR + 8, WALL_IN - WALL_T - 2, WALL_IN + 2, WALL_H + 18);
@@ -587,11 +598,35 @@ export class Scene3D {
     g.add(glow);
     this.glow = glow;
 
-    // Bosque alrededor de la sala (decorado).
-    g.add(forest(W, H, w.gym.order));
+    // Bosque alrededor de la sala (robles y pinos del usuario; conos si su imagen no está).
+    const rng = new Rng(w.gym.order * 131 + w.roomIndex * 17 + 5);
+    if (board) natureForest(W, H, rng, board, natural, gapL, gapR, bctx);
+    else g.add(forest(W, H, w.gym.order));
 
-    // Obstáculos.
-    for (const o of w.obstacles) g.add(o.kind === 'water' ? this.waterMesh(o) : o.kind === 'house' ? houseMesh(o) : rockMesh(o, theme.rock));
+    // Obstáculos: agua, casas y rocas (montones de rocas del usuario).
+    for (const o of w.obstacles) {
+      if (o.kind === 'water') g.add(this.waterMesh(o));
+      else if (o.kind === 'house') g.add(houseMesh(o));
+      else if (board) {
+        const name = rng.pick(ROCKS);
+        board(name, o.x + o.w / 2, o.y + o.h - 2, Math.max(0.6, (o.w * 1.45) / (NATURE_ATLAS[name][2] / NATURE_PX)));
+      } else g.add(rockMesh(o, theme.rock));
+    }
+    // Decorado suelto junto a los bordes: arbustos, plantas y matas de hierba alta (no estorban).
+    if (board && natural) {
+      const free = (x: number, z: number) => w.obstacles.every((o) => x < o.x - 18 || x > o.x + o.w + 18 || z < o.y - 18 || z > o.y + o.h + 24);
+      for (let i = 0; i < 14; i++) {
+        const left = i % 2 === 0;
+        const x = left ? rng.range(22, 52) : rng.range(W - 52, W - 22);
+        const z = rng.range(90, H - 40);
+        if (!free(x, z)) continue;
+        const r = rng.next();
+        if (r < 0.35) for (let k = 0; k < 3; k++) board(k % 2 ? 'tall0' : 'tall1', x + (k - 1) * 13, z + (k % 2) * 6, 0.6);
+        else board(r < 0.8 ? rng.pick(BUSHES) : rng.pick(PLANTS), x, z, 0.85);
+      }
+    }
+    boards?.flush();
+    if (board) groundTex.needsUpdate = true;
 
     // Capa de suelo para avisos, sombras y zonas.
     this.decal.width = Math.ceil(W * DECAL_RES);
@@ -610,6 +645,47 @@ export class Scene3D {
     this.sun.position.set(W / 2 - 260, 520, H / 2 + 220);
     this.sun.target.position.set(W / 2, 0, H / 2);
     this.scene.add(g);
+  }
+
+  /**
+   * Fábrica de «carteles» del atlas de naturaleza: árboles, arbustos y rocas de pie,
+   * inclinados hacia la cámara como los Pokémon. Se agrupan en una malla instanciada
+   * por dibujo (pocas llamadas de dibujo aunque haya cientos). Null si la imagen no ha cargado.
+   */
+  private natureBoards(g: Group): { add: (name: NatureSprite, x: number, z: number, scale?: number) => void; flush: () => void } | null {
+    if (!NATURE_IMG?.complete || !NATURE_IMG.naturalWidth) return null;
+    const tex = new Texture(NATURE_IMG);
+    tex.colorSpace = SRGBColorSpace;
+    tex.needsUpdate = true;
+    const mat = new MeshBasicMaterial({ map: tex, alphaTest: 0.5 });
+    const rot = new Matrix4().makeRotationX(-this.tilt);
+    const list = new Map<NatureSprite, Matrix4[]>();
+    return {
+      add: (name, x, z, scale = 1) => {
+        const m = new Matrix4().makeTranslation(x, 0, z).multiply(rot).multiply(new Matrix4().makeScale(scale, scale, scale));
+        const arr = list.get(name) ?? [];
+        arr.push(m);
+        list.set(name, arr);
+      },
+      flush: () => {
+        for (const [name, mats] of list) {
+          const [sx, sy, sw, sh, foot] = NATURE_ATLAS[name];
+          const k = 1 / NATURE_PX;
+          const geo = new PlaneGeometry(sw * k, sh * k);
+          (geo.attributes.uv.array as Float32Array).set([
+            sx / NATURE_W, 1 - sy / NATURE_H, (sx + sw) / NATURE_W, 1 - sy / NATURE_H,
+            sx / NATURE_W, 1 - (sy + sh) / NATURE_H, (sx + sw) / NATURE_W, 1 - (sy + sh) / NATURE_H,
+          ]);
+          // Los pies del dibujo en el origen.
+          geo.translate(0, (sh * k) / 2 - (sh - foot) * k, 0);
+          const im = new InstancedMesh(geo, mat, mats.length);
+          mats.forEach((m, i) => im.setMatrixAt(i, m));
+          im.frustumCulled = false;
+          g.add(im);
+        }
+        list.clear();
+      },
+    };
   }
 
   private waterMesh(o: Obstacle): Object3D {
@@ -1042,6 +1118,44 @@ function forest(W: number, H: number, seed: number): Object3D {
   tm.castShadow = cm.castShadow = true;
   g.add(tm, cm);
   return g;
+}
+
+/** Bosque de robles y pinos del usuario alrededor de la sala; en las rutas también cierra los lados. */
+function natureForest(
+  W: number, H: number, rng: Rng, board: (name: NatureSprite, x: number, z: number, scale?: number) => void,
+  natural: boolean, gapL: number, gapR: number, bctx: CanvasRenderingContext2D,
+): void {
+  const tree = (x: number, z: number, s = rng.range(0.85, 1.15)) => {
+    const r = rng.next();
+    board(r < 0.45 ? 'pine' : r < 0.6 ? 'pine2' : r < 0.85 ? 'oak' : 'oak2', x, z, s);
+    if (x > -10 && x < W + 10) {
+      bctx.fillStyle = 'rgba(10, 30, 10, 0.3)';
+      bctx.beginPath();
+      bctx.ellipse((x + 6) / PIXEL, z / PIXEL, 20 * s / PIXEL, 7 * s / PIXEL, 0, 0, Math.PI * 2);
+      bctx.fill();
+    }
+  };
+  for (let z = -40; z < H + 60; z += rng.range(26, 34)) {
+    tree(rng.range(-70, -34), z);
+    tree(W + rng.range(34, 70), z);
+    if (rng.next() < 0.7) tree(rng.range(-130, -80), z + 15);
+    if (rng.next() < 0.7) tree(W + rng.range(80, 130), z + 15);
+  }
+  for (let x = -40; x < W + 40; x += rng.range(30, 40)) {
+    if (x > gapL - 30 && x < gapR + 30) continue;
+    tree(x, rng.range(-70, -40));
+  }
+  if (!natural) return;
+  // Los lados del claro: hilera de árboles sobre la línea del muro, y arbustos abajo.
+  for (let z = 30; z < H + 10; z += rng.range(30, 38)) {
+    tree(rng.range(-8, 2), z);
+    tree(W + rng.range(-2, 8), z);
+  }
+  for (let x = 10; x < W; x += rng.range(34, 44)) {
+    if (x > gapL - 24 && x < gapR + 24) continue;
+    tree(x, rng.range(0, 8), rng.range(0.8, 1));
+  }
+  for (let x = 8; x < W; x += rng.range(22, 30)) board(rng.pick(BUSHES), x, H + rng.range(2, 8), 1);
 }
 
 /** Casa de pueblo: paredes, tejado a dos aguas, puerta y ventanas, del tamaño de su colisión. */

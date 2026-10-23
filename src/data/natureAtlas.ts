@@ -51,3 +51,6 @@ export const NATURE_ATLAS = {
 export type NatureSprite = keyof typeof NATURE_ATLAS;
 /** Píxeles del atlas por unidad del mundo. */
 export const NATURE_PX = 2;
+/** Tamaño del atlas. */
+export const NATURE_W = 1024;
+export const NATURE_H = 350;
