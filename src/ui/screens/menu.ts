@@ -3,7 +3,6 @@ import { getSpecies } from '../../data/pokemon';
 import type { App, Screen } from '../app';
 import { PERMANENT_UPGRADES } from '../../config/balance';
 import { canBuy } from '../../meta/shop';
-import { icon } from '../icons';
 import { h } from '../dom';
 import { renderGachaTab } from './gachaTab';
 import { renderMapTab } from './mapTab';
@@ -75,8 +74,9 @@ export class MenuScreen implements Screen {
       h('button', { class: 'tb-avatar', 'aria-label': `Tu Pokémon: ${sp.name}`, onclick: () => this.setTab('pokemon') },
         h('span', { class: 'tb-face' }, uiImg('avatar')),
         h('span', { class: 'tb-medals' },
-          h('span', { class: 'tb-medals-num' }, icon('medal', 18, 'tb-badge'), `${medals}/8`),
-          h('span', { class: 'tb-bar' }, h('span', { style: `width:${(medals / 8) * 100}%` })),
+          h('b', { class: 'tb-region' }, KANTO.name),
+          h('span', { class: 'tb-medals-num', 'data-testid': 'medals' }, `Medallas ${medals}/8`),
+          h('span', { class: 'tb-dots' }, ...Array.from({ length: 8 }, (_, i) => h('i', { class: i < medals ? 'on' : '' }))),
         ),
       ),
       h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, uiImg('i-coin'), compact(d.gold)),
@@ -102,6 +102,9 @@ export class MenuScreen implements Screen {
       this.tab === 'gacha' ? renderGachaTab(this) :
       renderSettingsTab(this);
     this.content.classList.toggle('full', this.tab === 'map' && this.ui.mapView === 'home');
+    // Las pestañas con escenario a pantalla completa cambian la barra superior (menu.css).
+    this.el.dataset.tab = this.tab;
+    this.el.style.backgroundImage = this.tab === 'pokemon' ? 'url(ui/pk-bg.webp)' : this.tab === 'map' && this.ui.mapView === 'home' ? 'url(ui/map-blur.webp)' : '';
     this.content.replaceChildren(body);
     this.content.scrollTop = scroll;
   }

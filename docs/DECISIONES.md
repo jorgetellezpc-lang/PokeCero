@@ -157,6 +157,26 @@ Cada Pokémon tiene **un solo ataque**, generado a partir de sus tipos. Todas la
 - **Ficha del Pokémon:** la pestaña *Ataque* muestra el ataque, sus valores, a qué evoluciona y con qué requisitos, en qué se convierte si la especie evoluciona y qué mejoras le encajan.
 - **Pantalla de pausa:** muestra las mejoras cogidas.
 
+## Menús v2: Pokémon y Mapa (diseños del usuario)
+
+- **Pokémon:**
+  - El escenario ocupa toda la pantalla y la barra superior solo muestra el oro y los tickets.
+  - A la izquierda está el selector de los 4 elegibles (retratos redondos, con aro dorado en el elegido) y en el centro tu Pokémon.
+  - A la derecha, la ficha: nombre, número, tipo, nivel de entrenamiento y una descripción. Debajo, PS, Defensa y Velocidad con barras.
+  - Más abajo: radar de 6 estadísticas, Entrenamiento y Evolución.
+  - **Entrenamiento:** 4 atributos con su nivel. **Entrenar** abre una hoja con las 10 mejoras permanentes.
+  - **Evolución:** cadena con los niveles a los que evoluciona.
+  - Al final, una tarjeta con el ataque característico y la habilidad, con botones Ataque, Objetos e Información que abren hojas.
+  - El «Nv.» de la ficha es el **nivel de entrenamiento**: la suma de las mejoras compradas. Los Pokémon no tienen nivel permanente.
+  - Pikachu usa la ilustración 3D del diseño. Los otros tres usan su sprite animado hasta que haya ilustración suya.
+- **Mapa:**
+  - La ilustración de Kanto, con las etiquetas de las ciudades dibujadas, ocupa la pantalla manteniendo su proporción; lo que sobra a los lados se rellena con el mapa desenfocado.
+  - Al tocar una ciudad, la tarjeta de abajo muestra su gimnasio: miniatura, tipo, descripción y medalla con 5 puntos de progreso. **Entrar** lleva a la ficha del gimnasio.
+  - Los gimnasios bloqueados o en desarrollo se pueden consultar, pero no se entra en ellos.
+  - Los 6 puntos de Plateada se redibujan con el progreso (mejor sala) y se encienden todos al conseguir la medalla.
+- **Barra superior nueva:** avatar, «Kanto», «Medallas x/8» con 8 puntos, oro, tickets y ajustes, sobre un cristal oscuro.
+- **Adaptable:** tamaños relativos al ancho real del menú (unidades de contenedor). En móviles muy estrechos el selector pasa a una fila. El juego sigue siendo una columna de hasta 480 px centrada en pantallas grandes.
+
 ## Menús (v0.3)
 
 Estética de juego móvil a partir del ejemplo del usuario: paneles azules con brillo, botones amarillos gruesos y tipografías Lilita One y Nunito (con fuentes de respaldo si no cargan).

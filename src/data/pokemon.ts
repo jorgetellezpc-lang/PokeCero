@@ -124,6 +124,14 @@ export const PLAYABLE_POKEMON = ['bulbasaur', 'charmander', 'squirtle', 'pikachu
 
 export const isPlayable = (id: string) => PLAYABLE_POKEMON.includes(id);
 
+/** Texto de presentación en la ficha de los elegibles. */
+export const PLAYABLE_BLURB: Record<string, string> = {
+  pikachu: 'Su energía eléctrica se acumula en las mejillas. Cuanto más se emociona, más potente se vuelve.',
+  charmander: 'La llama de su cola refleja su ánimo: cuanto más arde, más ganas tiene de pelear.',
+  bulbasaur: 'La semilla de su lomo guarda la energía del sol. Tranquilo y resistente, no se rinde nunca.',
+  squirtle: 'Se protege en su caparazón y contraataca con chorros de agua a toda presión.',
+};
+
 export function getSpecies(id: string): PokemonSpecies {
   const p = POKEMON[id];
   if (!p) throw new Error(`Pokémon desconocido: ${id}`);

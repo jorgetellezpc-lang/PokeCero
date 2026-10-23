@@ -51,7 +51,16 @@ test('ciclo completo del prototipo', async ({ page }) => {
 
   await page.goto('/?debug');
   await expect(page.locator('.bottom-nav .nav-btn')).toHaveCount(4);
-  await expect(page.getByTestId('enter')).toContainText('Ciudad Plateada');
+  // Mapa: la tarjeta de abajo es la del gimnasio elegido (Plateada al empezar).
+  await expect(page.getByTestId('gym-card')).toContainText('Ciudad Plateada');
+  await expect(page.getByTestId('gym-card')).toContainText('Medalla Roca');
+  await shot(page, '00-mapa');
+  // Un gimnasio bloqueado se puede consultar, pero no se entra.
+  await page.click('.map2-hot[data-gym="misty"]');
+  await expect(page.getByTestId('gym-card')).toContainText('Ciudad Celeste');
+  await expect(page.getByTestId('enter')).toContainText('Bloqueado');
+  await page.click('.map2-hot[data-gym="brock"]');
+  await expect(page.getByTestId('enter')).toContainText('Entrar');
   await page.getByTestId('enter').click();
   await expect(page.getByTestId('gym-detail')).toContainText('Ciudad Plateada');
   await expect(page.getByTestId('gym-detail')).toContainText('Onix');
@@ -60,25 +69,26 @@ test('ciclo completo del prototipo', async ({ page }) => {
   // Navegación por las cuatro pestañas
   await page.click('[data-tab="pokemon"]');
   await expect(page.locator('.hero-name')).toContainText('Charmander');
-  await expect(page.locator('.upgrade-row')).toHaveCount(10);
   await expect(page.getByTestId('hero-passive')).toContainText('Mar Llamas');
+  // Entrenar abre la hoja con las 10 mejoras permanentes.
+  await page.getByTestId('train').click();
+  await expect(page.locator('.upgrade-row')).toHaveCount(10);
+  await page.getByTestId('sheet-close').click();
   await shot(page, '02-pokemon');
   // Selección: solo los 3 iniciales de Kanto y Pikachu, todos disponibles.
-  await page.getByTestId('select-pokemon').click();
-  await expect(page.getByTestId('pokemon-selector').locator('.poke-slot')).toHaveCount(4);
-  await expect(page.getByTestId('pokemon-selector').locator('.poke-slot.locked')).toHaveCount(0);
-  await shot(page, '02a-seleccion');
+  await expect(page.getByTestId('pokemon-selector').locator('.pk3-face')).toHaveCount(4);
   await page.getByTestId('pick-pikachu').click();
   await expect(page.locator('.hero-name')).toContainText('Pikachu');
-  await page.getByTestId('select-pokemon').click();
+  await shot(page, '02a-seleccion');
   await page.getByTestId('pick-charmander').click();
   await expect(page.locator('.hero-name')).toContainText('Charmander');
   // Ataque característico: uno por Pokémon, con su evolución y sus mejoras posibles.
   await page.click('[data-sub="moves"]');
+  await expect(page.getByTestId('pk-sheet')).toBeVisible();
   await expect(page.getByTestId('signature-attack')).toContainText('Ascuas');
   await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
   await shot(page, '02b-ataque');
-  await page.click('[data-sub="stats"]');
+  await page.getByTestId('sheet-close').click();
   await page.click('[data-tab="settings"]');
   await expect(page.locator('[data-setting="testMode"]')).toBeChecked();
   await shot(page, '03-ajustes');
@@ -189,6 +199,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   // Comprar una mejora permanente con oro
   await page.click('[data-tab="pokemon"]');
   const goldBefore = Number(await page.getByTestId('gold').textContent());
+  await page.getByTestId('train').click();
   await page.getByTestId('buy-spd').click();
   const goldAfter = Number(await page.getByTestId('gold').textContent());
   expect(goldAfter).toBeLessThan(goldBefore);
@@ -199,6 +210,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.getByTestId('gold')).toHaveText(String(goldAfter));
   await expect(page.locator('.topbar')).toContainText('1/8');
   await page.click('[data-tab="pokemon"]');
+  await page.getByTestId('train').click();
   await expect(page.locator('.upgrade-row').nth(2)).toContainText('Nv 1');
 
   expect(errors).toEqual([]);

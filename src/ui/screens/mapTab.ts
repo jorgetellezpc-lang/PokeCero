@@ -6,7 +6,9 @@ import { roomSequence } from '../../game/rooms';
 import { gymStatus, isClaimed, type GymStatus } from '../../meta/rewards';
 import { caveArt } from '../../render/art';
 import { animatedPokemon } from '../anim';
-import { h, pokeImg, typeChip } from '../dom';
+import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
+import { h, pokeImg, toast, typeChip } from '../dom';
+import { typeGlyph } from '../typeGlyph';
 import { icon } from '../icons';
 import type { MenuScreen } from './menu';
 
@@ -21,16 +23,43 @@ const STATUS_LABEL: Record<GymStatus, string> = {
   soon: 'Próximamente',
 };
 
-/** Tamaño de la ilustración de la región (px) y dónde va cada cosa en ella. */
-const ART = { w: 941, h: 1375 };
-const PINS: Record<string, [number, number]> = {
-  brock: [301, 530], misty: [752, 425], surge: [647, 769], erika: [560, 470],
-  koga: [503, 933], sabrina: [691, 570], blaine: [181, 862], giovanni: [369, 709],
+/**
+ * Mapa de Kanto (diseño del usuario, public/ui/map-kanto.webp, 853 × 1545).
+ * Las etiquetas de las ciudades vienen dibujadas; encima solo hay zonas
+ * táctiles en su sitio exacto y, en Plateada, sus puntos de progreso
+ * redibujados. Coordenadas en píxeles de la ilustración.
+ */
+const MAP = { w: 853, h: 1545 };
+const pct = (x: number, y: number, w: number, hh: number) =>
+  `left:${(x / MAP.w) * 100}%;top:${(y / MAP.h) * 100}%;width:${(w / MAP.w) * 100}%;height:${(hh / MAP.h) * 100}%`;
+
+interface MapLabel { pill: [number, number, number, number]; city: [number, number]; gym?: string; name?: string; note?: string }
+const LABELS: MapLabel[] = [
+  { pill: [145, 117, 345, 175], city: [170, 60], name: 'Meseta Añil', note: 'La Liga Pokémon: hacen falta las 8 medallas.' },
+  { pill: [572, 230, 783, 292], city: [620, 320], gym: 'misty' },
+  { pill: [92, 342, 338, 415], city: [210, 270], gym: 'brock' },
+  { pill: [606, 415, 815, 477], city: [700, 550], name: 'Pueblo Lavanda', note: 'Pueblo Lavanda no tiene gimnasio.' },
+  { pill: [378, 495, 588, 555], city: [470, 600], gym: 'sabrina' },
+  { pill: [40, 578, 268, 640], city: [90, 650], gym: 'erika' },
+  { pill: [606, 675, 823, 737], city: [690, 790], gym: 'surge' },
+  { pill: [183, 740, 400, 802], city: [290, 840], gym: 'giovanni' },
+  { pill: [422, 875, 640, 937], city: [520, 970], gym: 'koga' },
+  { pill: [103, 1067, 322, 1128], city: [180, 1010], gym: 'blaine' },
+  { pill: [572, 1123, 790, 1185], city: [640, 1210], name: 'Pueblo Paleta', note: 'Pueblo Paleta: aquí empezó tu aventura.' },
+];
+/** Centro de los 6 puntos dibujados bajo «Ciudad Plateada». */
+const BROCK_DOTS = [184, 208, 232, 256, 280, 305].map((x) => [x, 393] as const);
+
+const GYM_TEXT: Record<string, string> = {
+  brock: 'Una ciudad en lo alto de la montaña, con un gimnasio de gran tradición.',
+  misty: 'Ciudad junto al mar, con un gimnasio de piscinas y una líder experta en el agua.',
+  surge: 'El gran puerto de Kanto. Su líder domina la electricidad.',
+  erika: 'La ciudad más grande de la región, con un gimnasio lleno de plantas.',
+  koga: 'Ciudad del sur con un gimnasio de trampas y venenos.',
+  sabrina: 'En el centro de Kanto, sede de una líder con poderes psíquicos.',
+  blaine: 'Isla volcánica con un gimnasio que arde.',
+  giovanni: 'El último gimnasio de Kanto. Pocos lo han visto abierto.',
 };
-const box = (x: number, y: number, w: number, h: number) =>
-  `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%;width:${(w / ART.w) * 100}%;height:${(h / ART.h) * 100}%`;
-const dot = (cx: number, cy: number) => `left:${((cx - 6.5) / 193) * 100}%;top:${((cy - 6.5) / 200) * 100}%`;
-const at = (x: number, y: number) => `left:${(x / ART.w) * 100}%;top:${(y / ART.h) * 100}%`;
 
 export function renderMapTab(menu: MenuScreen): HTMLElement {
   const region = REGIONS[0];
@@ -45,60 +74,71 @@ export function renderMapTab(menu: MenuScreen): HTMLElement {
 }
 
 // ----------------------------------------------------------------------------
-// Portada: mapa de la región
+// Portada: mapa de la región y tarjeta del gimnasio elegido
 // ----------------------------------------------------------------------------
+
+/** Progreso de un gimnasio de 0 a 1 (mejor sala alcanzada; completado = 1). */
+function progressOf(menu: MenuScreen, region: RegionDef, g: GymDef): number {
+  const store = menu.app.store;
+  if (gymStatus(store, region, g) === 'completed') return 1;
+  const best = store.data.bestRoom[g.id] ?? 0;
+  const rooms = roomSequence(store.data.settings.testMode);
+  return rooms.filter((r) => r <= best).length / rooms.length;
+}
 
 function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   const store = menu.app.store;
-  const medals = (store.data.medals[region.id] ?? []).length;
-  const next = region.gyms.find((g) => gymStatus(store, region, g) === 'available') ?? region.gyms.find((g) => gymStatus(store, region, g) === 'completed');
+  const gym = region.gyms.find((g) => g.id === menu.ui.selectedGym) ?? region.gyms[0];
+  const select = (id: string) => { menu.ui.selectedGym = id; menu.app.audio.sfx('click'); menu.render(); };
 
-  // Los pines dibujados en la ilustración se quedan tal cual; encima solo hay
-  // zonas táctiles invisibles. Si un gimnasio se desbloquea, su pin dibujado
-  // (con candado) se tapa con uno abierto.
-  const pins = region.gyms.map((g) => {
-    const st = gymStatus(store, region, g);
-    const [x, y] = PINS[g.id] ?? [g.mapPos.x * ART.w, g.mapPos.y * ART.h];
-    const open = st === 'available' || st === 'completed';
-    const go = () => menu.go('gym', g.id);
-    if (g.id === 'brock') {
-      // Pin dibujado de Brock + sus puntos de progreso (redibujados en su sitio).
-      const best = store.data.bestRoom[g.id] ?? 0;
-      const rooms = roomSequence(store.data.settings.testMode);
-      const lit = st === 'completed' ? 6 : Math.round((rooms.filter((r) => r <= best).length / rooms.length) * 6);
-      return h('button', { class: `hot ${st}`, style: box(205, 430, 193, 200), 'data-gym': g.id, 'aria-label': g.city, onclick: go },
-        ...[235, 260, 285, 312, 337, 362].map((cx, i) => h('i', { class: `bdot ${i < lit ? 'on' : ''}`, style: dot(cx - 205, 609 - 430) })),
-      );
-    }
-    if (open) {
-      const boss = g.bosses[BALANCE.rooms.bossRoom];
-      return h('button', { class: 'gpin open', style: at(x, y), 'data-gym': g.id, onclick: go },
-        h('span', { class: 'gpin-face' }, boss ? pokeImg(BOSSES[boss].dex, 64) : null),
-        h('span', { class: 'gpin-name' }, g.city.replace('Ciudad ', '')));
-    }
-    if (g.id === 'erika') {
-      // Azulona no está dibujada: mismo pin de candado que los demás.
-      return h('button', { class: 'drawn-lock', style: `${box(x - 55, y - 55, 110, 110)};background-image:url(ui/pin-locked.webp)`, 'data-gym': g.id, onclick: go },
-        h('span', {}, g.city.replace('Ciudad ', '')));
-    }
-    return h('button', { class: 'hot', style: box(x - 53, y - 52, 106, 104), 'data-gym': g.id, 'aria-label': g.city, onclick: go });
+  const hot = LABELS.map((l) => {
+    const [x0, y0, x1, y1] = l.pill;
+    const g = l.gym ? region.gyms.find((x) => x.id === l.gym) : undefined;
+    return h('button', {
+      class: `map2-hot ${g && g.id === gym.id ? 'on' : ''}`, style: pct(x0, y0, x1 - x0, y1 - y0),
+      'data-gym': g?.id ?? '', 'aria-label': g ? g.city : l.name ?? '',
+      onclick: () => (g ? select(g.id) : toast(l.note ?? '')),
+    });
   });
+  const lit = Math.round(progressOf(menu, region, region.gyms[0]) * BROCK_DOTS.length);
+  const dots = BROCK_DOTS.map(([x, y], i) => h('i', { class: `map2-dot ${i < lit ? 'on' : ''}`, style: pct(x - 10, y - 10, 20, 20) }));
 
-  return h('div', { class: 'tab tab-home' },
-    h('div', { class: 'home-stage' },
-      h('div', { class: 'home-sky', style: 'background-image:url(ui/home-sky.webp)' }),
-      h('div', { class: 'home-art' },
-        h('img', { class: 'home-img', src: 'ui/home-kanto.webp', alt: '', draggable: 'false' }),
-        h('h1', { class: 'sr-only' }, `Pokécero · ${region.name}`),
-        // Letrero de la región: el texto y la barra de medallas, en su sitio exacto.
-        h('span', { class: 'medal-text', style: at(137, 291) }, `Medallas ${medals}/8`),
-        h('span', { class: 'medal-bar', style: box(137, 329, 214, 16) }, ...region.gyms.map((_, i) => h('i', { class: i < medals ? 'on' : '' }))),
-        ...pins,
-        next
-          ? h('button', { class: 'hot cta-hot', style: box(245, 1110, 452, 140), 'data-testid': 'enter', onclick: () => menu.go('gym', next.id) },
-            h('span', { class: 'cta-t1' }, 'Entrar'), h('span', { class: 'cta-t2' }, `${next.order}. ${next.city}`))
-          : null,
-      ),
+  // --- tarjeta del gimnasio elegido ---
+  const st = gymStatus(store, region, gym);
+  const canPlay = (st === 'available' || st === 'completed') && gym.playable;
+  const label = LABELS.find((l) => l.gym === gym.id);
+  const [cx, cy] = label?.city ?? [426, 700];
+  const thumb = gym.id === 'brock'
+    ? h('div', { class: 'map2-thumb', style: 'background-image:url(ui/city-plateada.webp)' })
+    : h('div', { class: 'map2-thumb', style: `background-image:url(ui/map-kanto.webp);background-size:330%;background-position:${Math.max(0, Math.min(100, ((cx - 129) / (MAP.w - 258)) * 100))}% ${Math.max(0, Math.min(100, ((cy - 98) / (MAP.h - 197)) * 100))}%` });
+  const pr = progressOf(menu, region, gym);
+  const medal = h('div', { class: 'map2-medal' },
+    gym.id === 'brock' ? h('img', { src: 'ui/medal-roca.webp', alt: '', class: 'map2-medal-ic' }) : h('span', { class: 'map2-medal-ic type', style: `--t:${TYPE_COLORS[gym.type]}` }, typeGlyph(gym.type, 26)),
+    h('div', {}, h('b', {}, gym.badge),
+      h('span', { class: 'map2-medal-dots' }, ...Array.from({ length: 5 }, (_, i) => h('i', { class: i < Math.round(pr * 5) ? 'on' : '' })))),
+  );
+  const enter = h('button', {
+    class: `map2-enter ${canPlay ? '' : 'off'}`, 'data-testid': 'enter', 'aria-label': `Entrar: ${gym.city}`,
+    onclick: () => (canPlay ? menu.go('gym', gym.id) : toast(st === 'locked' ? `Consigue antes la medalla de ${region.gyms[gym.order - 2]?.city ?? 'el gimnasio anterior'}.` : 'Este gimnasio aún está en desarrollo.')),
+  }, h('span', {}, canPlay ? 'Entrar' : st === 'locked' ? 'Bloqueado' : 'Próximamente'), canPlay ? h('span', { class: 'map2-enter-arrow' }, '▶') : icon('lock', 20));
+  const card = h('section', { class: 'map2-card', 'data-testid': 'gym-card', style: pct(22, 1293, 808, 237) },
+    thumb,
+    h('div', { class: 'map2-info' },
+      h('h2', {}, gym.city),
+      h('b', { class: 'map2-sub' }, `Gimnasio de ${TYPE_NAMES[gym.type]}`),
+      h('p', {}, GYM_TEXT[gym.id] ?? ''),
+    ),
+    medal,
+    enter,
+  );
+
+  return h('div', { class: 'tab map2' },
+    h('h1', { class: 'sr-only' }, `Pokécero · ${region.name}`),
+    h('div', { class: 'map2-art' },
+      h('img', { class: 'map2-img', src: 'ui/map-kanto.webp', alt: `Mapa de ${region.name}`, draggable: 'false' }),
+      ...dots,
+      ...hot,
+      card,
     ),
   );
 }
