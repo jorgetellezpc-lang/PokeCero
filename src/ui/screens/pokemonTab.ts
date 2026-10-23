@@ -1,31 +1,23 @@
-import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
-import { TOWNS } from '../../data/adventure';
-import { isVisited } from '../../meta/adventure';
+import { BALANCE } from '../../config/balance';
 import { ITEMS, ITEM_IDS } from '../../data/items';
 import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
 import { getSpecies, obtainablePokemon, PLAYABLE_BLURB, sideOf, type PokemonSpecies } from '../../data/pokemon';
 import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
 import { passiveOf } from '../../game/abilities';
-import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
+import { xpToNext } from '../../game/levels';
+import { active, cardLabel, ownedOf, selectOwned, statsOf } from '../../meta/team';
+import { CAPTURE_COST } from '../../meta/capture';
 import { animatedPokemon } from '../anim';
 import { h, pokeImg, toast } from '../dom';
-import { icon, type IconName } from '../icons';
+import { icon } from '../icons';
 import { typeGlyph } from '../typeGlyph';
 import type { App } from '../app';
 import { uiImg, type MenuScreen } from './menu';
 
 // Pestaña Pokémon: calcada del diseño del usuario (selector, tu Pokémon sobre
-// la roca, ficha, PS/Defensa/Velocidad, radar, entrenamiento y evolución).
-// Entrenar abre las mejoras en una hoja; al tocar tu Pokémon se abre su ficha
+// la roca, ficha con nivel, PS/Defensa/Velocidad, radar, mejoras y evolución).
+// «Ver mejoras» abre las cartas permanentes en una hoja; al tocar tu Pokémon se abre su ficha
 // completa (habilidad, ataque, objetos e información).
-
-/** Icono de cada mejora: recorte del diseño si lo hay; si no, icono dibujado. */
-const UP_ICON: Record<PermanentUpgradeDef['id'], { img?: string; svg?: IconName; color: string }> = {
-  hp: { img: 'u-heart', color: '#ff5a8a' }, atk: { img: 'u-sword', color: '#ffb02e' }, spd: { img: 'u-boot', color: '#3ab0ff' },
-  cd: { img: 'u-bolt', color: '#ffd23a' }, def: { img: 'u-shield', color: '#8fa4ff' }, regen: { svg: 'leaf', color: '#4ad06a' },
-  magnet: { svg: 'magnet', color: '#ff5a6a' }, xp: { svg: 'book', color: '#3ac8ff' }, coins: { img: 'u-bag', color: '#ffc83a' },
-  crit: { img: 'u-burst', color: '#ff9a2a' },
-};
 
 /**
  * Lienzo del diseño (853 × 1844 px, la captura entera del usuario; abajo va la barra de navegación). Todo se coloca
@@ -42,17 +34,23 @@ const FACE_Y = [293, 408, 515, 622];
 
 export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   const store = menu.app.store;
-  const d = store.data;
-  const sp = getSpecies(d.selectedPokemon);
-  const perks = perksFor(store, sp.id);
+  const mon = active(store)!;
+  const sp = getSpecies(mon.species);
+  const stats = statsOf(mon);
   const side = sideOf(sp);
 
-  // --- selector ---
-  const faces = PICKER.map(getSpecies).map((p, i) => h('button', {
-    class: `pk4-face ${p.id === sp.id ? 'on' : ''}`, style: at(40, FACE_Y[i] - 45, 130, FACE_Y[i] + 45),
-    'data-testid': `pick-${p.id}`, 'aria-label': p.name, 'aria-pressed': String(p.id === sp.id),
-    onclick: () => { if (p.id !== sp.id) { store.update((x) => { x.selectedPokemon = p.id; }); menu.app.audio.sfx('click'); } },
-  }, uiImg(`pk-face-${p.id}`, 'pk4-face-img')));
+  // --- selector: los tuyos; los demás, con candado (se capturan en el laboratorio) ---
+  const faces = PICKER.map(getSpecies).map((p, i) => {
+    const own = ownedOf(store, p.id);
+    return h('button', {
+      class: `pk4-face ${p.id === mon.line ? 'on' : ''} ${own ? '' : 'locked'}`, style: at(40, FACE_Y[i] - 45, 130, FACE_Y[i] + 45),
+      'data-testid': `pick-${p.id}`, 'aria-label': own ? p.name : `${p.name} (sin capturar)`, 'aria-pressed': String(p.id === mon.line),
+      onclick: () => {
+        if (!own) return toast(`${p.name}: captúralo en el laboratorio de Pueblo Paleta (reto 1 contra 1, ${CAPTURE_COST} tickets).`);
+        if (p.id !== mon.line) { selectOwned(store, p.id); menu.app.audio.sfx('click'); }
+      },
+    }, uiImg(`pk-face-${p.id}`, 'pk4-face-img'), own ? null : h('span', { class: 'pk4-lock' }, icon('lock', 26)));
+  });
 
   // --- tu Pokémon (ilustración 3D si la hay; si no, su sprite) sobre la roca. Al tocarlo, su ficha completa. ---
   const passive = passiveOf(sp);
@@ -66,9 +64,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     : animatedPokemon(sp.dex, 190, { cls: 'pk4-hero-sprite' }));
 
   // --- ficha ---
-  const ups = PERMANENT_UPGRADES.map((u) => upgradeLevel(store, sp.id, u.id));
-  const trained = ups.reduce((a, b) => a + b, 0);
-  const trainMax = PERMANENT_UPGRADES.reduce((a, u) => a + u.maxLevel, 0);
+  const toNext = mon.level >= BALANCE.levels.max ? 0 : xpToNext(mon.level);
   const color = TYPE_COLORS[sp.types[0]];
   const idCard = h('section', { class: 'pk4-card', style: at(482, 257, 826, 588) });
   const els: HTMLElement[] = [
@@ -78,9 +74,9 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
       h('span', { class: 'hero-name' }, sp.name), h('span', { class: 'pk4-star' }, '★')),
     h('div', { class: 'pk4-meta', style: at(505, 340, 745, 372) }, h('span', {}, `N.º ${String(sp.dex).padStart(3, '0')}`), h('span', {}, `Tipo ${TYPE_NAMES[sp.types[0]]}`)),
     h('span', { class: 'pk4-type', style: `${at(757, 336, 807, 386)};--t:${color}`, title: sp.types.map((t) => TYPE_NAMES[t]).join(' / ') }, typeGlyph(sp.types[0], 26)),
-    h('div', { class: 'pk4-lv', style: at(505, 398, 805, 430), title: 'Nivel de entrenamiento (mejoras compradas con oro)' },
-      h('b', {}, `Nv. ${trained}`), h('small', {}, `${trained} / ${trainMax}`)),
-    h('div', { class: 'pk4-xp', style: at(505, 436, 805, 448) }, h('i', { style: `width:${(trained / trainMax) * 100}%` })),
+    h('div', { class: 'pk4-lv', style: at(505, 398, 805, 430), title: 'Nivel (1-100) y experiencia hasta el siguiente', 'data-testid': 'pk-level' },
+      h('b', {}, `Nv. ${mon.level}`), h('small', {}, toNext ? `${Math.floor(mon.xp)} / ${toNext} EXP` : 'Nivel máximo')),
+    h('div', { class: 'pk4-xp', style: at(505, 436, 805, 448) }, h('i', { style: `width:${toNext ? Math.min(100, (mon.xp / toNext) * 100) : 100}%` })),
     h('p', { class: 'pk4-blurb', style: at(505, 472, 812, 575) }, PLAYABLE_BLURB[sp.id] ?? ''),
   ];
 
@@ -88,9 +84,9 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   els.push(h('section', { class: 'pk4-card', style: at(482, 608, 826, 880) }));
   const def = side === 'special' ? sp.stats.sd : sp.stats.df;
   const vitals: [string, string, number, number, string][] = [
-    ['u-heart', 'PS', Math.round(sp.stats.hp + perks.hp), STAT_MAX.hp, 'linear-gradient(90deg, #ff4a3a, #ff8a3a)'],
+    ['u-heart', 'PS', stats.hp, Math.max(stats.hp, STAT_MAX.hp * 2), 'linear-gradient(90deg, #ff4a3a, #ff8a3a)'],
     ['u-shield', 'Defensa', def, STAT_MAX.df, 'linear-gradient(90deg, #2a7ff0, #5ab8ff)'],
-    ['u-boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul), STAT_MAX.speed, 'linear-gradient(90deg, #22b8ff, #6ae0ff)'],
+    ['u-boot', 'Velocidad', stats.speed, STAT_MAX.speed, 'linear-gradient(90deg, #22b8ff, #6ae0ff)'],
   ];
   vitals.forEach(([img, label, v, max, grad], i) => {
     const y = 656 + i * 80;
@@ -107,27 +103,24 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     h('h3', { class: 'pk4-title', style: at(58, 940, 430, 990) }, 'Estadísticas'),
     radarChart(sp));
 
-  // --- entrenamiento ---
-  const TRAIN: { id: PermanentUpgradeDef['id']; img: string; label: string }[] = [
-    { id: 'hp', img: 'u-heart', label: 'Vida' }, { id: 'atk', img: 'u-sword', label: 'Ataque' },
-    { id: 'def', img: 'u-shield', label: 'Defensa' }, { id: 'spd', img: 'u-boot', label: 'Velocidad' },
+  // --- mejoras permanentes (una carta por nivel) ---
+  const n = (f: (c: (typeof mon.cards)[number]) => boolean) => mon.cards.filter(f).length;
+  const TRAIN: { img: string; label: string; v: number }[] = [
+    { img: 'u-sword', label: 'Ataque', v: n((c) => c.type === 'attack' || c.type === 'attackEvolution' || (c.type === 'stat' && (c.stat === 'atk' || c.stat === 'cd'))) },
+    { img: 'u-heart', label: 'Vida', v: n((c) => c.type === 'stat' && (c.stat === 'hp' || c.stat === 'rgn')) },
+    { img: 'u-shield', label: 'Defensa', v: n((c) => c.type === 'stat' && c.stat === 'def') },
+    { img: 'u-burst', label: 'Habilidades', v: n((c) => c.type === 'ability') },
   ];
-  const canTrain = PERMANENT_UPGRADES.some((u) => canBuy(store, sp.id, u.id) === 'ok');
-  const shopOpen = Object.values(TOWNS).some((t) => isVisited(store, t.id) && t.spots.some((x) => x.kind === 'shop'));
   const SLOT_X = [494, 573, 653, 732];
   els.push(h('section', { class: 'pk4-card', style: at(467, 920, 827, 1317) }),
-    h('h3', { class: 'pk4-title', style: at(497, 940, 820, 990) }, 'Entrenamiento'),
-    h('p', { class: 'pk4-desc', style: at(497, 996, 815, 1062) }, 'Mejora sus atributos con oro en la tienda de los pueblos.'),
+    h('h3', { class: 'pk4-title', style: at(497, 940, 820, 990) }, 'Mejoras'),
+    h('p', { class: 'pk4-desc', style: at(497, 996, 815, 1062) }, `${mon.cards.length} permanentes. Cada nivel, una más.`),
     ...TRAIN.map((t, i) => h('div', { class: 'pk4-slot', style: at(SLOT_X[i], 1081, SLOT_X[i] + 71, 1182), title: t.label },
-      uiImg(t.img), h('b', {}, String(upgradeLevel(store, sp.id, t.id))))),
-    // El entrenamiento se compra en la tienda de los pueblos (Ciudad Verde, Ciudad Plateada).
+      uiImg(t.img), h('b', {}, String(t.v)))),
     h('button', {
-      class: `pk4-train ${canTrain && shopOpen ? 'ready' : ''}`, style: at(488, 1203, 806, 1288), 'data-testid': 'train',
-      // En modo admin se entrena desde aquí mismo.
-      onclick: () => store.data.admin ? openSheet(menu, `Entrenar a ${sp.name}`, () => upgrades(menu, sp)) : toast(shopOpen
-        ? 'Entrena en la tienda de un pueblo: Ciudad Verde o Ciudad Plateada.'
-        : 'La primera tienda está en Ciudad Verde: llega por la Ruta 1 desde Pueblo Paleta.'),
-    }, upArrow(), store.data.admin ? 'Entrenar' : 'Ir a la tienda'));
+      class: 'pk4-train ready', style: at(488, 1203, 806, 1288), 'data-testid': 'train',
+      onclick: () => openSheet(menu, `Mejoras de ${sp.name}`, () => cardList(mon.cards)),
+    }, upArrow(), 'Ver mejoras'));
 
   // --- evolución ---
   const chain: PokemonSpecies[] = [sp];
@@ -149,7 +142,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   );
 }
 
-/** Flecha gruesa del botón Entrenar (como en el diseño). */
+/** Flecha gruesa del botón de mejoras (como en el diseño). */
 function upArrow(): HTMLElement {
   const box = h('span', { class: 'pk4-arrow' });
   box.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 12h6v10h6V12h6z" fill="currentColor"/></svg>';
@@ -213,37 +206,25 @@ export function openSheet(menu: Host, title: string, body: () => HTMLElement): v
   document.body.appendChild(overlay);
 }
 
-export function upgrades(menu: Host, sp: PokemonSpecies): HTMLElement {
-  const store = menu.app.store;
-  const rows = PERMANENT_UPGRADES.map((u) => {
-    const lv = upgradeLevel(store, sp.id, u.id);
-    const state = canBuy(store, sp.id, u.id);
-    const cost = permanentUpgradeCost(u, lv);
-    const ic = UP_ICON[u.id];
-    const btn = h('button', {
-      class: `buy-btn2 ${state === 'ok' ? '' : 'disabled'} ${state === 'max' ? 'max' : ''}`,
-      'data-testid': `buy-${u.id}`,
-      onclick: () => {
-        const r = buyUpgrade(store, sp.id, u.id);
-        if (r === 'gold') toast('Oro insuficiente');
-        else if (r === 'max') toast('Nivel máximo');
-        else menu.app.audio.sfx('confirm');
-      },
-    }, state === 'max' ? 'MÁX' : h('span', { class: 'price' }, uiImg('i-coin'), String(cost)));
-    return h('div', { class: 'upgrade-row up2', style: `--c:${ic.color}` },
-      h('div', { class: 'up2-icon' }, ic.img ? uiImg(ic.img) : icon(ic.svg!, 40)),
-      h('div', { class: 'up2-body' },
-        h('div', { class: 'up2-name' }, u.name, h('span', { class: 'up2-lv' }, `Nv ${lv}/${u.maxLevel}`)),
-        h('div', { class: 'up2-desc' }, `${u.description} por nivel`),
-        h('div', { class: 'up2-bar' }, ...Array.from({ length: u.maxLevel }, (_, i) => h('i', { class: i < lv ? 'on' : '' }))),
-      ),
-      btn,
-    );
-  });
-  return h('section', { class: 'panel2 pk-body' },
-    h('div', { class: 'pk-body-head' }, h('h3', {}, `Mejoras de ${sp.name}`),
-      h('p', {}, 'Se compran con oro, se conservan entre partidas y solo cuentan cuando juegas con este Pokémon.')),
-    ...rows,
+/** Lista de las cartas permanentes, agrupadas y contadas. */
+function cardList(cards: Parameters<typeof cardLabel>[0][]): HTMLElement {
+  const groups = new Map<string, Map<string, { text: string; n: number }>>();
+  for (const c of cards) {
+    const l = cardLabel(c);
+    const g = groups.get(l.group) ?? new Map();
+    const e = g.get(l.name) ?? { text: l.text, n: 0 };
+    e.n++;
+    g.set(l.name, e);
+    groups.set(l.group, g);
+  }
+  return h('section', { class: 'panel2 pk-body', 'data-testid': 'card-list' },
+    h('div', { class: 'pk-body-head' }, h('h3', {}, 'Mejoras permanentes'),
+      h('p', {}, 'Al subir de nivel en una ruta o un gimnasio eliges una carta. Se guardan si superas la ruta o el gimnasio; si caes, se pierden con la experiencia.')),
+    cards.length ? null : h('p', { class: 'note' }, 'Aún no tiene ninguna. ¡Supera la Ruta 1 para conseguir las primeras!'),
+    ...[...groups].map(([group, list]) => h('div', {},
+      h('h4', { class: 'pk-h4' }, group),
+      h('div', { class: 'move-grid' }, ...[...list].map(([name, e]) => h('div', { class: 'move-cell', style: '--t:#ffd23a' },
+        h('b', {}, e.n > 1 ? `${name} ×${e.n}` : name), h('small', {}, e.text)))))),
   );
 }
 
@@ -260,7 +241,7 @@ function moves(sp: PokemonSpecies): HTMLElement {
   const fits = ATTACK_UPGRADES.filter((u) => u.fits(sig, raw));
   return h('section', { class: 'panel2 pk-body', 'data-testid': 'signature-attack' },
     h('div', { class: 'pk-body-head' }, h('h3', {}, 'Ataque característico'),
-      h('p', {}, 'Cada Pokémon tiene un único ataque que sale de sus tipos. Todas las cartas de ataque de la partida lo mejoran.')),
+      h('p', {}, 'Cada Pokémon tiene un único ataque que sale de sus tipos. Las cartas de ataque lo mejoran para siempre.')),
     h('div', { class: 'move-cell start', style: `--t:${colorA}` },
       h('b', {}, sig.name), h('small', {}, `${typeLine} · ${sig.cat === 'special' ? 'Especial' : 'Físico'}`), h('small', {}, sig.desc),
       sig.note ? h('small', {}, sig.note) : null),
@@ -269,7 +250,7 @@ function moves(sp: PokemonSpecies): HTMLElement {
     sig.kind === 'chain' ? stat('Saltos', String(s.count ?? 1)) : sig.kind === 'beam' ? null : stat('Proyectiles', String(s.count ?? 1)),
     h('div', { class: 'move-cell', style: '--t:#ffd23a' },
       h('b', {}, `Evoluciona a ${sig.evoName}`),
-      h('small', {}, `En partida, desde el nivel ${A.evoLevel} con ${A.evoUpgrades} mejoras del ataque, entre ellas ${ATTACK_UPGRADE[EVO_KEY[sig.kind]].name}.`),
+      h('small', {}, `Desde el nivel ${A.evoLevel}, con ${A.evoUpgrades} mejoras del ataque, entre ellas ${ATTACK_UPGRADE[EVO_KEY[sig.kind]].name}.`),
       h('small', {}, sig.evoText.replace(/^./, (c) => c.toUpperCase()))),
     nextSig && nextSig.name !== sig.name
       ? h('p', { class: 'note' }, `Al evolucionar a ${next!.name}, el ataque pasa a ser ${nextSig.name} y conserva las mejoras.`) : null,

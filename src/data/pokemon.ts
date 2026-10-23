@@ -71,7 +71,9 @@ const LEVEL_EVOLUTIONS: [number, number, number][] = [
   [72, 73, 30], [74, 75, 25], [77, 78, 40], [79, 80, 37], [81, 82, 30], [84, 85, 31],
   [86, 87, 34], [88, 89, 38], [92, 93, 25], [96, 97, 26], [98, 99, 28], [100, 101, 30],
   [104, 105, 28], [109, 110, 35], [111, 112, 42], [116, 117, 32], [118, 119, 33],
-  [129, 130, 20], [138, 139, 40], [140, 141, 40], [147, 148, 30], [148, 149, 55],
+  [129, 130, 20],
+  // Pikachu evoluciona con Piedra Trueno; aquí, al nivel 30 (es uno de los iniciales).
+  [25, 26, 30], [138, 139, 40], [140, 141, 40], [147, 148, 30], [148, 149, 55],
 ];
 
 /** Pre-evoluciones (también por piedra/intercambio) para saber la forma base de cada línea. */

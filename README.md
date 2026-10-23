@@ -33,7 +33,7 @@ npm run sim        # simulador de balance: un bot juega partidas completas e imp
 
 ## Aventura
 
-La partida empieza en **Pueblo Paleta**: se pasea por el pueblo, se habla con sus Pokémon y se sale por el norte a la **Ruta 1** (5 salas de combate) hasta **Ciudad Verde**, y de ahí por la **Ruta 2** a **Ciudad Plateada**, donde está el gimnasio de Brock. Las mejoras permanentes se compran en la tienda de los pueblos.
+Una partida nueva empieza con un **test de compatibilidad** que te asigna tu inicial (o eliges otro); los demás se capturan en un reto 1 contra 1 en el laboratorio. Cada Pokémon sube de nivel (hasta el 100) y gana una mejora permanente por nivel. La aventura empieza en **Pueblo Paleta**: se pasea por el pueblo, se habla con sus Pokémon y se sale por el norte a la **Ruta 1** (5 salas de combate) hasta **Ciudad Verde**, y de ahí por la **Ruta 2** a **Ciudad Plateada**, donde está el gimnasio de Brock.
 
 ## Controles
 

@@ -14,7 +14,7 @@ import type { GymDef } from './types';
 // (render/townArt.ts). Diseños PROVISIONALES.
 // ============================================================================
 
-export type SpotKind = 'talk' | 'sign' | 'shop' | 'center' | 'gym' | 'exit';
+export type SpotKind = 'talk' | 'sign' | 'shop' | 'center' | 'gym' | 'exit' | 'lab';
 
 /** Algo con lo que interactuar al acercarse. */
 export interface Spot {
@@ -193,7 +193,7 @@ export const TOWNS: Record<string, TownDef> = {
       { kind: 'sign', x: 420, y: 2184, label: 'Leer', title: 'Cartel', lines: ['PUEBLO PALETA', 'Donde empiezan todos los sueños.'] },
       { kind: 'talk', x: 195, y: 1334, label: 'Llamar', title: 'Casa de tu familia', lines: ['—¡Ten mucho cuidado ahí fuera!', '—Y vuelve cuando quieras, aquí siempre hay sitio para ti.'] },
       { kind: 'talk', x: 525, y: 1334, label: 'Llamar', title: 'Casa de tu rival', lines: ['No contesta nadie. Tu rival ya ha salido hacia Ciudad Verde…'] },
-      { kind: 'talk', x: 520, y: 1884, label: 'Entrar', title: 'Laboratorio Pokémon', lines: ['—¡Hola! Tu Pokémon y tú hacéis buen equipo.', '—Sigue la Ruta 1 hacia el norte. En Ciudad Plateada te espera Brock, el primer líder de gimnasio.'] },
+      { kind: 'lab', x: 520, y: 1884, label: 'Entrar', title: 'Laboratorio Pokémon', lines: ['—¡Hola! Tu Pokémon y tú hacéis buen equipo.', '—Aquí viven los otros Pokémon iniciales. Son muy fuertes: si quieres que uno se una a ti, tendrás que ganarle en un combate uno contra uno.'] },
       { kind: 'talk', x: 230, y: 736, label: 'Hablar', title: 'Pidgey', dex: 16, lines: ['¡Pidgey! ¡Pid-pidgey!', '(Parece que te anima a seguir hacia el norte.)'] },
       { kind: 'talk', x: 600, y: 1966, label: 'Hablar', title: 'Bulbasaur', dex: 1, lines: ['¡Bulba, bulbasaur!', '(Es uno de los Pokémon del laboratorio.)'] },
     ],

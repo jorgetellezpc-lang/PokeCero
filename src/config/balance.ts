@@ -54,15 +54,22 @@ export const BALANCE = {
     critMult: 1.5,
   },
 
-  experience: {
-    /** Nivel temporal máximo de una partida (blueprint: 36). Configurable. */
-    maxLevel: 36,
-    /** XP del nivel L al L+1: base + linear*L + L^power. PROVISIONAL. */
-    base: 5,
-    linear: 2,
-    power: 1.35,
-    /** La XP de cada enemigo crece con la sala: xp * (1 + xpPerRoom * (sala-1)). */
-    xpPerRoom: 0.02,
+  /**
+   * Nivel permanente de cada Pokémon (game/levels.ts). Curva de experiencia
+   * «media rápida» (n³). PROVISIONAL.
+   */
+  levels: {
+    max: 100,
+    /** Nivel con el que empieza el inicial. */
+    start: 5,
+    /** Crecimiento de vida, daño y regeneración por nivel (igual para ti y para los enemigos). */
+    statPerLevel: 0.08,
+    /** Experiencia por derrota = (8 + total de estadísticas/20) × nivel / 7 × esto. */
+    xpYield: 0.8,
+    minibossXp: 4,
+    bossXp: 8,
+    /** Nivel de los enemigos respecto al tuyo (se adaptan). */
+    enemyOffset: { normal: -1, strong: 1, miniboss: 1, boss: 2, mega: 3 },
   },
 
   rooms: {
@@ -72,7 +79,7 @@ export const BALANCE = {
     /** Salas que se juegan en "modo prueba" (gimnasio corto). Usa números reales de sala. */
     testModeRooms: [1, 4, 8, 20, 24, 40, 44, 50],
     /** Multiplicador de XP en modo prueba para poder ver la evolución en una partida corta. */
-    testModeXpMult: 2.5,
+    testModeXpMult: 1,
     /** En modo prueba la sala N escala como la sala N*factor (el jugador llega menos mejorado). */
     testModeScalingFactor: 0.5,
     /** Curación al completar una sala normal / de jefe (fracción de vida máxima). */
@@ -107,6 +114,16 @@ export const BALANCE = {
   bosses: {
     miniboss: { hp: 20, damage: 1.5 },
     boss: { hp: 55, damage: 2.0 },
+    /** Reto de captura 1v1 (meta/capture.ts): muy difícil. */
+    mega: { hp: 40, damage: 2.4 },
+  },
+
+  /** Captura de los otros iniciales. PROVISIONAL. */
+  capture: {
+    /** Tickets por intento. */
+    cost: 10,
+    /** El tramo de fuerza del reto sube con tu nivel (1 tramo cada tantos niveles). */
+    levelsPerTier: 12,
   },
 
   enemies: {
@@ -130,7 +147,7 @@ export const BALANCE = {
      */
     power: 1.8,
     /** Evolución del ataque: nivel mínimo, mejoras cogidas y la mejora clave de su comportamiento. */
-    evoLevel: 10,
+    evoLevel: 22,
     evoUpgrades: 5,
     /** Daño de la explosión, de la zona (por tic de 0,5 s) y de cada fragmento, sobre el golpe. */
     explodeK: 0.5,
@@ -174,30 +191,3 @@ export const BALANCE = {
     refund: { 1: 15, 2: 30, 3: 60, 4: 120, 5: 300 } as Record<number, number>,
   },
 } as const;
-
-/** Mejoras permanentes compradas con oro, por Pokémon (PokéSurvivor). PROVISIONAL. */
-export interface PermanentUpgradeDef {
-  id: 'hp' | 'atk' | 'spd' | 'cd' | 'def' | 'regen' | 'magnet' | 'xp' | 'coins' | 'crit';
-  name: string;
-  description: string;
-  maxLevel: number;
-  costBase: number;
-  costGrowth: number;
-}
-
-export const PERMANENT_UPGRADES: PermanentUpgradeDef[] = [
-  { id: 'hp', name: 'Vitalidad', description: '+8 de vida', maxLevel: 10, costBase: 60, costGrowth: 1.35 },
-  { id: 'atk', name: 'Fuerza', description: '+4% de daño', maxLevel: 10, costBase: 80, costGrowth: 1.38 },
-  { id: 'spd', name: 'Zancada', description: '+3% de velocidad', maxLevel: 8, costBase: 70, costGrowth: 1.4 },
-  { id: 'cd', name: 'Reflejos', description: '-3% de recarga', maxLevel: 8, costBase: 90, costGrowth: 1.42 },
-  { id: 'def', name: 'Coraza', description: '+2% de defensa', maxLevel: 8, costBase: 80, costGrowth: 1.4 },
-  { id: 'regen', name: 'Síntesis', description: '+0,2 de vida por segundo', maxLevel: 5, costBase: 120, costGrowth: 1.5 },
-  { id: 'magnet', name: 'Imán', description: '+12% de radio de recogida', maxLevel: 6, costBase: 50, costGrowth: 1.4 },
-  { id: 'xp', name: 'Sabiduría', description: '+5% de experiencia', maxLevel: 8, costBase: 100, costGrowth: 1.42 },
-  { id: 'coins', name: 'Fortuna', description: '+8% de oro', maxLevel: 8, costBase: 120, costGrowth: 1.45 },
-  { id: 'crit', name: 'Golpe Crítico', description: '+3% de críticos (×1,5 de daño)', maxLevel: 10, costBase: 90, costGrowth: 1.4 },
-];
-
-export function permanentUpgradeCost(def: PermanentUpgradeDef, currentLevel: number): number {
-  return Math.round((def.costBase * Math.pow(def.costGrowth, currentLevel)) / 10) * 10;
-}

@@ -164,7 +164,7 @@ Cada Pokémon tiene **un solo ataque**, generado a partir de sus tipos. Todas la
   - El fondo es su escenario, sin interfaz y sin Pikachu.
   - Contenido: selector, tu Pokémon sobre la roca, ficha, PS/Defensa/Velocidad, radar, Entrenamiento y Evolución. La barra de navegación queda encima del escenario, como en el diseño.
   - Lo que el diseño no muestra, pero sigue accesible:
-    - **Entrenar** ya no abre las mejoras: avisa de que se compran en la tienda de los pueblos (ver *Aventura*).
+    - **Ver mejoras** abre la lista de cartas permanentes del Pokémon (ver *Inicial único, niveles y captura*).
     - **Al tocar tu Pokémon** se abre su ficha completa: habilidad, ataque característico, objetos e información.
   - El «Nv.» es el **nivel de entrenamiento** (las mejoras compradas). Los Pokémon no tienen nivel permanente.
   - **Ilustraciones 3D:** de momento solo hay la de Pikachu, recortada del diseño. Charmander, Bulbasaur y Squirtle usan su sprite animado hasta tener la suya: basta añadir `public/ui/pk-3d-<especie>.webp` y su id en `HERO_ART` (`pokemonTab.ts`).
@@ -187,9 +187,25 @@ Decidido con el usuario:
   - Coste medido (Chromium de escritorio): unos 0,4 s para generar un pueblo al entrar y 0,3 ms por fotograma. En un móvil la generación tardará más.
   - El gimnasio es un edificio dentro de la ciudad (Plateada → Brock). El de Ciudad Verde está cerrado.
 - **Rutas:** 5 salas de combate estilo Archero con los salvajes de la ruta; el más fuerte aparece en la última sala. Cada ruta empieza de cero (nivel y cartas). Si caes, vuelves al pueblo anterior; el oro ganado se queda.
-- **Tienda:** las mejoras permanentes (el entrenamiento) se compran en la tienda de los pueblos (Verde y Plateada). En la pestaña Pokémon solo se ve el nivel.
+- **Tienda:** de momento no vende nada (se preparan objetos: pociones, caramelos raros…). Las mejoras con oro se quitaron (ver *Inicial único, niveles y captura*).
 - **Partidas guardadas:** todas empiezan en Pueblo Paleta, aunque ya tengan la medalla de Brock (la conservan).
 - Datos en `src/data/adventure.ts`; progreso en `src/meta/adventure.ts`; pantalla del pueblo en `src/ui/screens/town.ts`.
+
+## Inicial único, niveles y captura (v3 del guardado)
+
+Decidido con el usuario:
+
+- **Inicial único.** Una partida nueva empieza con un **test de compatibilidad** de 8 preguntas, como en Pokémon Mundo Misterioso (`ui/screens/starter.ts`). Cada respuesta suma a uno o varios iniciales; gana el que más suma (en empate, el que favoreció la última respuesta). Te dice tu naturaleza y tu compañero, y puedes aceptarlo o elegir otro de los cuatro. Empieza en el **nivel 5**.
+- **Los otros iniciales se capturan** en el laboratorio de Pueblo Paleta: reto 1 contra 1 contra un «mega jefe» muy difícil (`meta/capture.ts`), abierto desde el principio. **Cada intento cuesta 10 tickets** (se cobran al empezar). Su forma y su nivel se adaptan al tuyo (tu nivel + 3: si tú vas por el nivel 33, el reto de Squirtle ya es un Blastoise), y su fuerza sube un tramo cada 12 niveles tuyos. Al ganar se une a tu equipo con tu nivel y las cartas que habría elegido la casa al subir.
+- **Nivel permanente 1-100 por Pokémon** (`game/levels.ts`): curva «media rápida» de Pokémon (n³ de experiencia total). La experiencia por derrota es como en Pokémon: base de la especie × nivel / 7 (×4 un miniboss, ×8 un jefe).
+- **Correlación vida/daño:** la vida, el daño y la regeneración crecen con el nivel con un mismo factor (1 en el nivel 5, ~3,7 en el 50, ~6,8 en el 100). **Los enemigos se adaptan a tu nivel** (un nivel menos los normales; +1 el fuerte de la ruta y los minibosses; +2 los jefes; +3 el reto de captura) y usan el mismo factor. Lo que te hace más fuerte de verdad son las cartas y las evoluciones.
+- **Cartas permanentes:** cada subida de nivel da 1 de 3 cartas que se quedan para siempre. Valen poco cada una para poder seguir mejorando hasta el final: +5 % de daño, +6 % de vida, +3 % de defensa (hasta 70 %), +3 % de velocidad, −3 % de recarga, regeneración del 0,4 % de la vida… con topes por carta. La evolución del ataque pide nivel 22.
+- **Solo cuenta si superas la partida:** la experiencia y las cartas ganadas en una ruta, un gimnasio o un reto se guardan al ganarlo; si caes o abandonas, se pierden (el oro y los tickets se conservan).
+- **Evolución por nivel**, como en los juegos (Charmander 16 y 36, Squirtle 16 y 36, Bulbasaur 16 y 32). Pikachu evoluciona con Piedra Trueno en los juegos; aquí, **al nivel 30**.
+- **Equipo:** cada Pokémon tiene su nivel, su experiencia y sus cartas. Se cambia en la pestaña Pokémon; los que no tienes salen con candado.
+- **Mejoras con oro: quitadas.** El oro queda para objetos que se añadirán.
+- **Guardados:** las partidas de antes de la versión 3 empiezan de cero (todo borrado).
+- **Equilibrio observado** (bot sencillo, `SIM=1 npx vitest run tests/progress.sim.test.ts`): las rutas se superan a la primera y se llega al nivel ~11 tras jugar dos veces cada ruta. Brock (modo prueba): Squirtle lo gana al 7.º intento (nivel 15); Charmander (desventaja de tipo) se atasca en el miniboss de la sala 20 y necesita más nivel y cartas. PROVISIONAL.
 
 ## Naturaleza de los pueblos (sprites del usuario)
 
@@ -213,7 +229,7 @@ Decidido con el usuario:
 
 ## Modo admin (Ajustes)
 
-- En Ajustes → **Modo admin**, con contraseña (sin distinguir mayúsculas). Da oro y tickets ilimitados (se muestran como ∞), abre todos los pueblos y los gimnasios jugables y permite entrenar desde la pestaña Pokémon.
+- En Ajustes → **Modo admin**, con contraseña (sin distinguir mayúsculas). Da oro y tickets ilimitados (se muestran como ∞: retos de captura sin límite) y abre todos los pueblos y los gimnasios jugables.
 - Al desactivarlo vuelven el oro y los tickets que tenías; lo comprado se queda.
 - El código solo guarda la huella SHA-256 de la contraseña, pero es una barrera de juego, no seguridad real: todo vive en el navegador.
 

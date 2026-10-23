@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE } from '../src/config/balance';
 import { getSpecies, POKEMON } from '../src/data/pokemon';
-import { xpToNext } from '../src/game/progression';
+import { levelFactor, MAX_LEVEL, START_LEVEL, xpToNext } from '../src/game/levels';
 import { emptyRoom, makeWorld, run, spawnAt } from './helpers';
 
 describe('experiencia y subidas de nivel', () => {
   it('subir de nivel ofrece exactamente tres cartas distintas y pausa el combate', () => {
     const w = makeWorld();
-    w.addXp(xpToNext(1));
+    w.addXp(xpToNext(w.player.level));
     run(w, 1 / 60);
     expect(w.phase).toBe('levelup');
     expect(w.choices).toHaveLength(3);
@@ -19,7 +18,7 @@ describe('experiencia y subidas de nivel', () => {
 
   it('solo se aplica una mejora por subida', () => {
     const w = makeWorld();
-    w.addXp(xpToNext(1));
+    w.addXp(xpToNext(w.player.level));
     run(w, 1 / 60);
     expect(w.chooseUpgrade(0)).toBe(true);
     expect(w.phase).toBe('playing');
@@ -36,7 +35,7 @@ describe('experiencia y subidas de nivel', () => {
       w.chooseUpgrade(0);
     };
     pick({ type: 'stat', stat: 'atk' } as never);
-    expect(w.player.atkMul).toBeCloseTo(atk0 * 1.1);
+    expect(w.player.atkMul).toBeCloseTo(atk0 * 1.05);
     const atk = w.player.moves[0];
     const dmg0 = atk.s.dmg!;
     pick({ type: 'attack', upgradeId: 'potencia' } as never);
@@ -67,7 +66,7 @@ describe('experiencia y subidas de nivel', () => {
     const w = makeWorld();
     const evoLevel = getSpecies('charmander').evolution!.level;
     let xp = 0;
-    for (let l = 1; l < evoLevel; l++) xp += xpToNext(l);
+    for (let l = START_LEVEL; l < evoLevel; l++) xp += xpToNext(l);
     w.addXp(xp - 1);
     expect(w.player.species.id).toBe('charmander');
     w.addXp(1);
@@ -75,11 +74,44 @@ describe('experiencia y subidas de nivel', () => {
     expect(w.player.species.id).toBe('charmeleon');
   });
 
-  it('Pikachu no evoluciona por nivel (no se fuerzan tres formas)', () => {
+  it('Pikachu evoluciona a Raichu al nivel 30 y se llega como mucho al nivel 100', () => {
     const w = makeWorld({ speciesId: 'pikachu' });
-    w.addXp(1e6);
-    expect(w.player.species.id).toBe('pikachu');
-    expect(w.player.level).toBe(BALANCE.experience.maxLevel);
+    w.addXp(1e9);
+    expect(w.player.species.id).toBe('raichu');
+    expect(w.player.level).toBe(MAX_LEVEL);
+  });
+
+  it('el nivel sube la vida y el daño con el mismo factor que a los enemigos', () => {
+    const lo = makeWorld({ speciesId: 'squirtle', progress: { level: START_LEVEL, xp: 0, cards: [] } });
+    const hi = makeWorld({ speciesId: 'squirtle', progress: { level: 50, xp: 0, cards: [] } });
+    const k = levelFactor(50) / levelFactor(START_LEVEL);
+    expect(hi.player.maxHp / lo.player.maxHp).toBeCloseTo(k);
+    expect(hi.player.atkMul / lo.player.atkMul).toBeCloseTo(k);
+    expect(levelFactor(100)).toBeGreaterThan(levelFactor(50));
+  });
+
+  it('las cartas guardadas se vuelven a aplicar al empezar la partida', () => {
+    const cards = [{ type: 'stat', stat: 'atk' }, { type: 'attack', upgradeId: 'potencia' }, { type: 'stat', stat: 'hp' }] as never[];
+    const w = makeWorld({ speciesId: 'charmander', progress: { level: 12, xp: 30, cards } });
+    const base = makeWorld({ speciesId: 'charmander', progress: { level: 12, xp: 30, cards: [] } });
+    expect(w.player.level).toBe(12);
+    expect(w.player.xp).toBe(30);
+    expect(w.player.attack.ups).toEqual(['potencia']);
+    expect(w.player.atkMul).toBeCloseTo(base.player.atkMul * 1.05);
+    expect(w.player.maxHp).toBeCloseTo(base.player.maxHp * 1.06);
+    expect(w.player.cards).toEqual(cards);
+  });
+
+  it('los enemigos se adaptan a tu nivel', () => {
+    const at = (level: number) => {
+      const w = makeWorld({ progress: { level, xp: 0, cards: [] } });
+      emptyRoom(w);
+      return spawnAt(w, 19, 'runner', w.player.x, w.player.y - 140, 0);
+    };
+    const a = at(START_LEVEL);
+    const b = at(40);
+    expect(b.level).toBeGreaterThan(a.level);
+    expect(b.maxHp / a.maxHp).toBeCloseTo(levelFactor(b.level) / levelFactor(a.level));
   });
 });
 

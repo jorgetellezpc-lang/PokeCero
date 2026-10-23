@@ -8,6 +8,12 @@ const shots = process.env.SHOTS_DIR;
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/fonts.googleapis.com/**', (r) => r.fulfill({ body: '', contentType: 'text/css' }));
+  await page.addInitScript(() => {
+    if (localStorage.getItem('pokecero.save')) return;
+    localStorage.setItem('pokecero.save', JSON.stringify({
+      version: 3, selectedPokemon: 'charmander', owned: [{ line: 'charmander', species: 'charmander', level: 5, xp: 0, cards: [] }],
+    }));
+  });
 });
 
 const run = (page: Page, fn: string) =>

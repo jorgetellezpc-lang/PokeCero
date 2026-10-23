@@ -262,5 +262,35 @@ export function bossDefFor(id: string, tierIndex?: number): BossDef {
   };
 }
 
+/**
+ * Reto de captura 1v1: uno de los iniciales como jefe muy difícil. Su fuerza es
+ * la de un tramo de enemigos (sube con tu nivel) y, además, su nivel se adapta
+ * al tuyo en la partida (world.ts).
+ */
+export function megaBossDef(dex: number, tierIndex: number, phases: BossPhaseDef[], behavior: Behavior = 'charger'): BossDef {
+  const ti = Math.max(0, Math.min(ENEMY_TIERS.length - 1, tierIndex));
+  const p = DEX.find((d) => d.dex === dex)!;
+  const base = enemyFor(p, ti, behavior);
+  const tier = ENEMY_TIERS[ti];
+  const B = BALANCE.bosses.mega;
+  return {
+    ...base,
+    id: `mega-${dex}`,
+    hp: Math.round(tier.hp * B.hp),
+    damage: Math.round(tier.dmg * B.damage),
+    shotDmg: Math.round(tier.dmg * B.damage * 0.8),
+    speed: tier.spd * 1.05 * BALANCE.ps.enemySpeed,
+    xp: tier.xp * 25,
+    gold: 0,
+    role: 'boss',
+    title: 'Reto de captura',
+    contactDamage: Math.round(tier.dmg * B.damage * 0.7),
+    phase2At: 0.33,
+    phases,
+  };
+}
+
+export const bossPhase = ph;
+
 /** Jefes con su fuerza de referencia (la de las 50 salas). */
 export const BOSSES: Record<string, BossDef> = Object.fromEntries(Object.keys(BOSS_SPECS).map((id) => [id, bossDefFor(id)]));

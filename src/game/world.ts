@@ -22,10 +22,10 @@ import type {
 } from './entities';
 import { clamp, dist } from './math';
 import { isFree, levitates, NavGrid, pushOut, segmentBlocked } from './obstacles';
-import { xpToNext } from './progression';
+import { enemyLevel, killXp, levelFactor, MAX_LEVEL, START_LEVEL, xpToNext } from './levels';
 import { Rng } from './rng';
 import { planRoom, scalingFor, tierForRoom, type RoomPlan, type RoomScaling } from './rooms';
-import { generateChoices, type UpgradeChoice } from './upgradeGenerator';
+import { generateChoices, type UpgradeAction, type UpgradeChoice } from './upgradeGenerator';
 
 // Simulación de una partida (run). Contiene todo el estado TEMPORAL: nivel,
 // movimientos, cartas elegidas, objeto equipado, sala actual. No toca el
@@ -84,7 +84,14 @@ export interface WorldOptions {
   town?: TownDef;
   /** Ruta de combate: sus salvajes en todas las salas y uno más fuerte en la última. */
   route?: RouteDef;
+  /** Progreso permanente del Pokémon: nivel, experiencia y cartas ya conseguidas. */
+  progress?: Progress;
+  /** Combate de captura 1v1: solo el jefe (ver meta/capture.ts). */
+  mega?: BossDef;
 }
+
+/** Lo que se guarda de cada Pokémon entre partidas. */
+export interface Progress { level: number; xp: number; cards: UpgradeAction[] }
 
 /** Pokémon que está en un pueblo (no se le puede atravesar). */
 export interface TownNpcState { x: number; y: number; dex: number; anim: Animator; r: number }
@@ -192,7 +199,7 @@ export class World {
       regenFlat: perk.regen, magnet: BALANCE.player.magnet * perk.magnetMul, xpMul: perk.xpMul,
       coinMul: perk.coinMul, crit: perk.crit,
       buffs: { patk: buff(), satk: buff(), spd: buff(), def: buff(), regen: buff() },
-      invuln: 0, appear: 1, level: 1, xp: 0, moves: [], attack: { sig: signatureFor(species), ups: [], evolved: false },
+      invuln: 0, appear: 1, level: START_LEVEL, xp: 0, power: 1, cards: [], moves: [], attack: { sig: signatureFor(species), ups: [], evolved: false },
       statsTaken: {}, item: null, focusCd: 0,
       aim: -Math.PI / 2, moveAngle: -Math.PI / 2, moving: false, hitFlash: 0, lastPatch: null,
       abilities: {}, mods: { ...BASE_MODS }, synergies: [], sturdyLeft: 0, guardAngle: 0,
@@ -200,12 +207,36 @@ export class World {
     this.player.hp = this.player.maxHp;
     this.updatePlayerBody();
     this.rebuildAttack();
+    // Progreso permanente: nivel, experiencia y cartas ya conseguidas.
+    const prog = opts.progress;
+    if (prog) {
+      this.setLevel(Math.max(1, Math.min(MAX_LEVEL, prog.level)));
+      this.player.xp = prog.xp;
+      for (const c of prog.cards) this.applyAction(c, true);
+      this.player.hp = this.player.maxHp;
+    }
+    this.mega = opts.mega ?? null;
     recomputeMods(this.player);
     this.startRoom(0);
   }
 
   get room(): number {
     return this.rooms[this.roomIndex];
+  }
+
+  /** Combate de captura: el jefe que hay que derrotar. */
+  readonly mega: BossDef | null;
+
+  /** Pone el nivel y ajusta vida, daño y regeneración a su factor. */
+  private setLevel(level: number): void {
+    const p = this.player;
+    p.level = level;
+    const k = levelFactor(level) / p.power;
+    p.power *= k;
+    p.atkMul *= k;
+    p.maxHp *= k;
+    p.hp *= k;
+    p.regenFlat *= k;
   }
 
   get xpNeeded(): number {
@@ -250,6 +281,7 @@ export class World {
     const effective = Math.max(1, Math.round(room * this.scalingFactor));
     this.plan = this.town
       ? { room, kind: 'normal', scaling: scalingFor(1), waves: [] }
+      : this.mega ? { room, kind: 'boss', scaling: scalingFor(1), waves: [] }
       : planRoom(this.gym, room, this.cast[tierForRoom(effective)], this.rng);
     // Ruta: en la última sala aparece además el más fuerte.
     if (this.route && this.isLastRoom && this.plan.waves.length) {
@@ -291,7 +323,9 @@ export class World {
     p.lastPatch = null;
     p.sturdyLeft = p.mods.sturdy;
     this.pendingWaves = this.plan.waves.map((w) => [...w]);
-    if (this.plan.bossId) {
+    if (this.mega) {
+      this.markers.push({ x: this.W / 2, y: Math.round(this.H * 0.35), t: BALANCE.rooms.spawnTelegraph * 1.6, def: this.mega, boss: true, summoned: false });
+    } else if (this.plan.bossId) {
       const def = bossDefFor(this.plan.bossId, tierForRoom(effective));
       this.markers.push({ x: this.W / 2, y: Math.round(this.H * 0.35), t: BALANCE.rooms.spawnTelegraph * 1.6, def, boss: true, summoned: false });
     } else {
@@ -343,12 +377,16 @@ export class World {
     const boss = 'role' in def ? (def as BossDef) : null;
     const s = this.scaling;
     const scale = boss ? Math.max(1, Math.min(2, Math.round((110 / bodyHeight(def.dex)) * 2) / 2)) : 1;
-    const hp = def.hp * s.hpMult;
+    // Los enemigos se adaptan a tu nivel: misma escala de vida y daño que tú.
+    const role = boss ? (this.mega ? 'mega' : boss.role === 'boss' ? 'boss' : 'miniboss') : this.route && def.dex === this.route.strong ? 'strong' : 'normal';
+    const level = enemyLevel(this.player.level, role);
+    const lf = levelFactor(level);
+    const hp = def.hp * s.hpMult * lf;
     const e: Enemy = {
-      id: this.newId(), def, boss, behavior: def.behavior, types: def.types, cat: def.cat,
+      id: this.newId(), level, def, boss, behavior: def.behavior, types: def.types, cat: def.cat,
       anim: new Animator(def.dex, scale), scale,
       x: mk.x, y: mk.y, r: bodyRadius(def.dex, scale) * (boss ? 0.8 : 1), bodyH: bodyHeight(def.dex, scale),
-      hp, maxHp: hp, damage: def.damage * s.damageMult, shotDmg: (def.shotDmg ?? def.damage) * s.damageMult,
+      hp, maxHp: hp, damage: def.damage * s.damageMult * lf, shotDmg: (def.shotDmg ?? def.damage) * s.damageMult * lf,
       speed: def.speed * s.speedMult, flash: 0,
       slow: 0, slowT: 0, burn: 0, burnT: 0, burnTick: 0, poison: 0, poisonT: 0, poisonTick: 0, stunT: 0,
       shield: 0, shieldT: 0, kx: 0, ky: 0, touchCd: 0, hidden: false,
@@ -762,7 +800,7 @@ export class World {
   }
 
   private dropLoot(e: Enemy): void {
-    const xp = e.def.xp * (1 + BALANCE.experience.xpPerRoom * (this.room - 1));
+    const xp = killXp(e.def.dex, e.level, e.boss ? (e.boss.role === 'boss' ? 'boss' : 'miniboss') : 'normal');
     const pieces = e.boss ? 8 : 1;
     for (let i = 0; i < pieces; i++) {
       const spread = pieces > 1 ? 24 : 0;
@@ -849,19 +887,19 @@ export class World {
 
   addXp(amount: number): void {
     const p = this.player;
-    if (p.level >= BALANCE.experience.maxLevel) return;
+    if (p.level >= MAX_LEVEL) return;
     const item = p.item ? ITEMS[p.item].mods?.xp ?? 1 : 1;
     p.xp += amount * this.xpMult * p.xpMul * item;
-    while (p.level < BALANCE.experience.maxLevel && p.xp >= xpToNext(p.level)) {
+    while (p.level < MAX_LEVEL && p.xp >= xpToNext(p.level)) {
       p.xp -= xpToNext(p.level);
-      p.level++;
+      this.setLevel(p.level + 1);
       this.pendingLevelUps++;
       this.events.push({ type: 'levelUp', level: p.level });
       this.events.push({ type: 'sfx', name: 'level' });
       this.text(p.x, p.y - 36, '¡NIVEL!', '#7af0ff', 12);
       this.checkEvolution();
     }
-    if (p.level >= BALANCE.experience.maxLevel) p.xp = 0;
+    if (p.level >= MAX_LEVEL) p.xp = 0;
   }
 
   private checkEvolution(): void {
@@ -871,8 +909,7 @@ export class World {
     const from = p.species;
     const ratio = p.hp / p.maxHp;
     p.species = getSpecies(evo.to);
-    const hpBonus = p.species.stats.hp - from.stats.hp;
-    p.maxHp += hpBonus;
+    p.maxHp *= p.species.stats.hp / from.stats.hp;
     p.baseSpeed = p.species.stats.speed;
     p.hp = Math.min(p.maxHp, p.maxHp * ratio + p.maxHp * 0.25);
     this.updatePlayerBody();
@@ -892,56 +929,24 @@ export class World {
     return generateChoices(this.player, this.rng);
   }
 
+  /** Resuelve las subidas de nivel pendientes eligiendo carta con `pick` (Pokémon capturados). */
+  takeLevelUps(pick: (choices: UpgradeChoice[]) => number): void {
+    while (this.pendingLevelUps > 0) {
+      this.phase = 'levelup';
+      this.choices = this.makeChoices();
+      if (!this.choices.length) { this.pendingLevelUps = 0; break; }
+      this.chooseUpgrade(Math.max(0, Math.min(this.choices.length - 1, pick(this.choices))));
+    }
+    this.phase = 'playing';
+  }
+
   /** Aplica la carta elegida. Devuelve false si la elección no es válida. */
   chooseUpgrade(index: number): boolean {
     if (this.phase !== 'levelup') return false;
     const choice = this.choices[index];
     if (!choice) return false;
     const p = this.player;
-    const act = choice.action;
-    switch (act.type) {
-      case 'attack': {
-        const u = ATTACK_UPGRADE[act.upgradeId];
-        if (u && p.attack.ups.filter((x) => x === u.id).length < u.max) {
-          p.attack.ups.push(u.id);
-          this.rebuildAttack();
-        }
-        break;
-      }
-      case 'attackEvolution': {
-        const A = p.attack;
-        if (attackEvolutionReady(A.sig, A.ups, p.level, A.evolved)) {
-          const old = p.moves[0].name;
-          A.evolved = true;
-          this.rebuildAttack();
-          this.ring(p.x, p.y, 8, 120, '#ffd23f', 0.8, 6);
-          this.ring(p.x, p.y, 4, 70, TYPE_COLORS[A.sig.secondary ?? A.sig.primary], 0.6, 4);
-          this.burst(p.x, p.y - 12, '#ffe14d', 40);
-          this.shake = Math.max(this.shake, 0.2);
-          this.events.push({ type: 'moveEvolved', from: old, to: p.moves[0].name });
-          this.events.push({ type: 'sfx', name: 'legend' });
-        }
-        break;
-      }
-      case 'stat':
-        this.applyStat(act.stat);
-        p.statsTaken[act.stat] = (p.statsTaken[act.stat] ?? 0) + 1;
-        break;
-      case 'heal':
-        p.hp = Math.min(p.maxHp, p.hp + p.maxHp * act.amount);
-        break;
-      case 'gold':
-        this.bonusGold += act.amount;
-        break;
-      case 'ability': {
-        const a = ABILITIES[act.abilityId];
-        if (a && (p.abilities[a.id] ?? 0) < a.maxStacks) {
-          p.abilities[a.id] = (p.abilities[a.id] ?? 0) + 1;
-          if (a.id === 'robustez') p.sturdyLeft++;
-        }
-        break;
-      }
-    }
+    this.applyAction(choice.action, false);
     this.refreshMods();
     this.pendingLevelUps--;
     this.choices = [];
@@ -954,17 +959,70 @@ export class World {
     return true;
   }
 
+  /**
+   * Aplica una carta. Las permanentes (ataque, estadística, habilidad) se
+   * apuntan en `player.cards`; `replay` = al cargar las ya conseguidas (sin efectos).
+   */
+  applyAction(act: UpgradeAction, replay: boolean): void {
+    const p = this.player;
+    switch (act.type) {
+      case 'attack': {
+        const u = ATTACK_UPGRADE[act.upgradeId];
+        if (!u || p.attack.ups.filter((x) => x === u.id).length >= u.max) return;
+        p.attack.ups.push(u.id);
+        this.rebuildAttack();
+        break;
+      }
+      case 'attackEvolution': {
+        const A = p.attack;
+        if (A.evolved || (!replay && !attackEvolutionReady(A.sig, A.ups, p.level, A.evolved))) return;
+        const old = p.moves[0].name;
+        A.evolved = true;
+        this.rebuildAttack();
+        if (!replay) {
+          this.ring(p.x, p.y, 8, 120, '#ffd23f', 0.8, 6);
+          this.ring(p.x, p.y, 4, 70, TYPE_COLORS[A.sig.secondary ?? A.sig.primary], 0.6, 4);
+          this.burst(p.x, p.y - 12, '#ffe14d', 40);
+          this.shake = Math.max(this.shake, 0.2);
+          this.events.push({ type: 'moveEvolved', from: old, to: p.moves[0].name });
+          this.events.push({ type: 'sfx', name: 'legend' });
+        }
+        break;
+      }
+      case 'stat':
+        this.applyStat(act.stat);
+        if (act.stat === 'heal') return;
+        p.statsTaken[act.stat] = (p.statsTaken[act.stat] ?? 0) + 1;
+        break;
+      case 'heal':
+        p.hp = Math.min(p.maxHp, p.hp + p.maxHp * act.amount);
+        return;
+      case 'gold':
+        this.bonusGold += act.amount;
+        return;
+      case 'ability': {
+        const a = ABILITIES[act.abilityId];
+        if (!a || (p.abilities[a.id] ?? 0) >= a.maxStacks) return;
+        p.abilities[a.id] = (p.abilities[a.id] ?? 0) + 1;
+        if (a.id === 'robustez') p.sturdyLeft++;
+        break;
+      }
+    }
+    p.cards.push(act);
+  }
+
   private applyStat(id: RunStatId): void {
     const p = this.player;
     switch (id) {
-      case 'hp': p.maxHp += 20; p.hp += 20; break;
-      case 'atk': p.atkMul *= 1.1; break;
-      case 'spd': p.spdMul *= 1.07; break;
-      case 'cd': p.cdMul *= 0.92; break;
-      case 'def': p.dmgReduce = Math.min(BALANCE.player.maxDefense, p.dmgReduce + 0.06); break;
-      case 'rgn': p.regenFlat += 0.9; break;
-      case 'mag': p.magnet *= 1.3; break;
-      case 'xp': p.xpMul *= 1.12; break;
+      // Cartas permanentes: poco cada una, se acumulan durante todo el juego.
+      case 'hp': p.maxHp *= 1.06; p.hp *= 1.06; break;
+      case 'atk': p.atkMul *= 1.05; break;
+      case 'spd': p.spdMul *= 1.03; break;
+      case 'cd': p.cdMul *= 0.97; break;
+      case 'def': p.dmgReduce = Math.min(BALANCE.player.maxDefense, p.dmgReduce + 0.03); break;
+      case 'rgn': p.regenFlat += p.maxHp * 0.004; break;
+      case 'mag': p.magnet *= 1.15; break;
+      case 'xp': p.xpMul *= 1.06; break;
       case 'heal': p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.45); break;
     }
     void RUN_STAT_UPGRADES;

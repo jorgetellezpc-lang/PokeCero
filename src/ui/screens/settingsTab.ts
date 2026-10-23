@@ -97,7 +97,7 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
       linkRow('info', 'Créditos', () => openInfo('Créditos', CREDITS)),
     ),
     resetBtn,
-    h('p', { class: 'note center' }, 'El progreso se guarda en este navegador. Restablecerlo borra oro, tickets, medallas, Pokémon y mejoras.'),
+    h('p', { class: 'note center' }, 'El progreso se guarda en este navegador. Restablecerlo borra tus Pokémon, sus niveles y mejoras, el oro, los tickets y las medallas.'),
     h('p', { class: 'note center version' }, 'Pokécero · prototipo v0.4'),
   );
 }
@@ -111,10 +111,11 @@ const GUIDE = [
   'Muévete arrastrando el dedo por cualquier parte de la pantalla. Al soltarlo y quedarte quieto, tu Pokémon ataca solo al enemigo más cercano.',
   'Derrota a todos los enemigos de la sala y sube por la puerta del fondo para pasar a la siguiente.',
   'Cada Pokémon tiene un único ataque que sale de sus tipos. Al subir de nivel eliges 1 de 3 cartas: mejoras de ese ataque, estadísticas y habilidades. Algunas habilidades juntas activan sinergias.',
-  'Con nivel suficiente y las mejoras clave, el ataque EVOLUCIONA (carta dorada). Si tu Pokémon evoluciona, su ataque se transforma y conserva las mejoras.',
+  'Desde el nivel 22 y con las mejoras clave, el ataque EVOLUCIONA (carta dorada). Si tu Pokémon evoluciona, su ataque se transforma y conserva las mejoras.',
   'Cada gimnasio tiene 50 salas, con minibosses en la 20 y la 40 y el líder en la 50. Los jefes cambian de fase al perder vida.',
-  'Puedes jugar con Bulbasaur, Charmander, Squirtle o Pikachu, todos disponibles desde el principio; evolucionan durante la partida. El resto de Pokémon de Kanto son tus enemigos.',
-  'El oro sirve para mejoras permanentes de cada Pokémon. Guarda los tickets: pronto se canjearán en el gachapón. Al morir conservas el oro y los tickets.',
+  'Al empezar, un test de compatibilidad te asigna un compañero entre Bulbasaur, Charmander, Squirtle y Pikachu (o eliges otro). Evolucionan por nivel, como en los juegos: Charmander en el 16, Pikachu en el 30… El resto de Pokémon de Kanto son tus enemigos, y su nivel se adapta al tuyo.',
+  'Tu Pokémon sube de nivel (hasta el 100) con la experiencia de las rutas y los gimnasios. Cada nivel eliges una mejora para siempre. Si caes, pierdes la experiencia y las mejoras de esa partida; el oro y los tickets se conservan.',
+  'Los otros iniciales se capturan en el laboratorio de Pueblo Paleta: reto 1 contra 1 muy difícil, que cuesta tickets.',
 ];
 
 const CREDITS = [
@@ -127,7 +128,7 @@ const CREDITS = [
 function openAdminLogin(store: SaveStore): void {
   const close = () => overlay.remove();
   const input = h('input', { type: 'password', class: 'admin-pass', 'data-testid': 'admin-pass', placeholder: 'Contraseña', autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
-  const msg = h('p', { class: 'modal-text admin-msg', 'data-testid': 'admin-msg' }, `Oro y tickets ilimitados (${ADMIN_FUNDS.toLocaleString('es-ES')}), todos los pueblos y gimnasios abiertos y entrenamiento desde la pestaña Pokémon.`);
+  const msg = h('p', { class: 'modal-text admin-msg', 'data-testid': 'admin-msg' }, `Oro y tickets ilimitados (${ADMIN_FUNDS.toLocaleString('es-ES')}), todos los pueblos y gimnasios abiertos y retos de captura sin límite.`);
   const submit = (e?: Event) => {
     e?.preventDefault();
     if (checkAdminPassword(input.value)) {

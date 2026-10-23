@@ -1,8 +1,7 @@
 import { KANTO } from '../../data/regions';
 import { getSpecies } from '../../data/pokemon';
 import type { App, Screen } from '../app';
-import { PERMANENT_UPGRADES } from '../../config/balance';
-import { canBuy } from '../../meta/shop';
+import { active } from '../../meta/team';
 import { h } from '../dom';
 import { renderGachaTab } from './gachaTab';
 import { renderMapTab } from './mapTab';
@@ -64,10 +63,10 @@ export class MenuScreen implements Screen {
   render(): void {
     const d = this.app.store.data;
     const medals = (d.medals[KANTO.id] ?? []).length;
-    const sp = getSpecies(d.selectedPokemon);
-    // Avisos «!» con sentido: una mejora que puedes pagar o tickets para tirar.
+    const sp = getSpecies(active(this.app.store)?.species ?? 'charmander');
+    // Avisos «!» con sentido (ahora no hay nada pendiente en Pokémon ni en el gachapón).
     const alerts: Partial<Record<MenuTab, boolean>> = {
-      pokemon: PERMANENT_UPGRADES.some((u) => canBuy(this.app.store, sp.id, u.id) === 'ok'),
+      pokemon: false,
       gacha: false, // sin sorteo por ahora: no hay nada que hacer allí
     };
     this.topbar.replaceChildren(

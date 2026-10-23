@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost } from '../src/config/balance';
+import { BALANCE } from '../src/config/balance';
 import { PLAYABLE_POKEMON } from '../src/data/pokemon';
 import { JOHTO, KANTO } from '../src/data/regions';
 import { World } from '../src/game/world';
@@ -7,71 +7,101 @@ import { Rng } from '../src/game/rng';
 import { pull } from '../src/meta/gacha';
 import { awardMedal, bankRunGold, claimMilestone, gymStatus, regionUnlocked } from '../src/meta/rewards';
 import { MemoryStorage, migrate, SAVE_KEY, SaveStore } from '../src/meta/save';
-import { buyUpgrade, perksFor, upgradeLevel } from '../src/meta/shop';
+import { active, addOwned, chooseStarter, commitRun, hasStarter, missingStarters, progressOf, selectOwned } from '../src/meta/team';
+import { captureBoss, capturedMon, CAPTURE_COST, payCapture } from '../src/meta/capture';
+import { formAtLevel, START_LEVEL } from '../src/game/levels';
 
 const fresh = () => new SaveStore(new MemoryStorage());
 
 describe('persistencia', () => {
-  it('el progreso permanente sobrevive a "cerrar y abrir" el juego', () => {
+  it('tus Pokémon y el progreso sobreviven a «cerrar y abrir» el juego', () => {
     const storage = new MemoryStorage();
     const a = new SaveStore(storage);
-    const gold0 = a.data.gold;
-    buyUpgrade(a, 'charmander', 'hp');
+    chooseStarter(a, 'squirtle');
     claimMilestone(a, 'brock', 20);
     const b = new SaveStore(storage);
-    expect(upgradeLevel(b, 'charmander', 'hp')).toBe(1);
+    expect(b.data.owned).toEqual([{ line: 'squirtle', species: 'squirtle', level: START_LEVEL, xp: 0, cards: [] }]);
+    expect(b.data.selectedPokemon).toBe('squirtle');
     expect(b.data.claimedRewards).toContain('brock:20');
-    expect(b.data.gold).toBe(gold0 - permanentUpgradeCost(PERMANENT_UPGRADES[0], 0));
   });
 
-  it('migra un guardado v1 (mejoras globales) a v2 (por Pokémon)', () => {
-    const m = migrate({ version: 1, gold: 120, selectedPokemon: 'charmander', unlockedPokemon: ['charmander'], permanentUpgrades: { hp: 2, power: 1, defense: 0, speed: 3 } });
-    expect(m.version).toBe(2);
-    expect(m.gold).toBe(120);
-    expect(m.upgrades.charmander).toEqual({ hp: 2, atk: 1, spd: 3 });
+  it('las partidas de antes de la versión 3 empiezan de cero (y un guardado roto también)', () => {
+    const m = migrate({ version: 2, gold: 9999, medals: { kanto: ['brock'] }, selectedPokemon: 'charmander', upgrades: { charmander: { hp: 3 } } });
+    expect(m.version).toBe(3);
+    expect(m.gold).toBe(BALANCE.rewards.starterGold);
+    expect(m.medals).toEqual({});
+    expect(m.owned).toEqual([]);
+    expect('upgrades' in m).toBe(false);
     const storage = new MemoryStorage();
     storage.setItem(SAVE_KEY, '{no es json');
     expect(new SaveStore(storage).data.gold).toBe(BALANCE.rewards.starterGold);
   });
+
+  it('limpia Pokémon y cartas no válidos de un guardado v3', () => {
+    const m = migrate({ version: 3, selectedPokemon: 'mewtwo', owned: [
+      { line: 'pikachu', species: 'raichu', level: 300, xp: 5, cards: [{ type: 'stat', stat: 'atk' }, { type: 'stat', stat: 'heal' }, { type: 'attack', upgradeId: 'nada' }] },
+      { line: 'mewtwo', species: 'mewtwo', level: 50, xp: 0, cards: [] },
+      { line: 'pikachu', species: 'pikachu', level: 5, xp: 0, cards: [] },
+    ] });
+    expect(m.owned).toHaveLength(1);
+    expect(m.owned[0]).toMatchObject({ line: 'pikachu', species: 'raichu', level: 100, cards: [{ type: 'stat', stat: 'atk' }] });
+    expect(m.selectedPokemon).toBe('pikachu');
+  });
 });
 
-describe('Pokémon elegibles', () => {
-  it('solo se juega con los 3 iniciales y Pikachu, todos desde el principio', () => {
+describe('inicial único y equipo', () => {
+  it('una partida nueva no tiene Pokémon hasta hacer el test; luego solo el elegido, en el nivel 5', () => {
+    const s = fresh();
     expect(PLAYABLE_POKEMON).toEqual(['bulbasaur', 'charmander', 'squirtle', 'pikachu']);
-    expect(fresh().data.unlockedPokemon).toEqual(PLAYABLE_POKEMON);
+    expect(hasStarter(s)).toBe(false);
+    chooseStarter(s, 'bulbasaur');
+    expect(hasStarter(s)).toBe(true);
+    expect(active(s)).toMatchObject({ line: 'bulbasaur', level: START_LEVEL });
+    expect(missingStarters(s)).toEqual(['charmander', 'squirtle', 'pikachu']);
   });
 
-  it('un guardado antiguo con otros Pokémon pasa a los 4 elegibles (y conserva la elección si es válida)', () => {
-    const m = migrate({ version: 2, selectedPokemon: 'mewtwo', unlockedPokemon: ['charmander', 'mewtwo', 'pidgeotto'], upgrades: { mewtwo: { hp: 3 } } });
-    expect(m.unlockedPokemon).toEqual(PLAYABLE_POKEMON);
-    expect(m.selectedPokemon).toBe('charmander');
-    expect(m.upgrades.mewtwo).toEqual({ hp: 3 });
-    expect(migrate({ version: 2, selectedPokemon: 'pikachu', unlockedPokemon: ['charmander'] }).selectedPokemon).toBe('pikachu');
+  it('la experiencia y las cartas solo se guardan al superar la partida', () => {
+    const s = fresh();
+    chooseStarter(s, 'charmander');
+    const w = new World({ speciesId: 'charmander', gym: KANTO.gyms[0], rooms: [1], seed: 2, progress: progressOf(active(s)!) });
+    w.addXp(5000);
+    w.takeLevelUps(() => 0);
+    // Caer: no se llama a commitRun → nada cambia.
+    expect(active(s)!.level).toBe(START_LEVEL);
+    commitRun(s, 'charmander', w);
+    expect(active(s)!.level).toBe(w.player.level);
+    expect(active(s)!.cards.length).toBe(w.player.level - START_LEVEL);
+    expect(active(s)!.species).toBe(formAtLevel('charmander', w.player.level).id);
   });
 
-  it('los demás siguen saliendo como enemigos', () => {
+  it('capturar: el reto cuesta tickets, el jefe se adapta a tu nivel y el capturado llega con tu nivel', () => {
+    const s = fresh();
+    chooseStarter(s, 'charmander');
+    s.update((d) => { d.tickets = CAPTURE_COST; });
+    expect(payCapture(s)).toBe(true);
+    expect(payCapture(s)).toBe(false);
+    const low = captureBoss('squirtle', 5);
+    const high = captureBoss('squirtle', 40);
+    expect(low.dex).toBe(7);
+    expect(high.dex).toBe(9);
+    expect(high.hp).toBeGreaterThan(low.hp);
+    const mon = capturedMon('squirtle', 20, 3);
+    expect(mon).toMatchObject({ line: 'squirtle', species: 'wartortle', level: 20 });
+    expect(mon.cards.length).toBe(20 - START_LEVEL);
+    addOwned(s, mon);
+    addOwned(s, mon);
+    expect(s.data.owned.map((o) => o.line)).toEqual(['charmander', 'squirtle']);
+    selectOwned(s, 'squirtle');
+    expect(active(s)!.line).toBe('squirtle');
+    selectOwned(s, 'pikachu');
+    expect(active(s)!.line).toBe('squirtle');
+  });
+
+  it('los demás Pokémon siguen saliendo como enemigos', () => {
     const w = new World({ speciesId: 'squirtle', gym: KANTO.gyms[0], rooms: [1, 2, 3], seed: 5 });
     const cast = w.cast.flat().map((d) => d.dex);
     expect(cast.length).toBeGreaterThan(10);
     expect(cast.some((dex) => ![1, 4, 7, 25].includes(dex))).toBe(true);
-  });
-});
-
-describe('oro y mejoras permanentes', () => {
-  it('no se puede comprar sin oro suficiente', () => {
-    const s = fresh();
-    s.update((d) => { d.gold = 0; });
-    expect(buyUpgrade(s, 'charmander', 'atk')).toBe('gold');
-  });
-
-  it('las mejoras son de cada Pokémon, respetan el límite y llegan a la partida', () => {
-    const s = fresh();
-    s.update((d) => { d.gold = 1e7; });
-    const def = PERMANENT_UPGRADES.find((u) => u.id === 'spd')!;
-    for (let i = 0; i < def.maxLevel; i++) expect(buyUpgrade(s, 'charmander', 'spd')).toBe('ok');
-    expect(buyUpgrade(s, 'charmander', 'spd')).toBe('max');
-    expect(perksFor(s, 'charmander').spdMul).toBeCloseTo(1 + 0.03 * def.maxLevel);
-    expect(perksFor(s, 'squirtle').spdMul).toBe(1);
   });
 
   it('el oro de la partida se ingresa al terminar', () => {

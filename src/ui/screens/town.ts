@@ -3,19 +3,19 @@ import { getSpecies } from '../../data/pokemon';
 import { World } from '../../game/world';
 import { InputController } from '../../input/input';
 import { arriveAt } from '../../meta/adventure';
-import { perksFor } from '../../meta/shop';
+import { active, missingStarters } from '../../meta/team';
+import { CAPTURE_COST, canAffordCapture, payCapture } from '../../meta/capture';
 import { preload } from '../../render/animator';
 import { TownView } from '../../render/townView';
 import type { App, Screen } from '../app';
-import { h, pokeImg } from '../dom';
+import { h, pokeImg, toast } from '../dom';
 import { uiImg } from './menu';
-import { openSheet, upgrades } from './pokemonTab';
 
 // ============================================================================
 // Pueblo de la aventura: se recorre a pie con el joystick (sin combate), en
 // pixel art (render/townView.ts) con minimapa. Al acercarte a un cartel, una
 // puerta o un Pokémon aparece un botón para interactuar: diálogo, tienda de
-// entrenamiento, gimnasio o la salida hacia la siguiente ruta.
+// reto de captura (laboratorio), gimnasio o la salida hacia la siguiente ruta.
 // ============================================================================
 
 const STEP = 1 / 60;
@@ -23,7 +23,7 @@ const STEP = 1 / 60;
 const REACH = 30;
 
 const ICON: Record<Spot['kind'], string> = {
-  talk: '💬', sign: '📜', shop: '🛒', center: '❤', gym: '🏟', exit: '➜',
+  talk: '💬', sign: '📜', shop: '🛒', center: '❤', gym: '🏟', exit: '➜', lab: '🔬',
 };
 
 export class TownScreen implements Screen {
@@ -51,8 +51,8 @@ export class TownScreen implements Screen {
     this.town = town;
     const store = app.store;
     arriveAt(store, town.id);
-    const speciesId = store.data.selectedPokemon;
-    this.world = new World({ speciesId, gym: placeGym(town), rooms: [1], town, perks: perksFor(store, speciesId) });
+    const speciesId = active(store)?.species ?? 'charmander';
+    this.world = new World({ speciesId, gym: placeGym(town), rooms: [1], town });
     this.world.player.invuln = 0;
     preload([getSpecies(speciesId).dex, ...town.npcs.map((n) => n.dex)]);
 
@@ -141,14 +141,25 @@ export class TownScreen implements Screen {
     if (!s || this.busy) return;
     this.app.audio.sfx('click');
     if (s.kind === 'shop') {
-      const sp = getSpecies(this.app.store.data.selectedPokemon);
-      this.setBusy(true);
-      openSheet(this, `Tienda · Entrenar a ${sp.name}`, () => upgrades(this, sp));
-      // La hoja se cierra sola (botón o fondo): al quitarse, se puede volver a andar.
-      const watch = new MutationObserver(() => {
-        if (!document.querySelector('.pk3-sheet-bg')) { watch.disconnect(); this.setBusy(false); }
-      });
-      watch.observe(document.body, { childList: true });
+      this.dialog(s, ['—¡Bienvenido a la tienda!', '—Estamos preparando objetos para tus aventuras: pociones, caramelos raros… ¡Vuelve pronto!']);
+      return;
+    }
+    if (s.kind === 'lab') {
+      // Reto de captura 1 contra 1 por cada inicial que te falta.
+      const store = this.app.store;
+      const missing = missingStarters(store);
+      const lines = [...(s.lines ?? [])];
+      if (!missing.length) lines.push('—¡Ya tienes a los cuatro! Eres todo un entrenador.');
+      else lines.push(`—Cada reto cuesta ${CAPTURE_COST} tickets. Tienes ${store.data.admin ? '∞' : store.data.tickets}. Su nivel se adapta al tuyo: ¡no será fácil!`);
+      this.dialog(s, lines, missing.map((line) => ({
+        label: `Retar a ${getSpecies(line).name}`,
+        id: `capture-${line}`,
+        run: () => {
+          if (!canAffordCapture(store)) return toast(`Necesitas ${CAPTURE_COST} tickets para el reto.`);
+          payCapture(store);
+          this.app.startCapture(line);
+        },
+      })));
       return;
     }
     if (s.kind === 'gym' && s.gym === 'brock') {
@@ -157,9 +168,9 @@ export class TownScreen implements Screen {
     }
     if (s.kind === 'exit' && s.route) {
       const r = ROUTES[s.route];
-      this.dialog(s, [...(s.lines ?? []), `Son ${r.rooms} salas de combate. Si caes, vuelves a ${this.town.name}; el oro ganado se queda.`], {
-        label: `Ir a la ${r.name}`, run: () => this.app.startRoute(r.id),
-      });
+      this.dialog(s, [...(s.lines ?? []), `Son ${r.rooms} salas de combate. Si caes, vuelves a ${this.town.name}: el oro se queda, la experiencia no.`], [{
+        label: `Ir a la ${r.name}`, id: 'town-go', run: () => this.app.startRoute(r.id),
+      }]);
       return;
     }
     this.dialog(s, s.lines ?? []);
@@ -172,8 +183,8 @@ export class TownScreen implements Screen {
     this.near = null;
   }
 
-  /** Cuadro de diálogo (una línea tras otra). Opcionalmente, un botón de acción al final. */
-  private dialog(s: Spot, lines: string[], action?: { label: string; run: () => void }): void {
+  /** Cuadro de diálogo (una línea tras otra). Opcionalmente, botones de acción al final. */
+  private dialog(s: Spot, lines: string[], actions: { label: string; id: string; run: () => void }[] = []): void {
     this.setBusy(true);
     let i = 0;
     const text = h('p', { class: 'town-line', 'data-testid': 'town-line' });
@@ -184,8 +195,8 @@ export class TownScreen implements Screen {
       const last = i >= lines.length - 1;
       const btns = [
         !last ? h('button', { class: 'btn', 'data-testid': 'town-next', onclick: () => { i++; show(); } }, 'Siguiente') : null,
-        last && action ? h('button', { class: 'btn btn-play', 'data-testid': 'town-go', onclick: () => { close(); action.run(); } }, action.label) : null,
-        last ? h('button', { class: 'btn', 'data-testid': 'town-close', onclick: close }, action ? 'Ahora no' : 'Cerrar') : null,
+        ...(last ? actions.map((a) => h('button', { class: 'btn btn-play', 'data-testid': a.id, onclick: () => { close(); a.run(); } }, a.label)) : []),
+        last ? h('button', { class: 'btn', 'data-testid': 'town-close', onclick: close }, actions.length ? 'Ahora no' : 'Cerrar') : null,
       ];
       buttons.replaceChildren(...btns.filter((b): b is HTMLButtonElement => !!b));
     };

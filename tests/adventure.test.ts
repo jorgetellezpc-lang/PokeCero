@@ -21,11 +21,8 @@ describe('aventura: progreso', () => {
     expect(s.data.adventure.at).toBe('verde');
   });
 
-  it('quien ya tenía la medalla de Brock también empieza en Paleta (y la conserva)', () => {
-    const m = migrate({ version: 2, medals: { kanto: ['brock'] }, bestRoom: { brock: 50 } });
-    expect(m.adventure).toEqual({ visited: ['paleta'], at: 'paleta' });
-    expect(m.medals.kanto).toEqual(['brock']);
-    const bad = migrate({ version: 2, adventure: { visited: ['inventado', 'verde'], at: 'inventado' } });
+  it('un guardado v3 limpia los lugares desconocidos y siempre incluye Paleta', () => {
+    const bad = migrate({ version: 3, adventure: { visited: ['inventado', 'verde'], at: 'inventado' } });
     expect(bad.adventure).toEqual({ visited: ['paleta', 'verde'], at: 'paleta' });
   });
 

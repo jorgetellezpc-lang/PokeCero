@@ -48,6 +48,13 @@ async function pickAllCards(page: Page) {
 test.beforeEach(async ({ page }) => {
   // Sin red en CI: la fuente pixel se sustituye por la de reserva.
   await page.route('**/fonts.googleapis.com/**', (r) => r.fulfill({ body: '', contentType: 'text/css' }));
+  // Partida con Charmander ya elegido (salvo con ?nuevo, para probar el test del inicial).
+  await page.addInitScript(() => {
+    if (location.search.includes('nuevo') || localStorage.getItem('pokecero.save')) return;
+    localStorage.setItem('pokecero.save', JSON.stringify({
+      version: 3, selectedPokemon: 'charmander', owned: [{ line: 'charmander', species: 'charmander', level: 5, xp: 0, cards: [] }],
+    }));
+  });
 });
 const world = (page: Page, fn: string) =>
   page.evaluate(`(() => { const w = window.__pokecero.app.run.world; ${fn} })()`);
@@ -83,17 +90,19 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
   await shot(page, '02b-ataque');
   await page.getByTestId('sheet-close').click();
-  // El entrenamiento se compra en la tienda de los pueblos: el botón lo indica.
+  // Nivel real (empieza en el 5) y lista de mejoras permanentes (vacía al empezar).
+  await expect(page.getByTestId('pk-level')).toContainText('Nv. 5');
   await page.getByTestId('train').click();
-  await expect(page.locator('.toast').last()).toContainText('Ciudad Verde');
+  await expect(page.getByTestId('card-list')).toContainText('Aún no tiene ninguna');
+  await page.getByTestId('sheet-close').click();
   await shot(page, '02-pokemon');
-  // Selección: solo los 3 iniciales de Kanto y Pikachu, todos disponibles.
+  // Selección: los otros iniciales están bloqueados (se capturan en el laboratorio).
   await expect(page.locator('.pk4-face')).toHaveCount(4);
+  await expect(page.locator('.pk4-face.locked')).toHaveCount(3);
   await page.getByTestId('pick-pikachu').click();
-  await expect(page.locator('.hero-name')).toContainText('Pikachu');
-  await shot(page, '02a-seleccion');
-  await page.getByTestId('pick-charmander').click();
+  await expect(page.locator('.toast').last()).toContainText('laboratorio');
   await expect(page.locator('.hero-name')).toContainText('Charmander');
+  await shot(page, '02a-seleccion');
   await page.click('[data-tab="settings"]');
   await expect(page.locator('[data-setting="testMode"]')).toBeChecked();
   await shot(page, '03-ajustes');
@@ -201,23 +210,17 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await page.getByTestId('result-continue').click();
   expect(Number(await page.getByTestId('tickets').textContent())).toBeLessThan(ticketsAfterWin + 10);
 
-  // Comprar una mejora permanente con oro en la tienda de Ciudad Verde
-  await page.evaluate(() => { const a = (window as any).__pokecero.app; a.store.update((d: any) => { d.adventure.visited.push('verde'); }); a.showTown('verde'); });
-  await expect(page.getByTestId('town-name')).toContainText('Ciudad Verde');
-  const gold = () => page.evaluate(() => (window as any).__pokecero.app.store.data.gold as number);
-  const goldBefore = await gold();
-  await actAt(page, 515, 1872);
-  await page.getByTestId('buy-spd').click();
-  const goldAfter = await gold();
-  expect(goldAfter).toBeLessThan(goldBefore);
-  await shot(page, '13-mejora');
-  await page.getByTestId('sheet-close').click();
+  // Al ganar se guarda la experiencia: el jefe da mucha.
+  const level = await page.evaluate(() => (window as any).__pokecero.app.store.data.owned[0].level as number);
+  expect(level).toBeGreaterThan(5);
+  const goldAfter = Number(await page.getByTestId('gold').textContent());
 
   // El progreso permanente sobrevive a recargar la página
   await page.reload();
   await expect(page.getByTestId('gold')).toHaveText(String(goldAfter));
   await expect(page.locator('.topbar')).toContainText('1/8');
-  expect(await page.evaluate(() => (window as any).__pokecero.app.store.data.upgrades.charmander?.spd)).toBe(1);
+  await page.click('[data-tab="pokemon"]');
+  await expect(page.getByTestId('pk-level')).toContainText(`Nv. ${level}`);
 
   expect(errors).toEqual([]);
 });
@@ -318,14 +321,64 @@ test('modo admin en Ajustes: contraseña, oro ilimitado y todo abierto', async (
   await page.click('[data-tab="map"]');
   await page.click('.map3-hot[data-place="plateada"]');
   await expect(page.getByTestId('enter')).toContainText('Entrar');
-  await page.click('[data-tab="pokemon"]');
-  await page.getByTestId('train').click();
-  await page.getByTestId('buy-atk').click();
-  await expect(page.getByTestId('gold')).toHaveText('∞');
-  await page.getByTestId('sheet-close').click();
   await page.reload();
   await expect(page.getByTestId('gold')).toHaveText('∞');
   await page.click('[data-tab="settings"]');
   await page.getByTestId('admin-toggle').click();
   await expect(page.getByTestId('gold')).toHaveText('500');
+});
+
+test('partida nueva: test de compatibilidad, elegir otro y empezar en Paleta', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?debug&nuevo');
+  await expect(page.getByTestId('starter-test')).toBeVisible();
+  await page.getByTestId('starter-start').click();
+  for (let i = 0; i < 8; i++) {
+    await expect(page.getByTestId('starter-q')).toBeVisible();
+    // Todas las primeras respuestas: empatan Charmander y Bulbasaur; gana el de la última (Bulbasaur).
+    await page.getByTestId('answer-0').click();
+  }
+  await expect(page.getByTestId('starter-result')).toHaveAttribute('data-line', 'bulbasaur');
+  await shot(page, '40-resultado');
+  // No le convence: elige otro.
+  await page.getByTestId('starter-other').click();
+  await page.getByTestId('starter-pick-pikachu').click();
+  await page.getByTestId('starter-done').click();
+  await expect(page.getByTestId('town-name')).toContainText('Pueblo Paleta');
+  const owned = await page.evaluate(() => (window as any).__pokecero.app.store.data.owned);
+  expect(owned).toEqual([{ line: 'pikachu', species: 'pikachu', level: 5, xp: 0, cards: [] }]);
+  expect(errors).toEqual([]);
+});
+
+test('capturar otro inicial: reto 1 contra 1 en el laboratorio (cuesta tickets)', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  await page.goto('/?debug');
+  await page.evaluate(() => (window as any).__pokecero.app.showTown('paleta'));
+  await actAt(page, 520, 1884);
+  await page.getByTestId('town-next').click();
+  await page.getByTestId('town-next').click();
+  await expect(page.getByTestId('town-line')).toContainText('10 tickets');
+  await shot(page, '41-laboratorio');
+  await page.getByTestId('capture-squirtle').click();
+  await page.waitForFunction(() => { const r = (window as any).__pokecero.app.run; return r && !r.intro; });
+  expect(await page.evaluate(() => (window as any).__pokecero.app.store.data.tickets)).toBe(0);
+  await expect(page.getByTestId('room')).toHaveText('Reto de captura');
+  await expect(page.locator('.boss-bar')).toBeVisible({ timeout: 8000 });
+  await shot(page, '42-reto');
+  await world(page, 'w.debugKillAll();');
+  await pickUntilResult(page);
+  await expect(page.getByTestId('result')).toContainText('capturado');
+  await page.getByTestId('result-continue').click();
+  await expect(page.getByTestId('town-name')).toContainText('Pueblo Paleta');
+  const lines = await page.evaluate(() => (window as any).__pokecero.app.store.data.owned.map((o: any) => o.line));
+  expect(lines).toEqual(['charmander', 'squirtle']);
+  // Sin tickets no se puede volver a retar.
+  await page.getByTestId('town-map').click();
+  await page.click('[data-tab="pokemon"]');
+  await page.getByTestId('pick-squirtle').click();
+  await expect(page.locator('.hero-name')).toContainText('Squirtle');
+  expect(errors).toEqual([]);
 });

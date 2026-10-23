@@ -11,7 +11,9 @@ import type { UpgradeChoice } from '../../game/upgradeGenerator';
 import { World, type WorldEvent } from '../../game/world';
 import { InputController } from '../../input/input';
 import { awardMedal, bankRunGold, claimMilestone, recordBestRoom } from '../../meta/rewards';
-import { perksFor } from '../../meta/shop';
+import { active, addOwned, commitRun, progressOf } from '../../meta/team';
+import { captureBoss, capturedMon } from '../../meta/capture';
+import { MAX_LEVEL, START_LEVEL } from '../../game/levels';
 import { preload } from '../../render/animator';
 import { Renderer, type Viewport } from '../../render/renderer';
 import { Scene3D } from '../../render/scene3d';
@@ -72,25 +74,39 @@ export class RunScreen implements Screen {
   /** Ruta de la aventura que se está jugando (si no, es un gimnasio). */
   private readonly route: RouteDef | null;
 
-  constructor(private app: App, private gymId: string, isRoute = false) {
+  /** Pokémon con el que se juega (su línea) y su nivel al empezar. */
+  private readonly line: string;
+  private readonly startLevel: number;
+  /** Reto de captura 1v1: la línea del inicial que se intenta capturar. */
+  private readonly capture: string | null;
+
+  constructor(private app: App, private gymId: string, mode: 'gym' | 'route' | 'capture' = 'gym') {
     const store = app.store;
     const test = store.data.settings.testMode;
-    const speciesId = store.data.selectedPokemon;
-    this.route = isRoute ? ROUTES[gymId] : null;
-    if (this.route) {
+    const mon = active(store)!;
+    this.line = mon.line;
+    this.startLevel = mon.level;
+    const speciesId = mon.species;
+    const progress = progressOf(mon);
+    this.route = mode === 'route' ? ROUTES[gymId] : null;
+    this.capture = mode === 'capture' ? gymId : null;
+    if (this.capture) {
+      this.world = new World({
+        speciesId, gym: { ...placeGym(TOWNS.paleta), city: 'Reto de captura' }, rooms: [50], progress,
+        mega: captureBoss(this.capture, mon.level),
+      });
+    } else if (this.route) {
       const r = this.route;
       this.world = new World({
-        speciesId, gym: placeGym(r), route: r,
+        speciesId, gym: placeGym(r), route: r, progress,
         rooms: Array.from({ length: r.rooms }, (_, i) => i + 1),
-        perks: perksFor(store, speciesId),
         xpMult: BALANCE.rooms.testModeXpMult,
       });
     } else {
       const { gym } = findGym(gymId);
       this.world = new World({
-        speciesId, gym,
+        speciesId, gym, progress,
         rooms: roomSequence(test),
-        perks: perksFor(store, speciesId),
         xpMult: test ? BALANCE.rooms.testModeXpMult : 1,
         scalingFactor: test ? BALANCE.rooms.testModeScalingFactor : 1,
       });
@@ -184,10 +200,10 @@ export class RunScreen implements Screen {
     const H = this.hud;
     H.hpFill.style.width = `${(100 * p.hp) / p.maxHp}%`;
     H.hpText.textContent = `${Math.ceil(p.hp)} / ${Math.round(p.maxHp)}`;
-    const maxed = p.level >= BALANCE.experience.maxLevel;
+    const maxed = p.level >= MAX_LEVEL;
     H.xpFill.style.width = maxed ? '100%' : `${(100 * p.xp) / w.xpNeeded}%`;
     H.level.textContent = `Nv ${p.level}`;
-    H.room.textContent = this.route ? `Sala ${w.room}/${w.rooms.length}` : `Sala ${w.room}/${BALANCE.rooms.perGym}`;
+    H.room.textContent = this.capture ? 'Reto de captura' : this.route ? `Sala ${w.room}/${w.rooms.length}` : `Sala ${w.room}/${BALANCE.rooms.perGym}`;
     H.gold.textContent = String(Math.floor(w.runGold + w.bonusGold));
     const key = p.moves.map((m) => `${m.def.id}${m.level}${m.evolved}`).join() + (p.item ?? '');
     if (H.attacks.dataset.key !== key) {
@@ -293,7 +309,7 @@ export class RunScreen implements Screen {
           // La Poké Ball solo se lanza al empezar; en las demás salas el entrenador entra contigo y se queda mirando.
           if (ev.index === 0) this.startThrow();
           else this.watcher = this.trainerSpot();
-          if (!this.route) recordBestRoom(store, this.gymId, ev.room);
+          if (!this.route && !this.capture) recordBestRoom(store, this.gymId, ev.room);
           audio.music(songForRoom(ev.room, ev.kind));
           this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!'
             : this.route ? (ev.index === 0 ? `${this.route.name} · Sala 1` : ev.index === ev.total - 1 ? '¡Un Pokémon fuerte!' : `Sala ${ev.room}`) : `Sala ${ev.room}`, ev.kind === 'normal' ? '' : 'danger');
@@ -301,7 +317,7 @@ export class RunScreen implements Screen {
           break;
         case 'roomCleared': {
           // Los tickets de hito se guardan al momento y solo una vez (solo en gimnasios).
-          const t = this.route ? 0 : claimMilestone(store, this.gymId, ev.room);
+          const t = this.route || this.capture ? 0 : claimMilestone(store, this.gymId, ev.room);
           if (t) {
             this.ticketsEarned += t;
             toast(`+${t} tickets del gachapón`);
@@ -422,7 +438,7 @@ export class RunScreen implements Screen {
     });
     this.showOverlay(h('div', { class: 'levelup' },
       h('div', { class: 'levelup-title' }, `¡Nivel ${w.player.level}!`),
-      h('div', { class: 'note center' }, 'Elige una mejora'),
+      h('div', { class: 'note center' }, 'Elige una mejora permanente (se guarda si superas la partida)'),
       h('div', { class: 'cards' }, ...cards),
     ));
     // Pequeño retardo para no elegir sin querer con el dedo del joystick.
@@ -497,7 +513,7 @@ export class RunScreen implements Screen {
       abilityList(p),
       h('button', { class: 'btn btn-play', 'data-testid': 'resume', onclick: () => this.togglePause() }, 'Continuar'),
       h('button', { class: 'btn btn-danger', 'data-testid': 'abandon', onclick: () => this.finish(false, true) }, 'Abandonar partida'),
-      h('p', { class: 'note' }, 'Al abandonar pierdes el nivel y las mejoras de esta partida; conservas el oro y los tickets.'),
+      h('p', { class: 'note' }, 'Al abandonar pierdes la experiencia y las mejoras de esta partida; conservas el oro y los tickets.'),
     ));
   }
 
@@ -508,6 +524,9 @@ export class RunScreen implements Screen {
     this.input.enabled = false;
     const w = this.world;
     const store = this.app.store;
+    // Solo se guarda la experiencia (y las cartas) si se supera la ruta, el gimnasio o el reto.
+    if (victory) commitRun(store, this.line, w);
+    if (this.capture) return this.finishCapture(victory, abandoned);
     if (this.route) return this.finishRoute(victory, abandoned);
     const { region, gym } = findGym(this.gymId);
     const p = w.player;
@@ -527,7 +546,7 @@ export class RunScreen implements Screen {
       pokeImg(p.species.dex, 96, 'gacha-sprite'),
       h('div', { class: 'result-lines' },
         line('Sala alcanzada', `${w.room} / ${BALANCE.rooms.perGym}`),
-        line('Nivel alcanzado', String(p.level)),
+        this.levelLine(victory),
         line('Enemigos derrotados', String(w.kills)),
         line('Oro ganado', `+${gold}`),
         line('Tickets ganados', `+${this.ticketsEarned}`),
@@ -535,7 +554,7 @@ export class RunScreen implements Screen {
       ),
       h('p', { class: 'note' }, victory
         ? `Has derrotado al jefe del gimnasio de ${gym.leader}.`
-        : 'El nivel, los movimientos y el objeto de la partida se pierden. El oro, los tickets y las mejoras permanentes se conservan.'),
+        : 'La experiencia y las mejoras de esta partida se pierden. El oro y los tickets se conservan.'),
       h('button', { class: 'btn btn-play', 'data-testid': 'result-continue', onclick: () => this.app.showMenu('map') }, 'Continuar'),
     ));
   }
@@ -560,13 +579,47 @@ export class RunScreen implements Screen {
       pokeImg(p.species.dex, 96, 'gacha-sprite'),
       h('div', { class: 'result-lines' },
         line('Sala alcanzada', `${w.room} / ${w.rooms.length}`),
+        this.levelLine(victory),
         line('Enemigos derrotados', String(w.kills)),
         line('Oro ganado', `+${gold}`),
       ),
       h('p', { class: 'note' }, victory
         ? `Has llegado a ${dest.name}. ¡Ya puedes visitarla desde el mapa!`
-        : `Vuelves a ${dest.name}. Conservas el oro; la ruta se repite desde el principio.`),
+        : `Vuelves a ${dest.name}. Conservas el oro, pero pierdes la experiencia de la ruta; se repite desde el principio.`),
       h('button', { class: 'btn btn-play', 'data-testid': 'result-continue', onclick: () => this.app.showTown(dest.id) }, `Ir a ${dest.name}`),
+    ));
+  }
+
+  /** Nivel: de cuál a cuál (o, al perder, que no se guarda). */
+  private levelLine(victory: boolean): HTMLElement {
+    const lv = this.world.player.level;
+    if (victory) return line('Nivel', lv > this.startLevel ? `${this.startLevel} → ${lv}` : String(lv));
+    return line('Nivel', lv > this.startLevel ? `${this.startLevel} (no se guarda el ${lv})` : String(this.startLevel));
+  }
+
+  /** Fin del reto de captura: al ganar, el inicial se une a tu equipo. */
+  private finishCapture(victory: boolean, abandoned: boolean): void {
+    const store = this.app.store;
+    const w = this.world;
+    const target = this.capture!;
+    const p = w.player;
+    let caught: { name: string; level: number } | null = null;
+    if (victory) {
+      const mon = capturedMon(target, Math.max(START_LEVEL, p.level));
+      addOwned(store, mon);
+      caught = { name: getSpecies(mon.species).name, level: mon.level };
+      this.app.audio.sfx('legend');
+    }
+    store.update((d) => { d.stats.kills += w.kills; });
+    const boss = w.mega!;
+    this.showOverlay(h('div', { class: `panel result ${victory ? 'win' : 'lose'}`, 'data-testid': 'result' },
+      h('div', { class: 'levelup-title' }, caught ? `¡${caught.name} capturado!` : abandoned ? 'Reto abandonado' : `¡${boss.name} se ha escapado!`),
+      pokeImg(caught ? getSpecies(store.data.owned.find((o) => o.line === target)!.species).dex : boss.dex, 96, 'gacha-sprite'),
+      h('div', { class: 'result-lines' }, this.levelLine(victory)),
+      h('p', { class: 'note' }, caught
+        ? `Se une a tu equipo con nivel ${caught.level}. Elígelo en la pestaña Pokémon.`
+        : 'Puedes volver a intentarlo desde el laboratorio de Pueblo Paleta (cuesta tickets).'),
+      h('button', { class: 'btn btn-play', 'data-testid': 'result-continue', onclick: () => this.app.showTown('paleta') }, 'Volver a Pueblo Paleta'),
     ));
   }
 }

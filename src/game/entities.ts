@@ -1,3 +1,4 @@
+import type { UpgradeAction } from './upgradeGenerator';
 import type { CombatMods } from '../data/abilities';
 import type { BossDef, BossSignature, EnemyDef, Behavior } from '../data/enemies';
 import type { ItemId } from '../data/items';
@@ -60,13 +61,18 @@ export interface Player extends Vec {
   invuln: number;
   /** Cuánto se ve (0 = aún dentro de la Poké Ball, 1 = del todo). Lo marca el lanzamiento antes de cada sala. */
   appear: number;
-  level: number;
-  xp: number;
   /** Movimientos activos. Con el ataque característico, solo uno: el de `attack`. */
   moves: OwnedMove[];
   attack: AttackState;
   /** Veces que se ha cogido cada carta de estadística. */
   statsTaken: Partial<Record<RunStatId, number>>;
+  /** Nivel permanente (1-100) y experiencia dentro del nivel. */
+  level: number;
+  xp: number;
+  /** Factor de vida, daño y regeneración por nivel (game/levels.ts), ya aplicado. */
+  power: number;
+  /** Cartas permanentes del Pokémon (las guardadas y las de esta partida, en orden). */
+  cards: UpgradeAction[];
   item: ItemId | null;
   focusCd: number;
   /** Hacia dónde apunta (rad). */
@@ -124,6 +130,8 @@ export interface Jump { sx: number; sy: number; tx: number; ty: number; t: numbe
 
 export interface Enemy extends Vec {
   id: number;
+  /** Nivel (se adapta al tuyo). */
+  level: number;
   def: EnemyDef | BossDef;
   boss: BossDef | null;
   behavior: Behavior;

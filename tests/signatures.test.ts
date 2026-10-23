@@ -5,7 +5,7 @@ import {
   ATTACK_UPGRADES, ATTACK_UPGRADE, EVO_KEY, TYPE_SIG, attackEvolutionReady, attackStats, rawAttackNums, signatureFor,
 } from '../src/data/signatures';
 import type { ElementType } from '../src/data/types';
-import { xpToNext } from '../src/game/progression';
+import { xpToNext } from '../src/game/levels';
 import { Rng } from '../src/game/rng';
 import { availableAttackUpgrades, generateChoices } from '../src/game/upgradeGenerator';
 import type { World } from '../src/game/world';

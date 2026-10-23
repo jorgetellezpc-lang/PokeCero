@@ -667,3 +667,47 @@
 .admin-btns .cta { flex: 1; }
 .admin-btns .cta.ghost { background: rgba(255, 255, 255, 0.08); color: #dfe6ff; box-shadow: none; }
 .set-row[data-admin="on"] .set-text small { color: #ffd34a; }
+
+/* ---------------- Test de compatibilidad (starter.ts) ---------------- */
+.starter {
+  display: flex; align-items: center; justify-content: center; padding: calc(16px + var(--safe-top, 0px)) 16px calc(16px + var(--safe-bottom, 0px));
+  background-size: cover; background-position: center; background-color: #10182c; overflow-y: auto;
+}
+.starter-box {
+  width: min(100%, 440px); display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 20px 18px 18px;
+  background: #f8f6ee; color: #1f1b2a; border: 4px solid #1f1b2a; border-radius: 10px;
+  box-shadow: inset 0 0 0 3px #8a90a8, 0 8px 0 rgba(0, 0, 0, 0.35); text-align: center;
+  font: 700 15px/1.45 'Nunito', system-ui, sans-serif;
+}
+.starter-box p { margin: 0; }
+.starter-title { margin: 4px 0 2px; font: 400 22px/1.3 'Press Start 2P', monospace; color: #c8382c; }
+.starter-title.small { font-size: 16px; }
+.starter-step { font: 400 10px 'Press Start 2P', monospace; color: #5a5870; }
+.starter-dots { display: flex; justify-content: center; gap: 6px; }
+.starter-dots i { width: 10px; height: 10px; border-radius: 50%; background: #d8d4c8; border: 2px solid #1f1b2a; }
+.starter-dots i.done { background: #8a90a8; }
+.starter-dots i.on { background: #ffd23a; }
+.starter-q { font: 800 19px/1.35 'Nunito', system-ui, sans-serif; padding: 6px 0; }
+.starter-answers { display: flex; flex-direction: column; gap: 9px; }
+.starter-btn {
+  padding: 12px 14px; border: 3px solid #1f1b2a; border-radius: 8px; background: #fff; color: #1f1b2a; text-align: left;
+  font: 800 15px/1.3 'Nunito', system-ui, sans-serif; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25); cursor: pointer;
+}
+.starter-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); }
+.starter-btn.go { background: #ffd23a; text-align: center; font-family: 'Press Start 2P', monospace; font-weight: 400; font-size: 12px; padding: 14px; }
+.starter-back { align-self: flex-start; border: 0; background: none; color: #5a5870; font: 800 14px 'Nunito', system-ui, sans-serif; }
+.starter-mon { display: flex; justify-content: center; }
+.starter-mon canvas { image-rendering: pixelated; }
+.starter-pick { font-size: 17px; }
+.starter-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.starter-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; border: 3px solid #1f1b2a; border-radius: 8px;
+  background: #fff; color: #1f1b2a; font: 800 14px 'Nunito', system-ui, sans-serif; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.25);
+}
+.starter-card small { font-weight: 600; font-size: 11px; line-height: 1.3; color: #4a4860; }
+.starter-face { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+
+/* Pokémon sin capturar en el selector */
+.pk4-face.locked img { filter: grayscale(1) brightness(0.55); }
+.pk4-lock { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; pointer-events: none; }
+.pk4-face { position: absolute; }

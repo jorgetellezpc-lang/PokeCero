@@ -4,7 +4,7 @@ import { ADMIN_FUNDS, checkAdminPassword, disableAdmin, enableAdmin } from '../s
 import { canEnterTown } from '../src/meta/adventure';
 import { gymStatus } from '../src/meta/rewards';
 import { MemoryStorage, SaveStore } from '../src/meta/save';
-import { buyUpgrade } from '../src/meta/shop';
+import { payCapture } from '../src/meta/capture';
 
 describe('modo admin', () => {
   it('solo se activa con la contraseña correcta', () => {
@@ -31,9 +31,9 @@ describe('modo admin', () => {
     expect(s.data.tickets).toBe(ADMIN_FUNDS);
     expect(canEnterTown(s, 'plateada')).toBe(true);
     expect(gymStatus(s, kanto, misty)).not.toBe('locked');
-    // Comprar no lo agota.
-    for (let i = 0; i < 5; i++) buyUpgrade(s, s.data.selectedPokemon, 'atk');
-    expect(s.data.gold).toBe(ADMIN_FUNDS);
+    // Gastar no lo agota.
+    for (let i = 0; i < 5; i++) expect(payCapture(s)).toBe(true);
+    expect(s.data.tickets).toBe(ADMIN_FUNDS);
     // Sobrevive a recargar.
     expect(new SaveStore(storage).data.admin).toBe(true);
 
@@ -41,7 +41,5 @@ describe('modo admin', () => {
     expect(s.data.admin).toBe(false);
     expect(s.data.gold).toBe(gold);
     expect(canEnterTown(s, 'plateada')).toBe(false);
-    // Las mejoras compradas se quedan.
-    expect(s.data.upgrades[s.data.selectedPokemon]?.atk).toBe(5);
   });
 });
