@@ -1,7 +1,7 @@
 import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
 import { ITEMS, ITEM_IDS } from '../../data/items';
 import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
-import { getSpecies, obtainablePokemon, PLAYABLE_BLURB, playablePokemon, sideOf, type PokemonSpecies } from '../../data/pokemon';
+import { getSpecies, obtainablePokemon, PLAYABLE_BLURB, sideOf, type PokemonSpecies } from '../../data/pokemon';
 import { TYPE_COLORS, TYPE_NAMES } from '../../data/typeColors';
 import { passiveOf } from '../../game/abilities';
 import { buyUpgrade, canBuy, perksFor, upgradeLevel } from '../../meta/shop';
@@ -11,11 +11,10 @@ import { icon, type IconName } from '../icons';
 import { typeGlyph } from '../typeGlyph';
 import { uiImg, type MenuScreen } from './menu';
 
-// Pestaña Pokémon (diseño del usuario): escenario a pantalla completa con el
-// selector de los 4 elegibles a la izquierda, tu Pokémon en el centro y su
-// ficha a la derecha; debajo, estadísticas en radar, entrenamiento (mejoras
-// permanentes), evolución y el ataque. Entrenar, Ataque, Objetos e
-// Información se abren en una hoja. Se adapta a cualquier ancho (menu.css).
+// Pestaña Pokémon: calcada del diseño del usuario (selector, tu Pokémon sobre
+// la roca, ficha, PS/Defensa/Velocidad, radar, entrenamiento y evolución).
+// Entrenar abre las mejoras en una hoja; al tocar tu Pokémon se abre su ficha
+// completa (habilidad, ataque, objetos e información).
 
 /** Icono de cada mejora: recorte del diseño si lo hay; si no, icono dibujado. */
 const UP_ICON: Record<PermanentUpgradeDef['id'], { img?: string; svg?: IconName; color: string }> = {
@@ -25,102 +24,128 @@ const UP_ICON: Record<PermanentUpgradeDef['id'], { img?: string; svg?: IconName;
   crit: { img: 'u-burst', color: '#ff9a2a' },
 };
 
+/**
+ * Lienzo del diseño (853 × 1844 px, la captura entera del usuario; abajo va la barra de navegación). Todo se coloca
+ * en sus coordenadas exactas, en % del lienzo, y las letras en cqi (1 px del
+ * diseño = 100cqi / 853), así queda idéntico a cualquier ancho.
+ */
+const CW = 853;
+const CH = 1844;
+const at = (x0: number, y0: number, x1: number, y1: number) =>
+  `left:${(x0 / CW) * 100}%;top:${(y0 / CH) * 100}%;width:${((x1 - x0) / CW) * 100}%;height:${((y1 - y0) / CH) * 100}%`;
+/** Orden del selector, como en el diseño. */
+const PICKER = ['pikachu', 'charmander', 'bulbasaur', 'squirtle'];
+const FACE_Y = [293, 408, 515, 622];
+
 export function renderPokemonTab(menu: MenuScreen): HTMLElement {
   const store = menu.app.store;
   const d = store.data;
   const sp = getSpecies(d.selectedPokemon);
   const perks = perksFor(store, sp.id);
   const side = sideOf(sp);
-  const color = TYPE_COLORS[sp.types[0]];
 
-  // --- selector lateral: los 4 elegibles ---
-  const picker = h('nav', { class: 'pk3-picker', 'aria-label': 'Elige tu Pokémon', 'data-testid': 'pokemon-selector' },
-    ...playablePokemon().map((p) => h('button', {
-      class: `pk3-face ${p.id === sp.id ? 'on' : ''}`, 'data-testid': `pick-${p.id}`, 'aria-label': p.name, 'aria-pressed': String(p.id === sp.id),
-      onclick: () => { if (p.id !== sp.id) { store.update((x) => { x.selectedPokemon = p.id; }); menu.app.audio.sfx('click'); } },
-    }, uiImg(`pk-face-${p.id}`, 'pk3-face-img'))));
+  // --- selector ---
+  const faces = PICKER.map(getSpecies).map((p, i) => h('button', {
+    class: `pk4-face ${p.id === sp.id ? 'on' : ''}`, style: at(40, FACE_Y[i] - 45, 130, FACE_Y[i] + 45),
+    'data-testid': `pick-${p.id}`, 'aria-label': p.name, 'aria-pressed': String(p.id === sp.id),
+    onclick: () => { if (p.id !== sp.id) { store.update((x) => { x.selectedPokemon = p.id; }); menu.app.audio.sfx('click'); } },
+  }, uiImg(`pk-face-${p.id}`, 'pk4-face-img')));
 
-  // --- tu Pokémon en el escenario (ilustración 3D si la hay; si no, su sprite animado) ---
-  const hero = HERO_ART.has(sp.id)
-    ? h('img', { class: 'pk3-hero-art', src: `ui/pk-3d-${sp.id}.webp`, alt: sp.name, draggable: 'false' })
-    : animatedPokemon(sp.dex, 190, { cls: 'pk3-hero-sprite' });
-  const stage = h('div', { class: 'pk3-stage' }, h('div', { class: 'pk3-ground' }), hero);
+  // --- tu Pokémon (ilustración 3D si la hay; si no, su sprite) sobre la roca. Al tocarlo, su ficha completa. ---
+  const passive = passiveOf(sp);
+  const openFicha = () => openSheet(menu, sp.name, () => h('div', {},
+    h('p', { class: 'pk3-passive', 'data-testid': 'hero-passive' }, h('b', {}, `Habilidad: ${passive.name}. `), passive.description),
+    moves(sp), items(), info(sp)));
+  const hero = h('button', {
+    class: 'pk4-hero', style: at(150, 540, 440, 852), 'data-testid': 'pk-hero', 'aria-label': `Ficha de ${sp.name}`, onclick: openFicha,
+  }, HERO_ART.has(sp.id)
+    ? h('img', { class: 'pk4-hero-art', src: `ui/pk-3d-${sp.id}.webp`, alt: sp.name, draggable: 'false' })
+    : animatedPokemon(sp.dex, 190, { cls: 'pk4-hero-sprite' }));
 
-  // --- ficha: nombre, nº, tipo, entrenamiento y descripción ---
+  // --- ficha ---
   const ups = PERMANENT_UPGRADES.map((u) => upgradeLevel(store, sp.id, u.id));
   const trained = ups.reduce((a, b) => a + b, 0);
   const trainMax = PERMANENT_UPGRADES.reduce((a, u) => a + u.maxLevel, 0);
-  const idCard = h('section', { class: 'pk3-card pk3-id' },
-    h('div', { class: 'pk3-name' }, h('span', { class: 'hero-name' }, sp.name), h('span', { class: 'pk3-star', title: 'Tu Pokémon' }, '★')),
-    h('div', { class: 'pk3-meta' },
-      h('span', {}, `N.º ${String(sp.dex).padStart(3, '0')}`),
-      h('span', {}, `Tipo ${sp.types.map((t) => TYPE_NAMES[t]).join(' / ')}`),
-      h('span', { class: 'pk3-type', style: `--t:${color}` }, typeGlyph(sp.types[0]))),
-    h('div', { class: 'pk3-lv', title: 'Nivel de entrenamiento (mejoras compradas)' }, h('b', {}, `Nv. ${trained}`), h('small', {}, `${trained} / ${trainMax}`)),
-    h('div', { class: 'pk3-xp' }, h('i', { style: `width:${(trained / trainMax) * 100}%` })),
-    h('p', { class: 'pk3-blurb' }, PLAYABLE_BLURB[sp.id] ?? ''),
-  );
+  const color = TYPE_COLORS[sp.types[0]];
+  const idCard = h('section', { class: 'pk4-card', style: at(482, 257, 826, 588) });
+  const els: HTMLElement[] = [
+    idCard,
+    // 50 px de letra como en el diseño; los nombres largos se encogen para caber con la estrella.
+    h('div', { class: 'pk4-name', style: `${at(505, 272, 805, 330)};--fs:${Math.min(50, (50 * 7.4) / sp.name.length)}` },
+      h('span', { class: 'hero-name' }, sp.name), h('span', { class: 'pk4-star' }, '★')),
+    h('div', { class: 'pk4-meta', style: at(505, 340, 745, 372) }, h('span', {}, `N.º ${String(sp.dex).padStart(3, '0')}`), h('span', {}, `Tipo ${TYPE_NAMES[sp.types[0]]}`)),
+    h('span', { class: 'pk4-type', style: `${at(757, 336, 807, 386)};--t:${color}`, title: sp.types.map((t) => TYPE_NAMES[t]).join(' / ') }, typeGlyph(sp.types[0], 26)),
+    h('div', { class: 'pk4-lv', style: at(505, 398, 805, 430), title: 'Nivel de entrenamiento (mejoras compradas con oro)' },
+      h('b', {}, `Nv. ${trained}`), h('small', {}, `${trained} / ${trainMax}`)),
+    h('div', { class: 'pk4-xp', style: at(505, 436, 805, 448) }, h('i', { style: `width:${(trained / trainMax) * 100}%` })),
+    h('p', { class: 'pk4-blurb', style: at(505, 472, 812, 575) }, PLAYABLE_BLURB[sp.id] ?? ''),
+  ];
 
-  // --- vida, defensa y velocidad (con las mejoras compradas) ---
+  // --- PS, defensa y velocidad ---
+  els.push(h('section', { class: 'pk4-card', style: at(482, 608, 826, 880) }));
   const def = side === 'special' ? sp.stats.sd : sp.stats.df;
-  const vitals = h('section', { class: 'pk3-card pk3-vitals' },
-    vital('u-heart', 'PS', Math.round(sp.stats.hp + perks.hp), STAT_MAX.hp, 'var(--pk3-red)'),
-    vital('u-shield', 'Defensa', def, STAT_MAX.df, 'var(--pk3-blue)'),
-    vital('u-boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul), STAT_MAX.speed, 'var(--pk3-cyan)'),
-  );
+  const vitals: [string, string, number, number, string][] = [
+    ['u-heart', 'PS', Math.round(sp.stats.hp + perks.hp), STAT_MAX.hp, 'linear-gradient(90deg, #ff4a3a, #ff8a3a)'],
+    ['u-shield', 'Defensa', def, STAT_MAX.df, 'linear-gradient(90deg, #2a7ff0, #5ab8ff)'],
+    ['u-boot', 'Velocidad', Math.round(sp.stats.speed * perks.spdMul), STAT_MAX.speed, 'linear-gradient(90deg, #22b8ff, #6ae0ff)'],
+  ];
+  vitals.forEach(([img, label, v, max, grad], i) => {
+    const y = 656 + i * 80;
+    els.push(
+      h('span', { class: 'pk4-vic', style: at(502, y - 28, 558, y + 28) }, uiImg(img)),
+      h('span', { class: 'pk4-vlabel', style: at(581, y - 20, 760, y + 4) }, label),
+      h('div', { class: 'pk4-bar', style: at(581, y + 9, 740, y + 21) }, h('i', { style: `width:${Math.min(100, (v / max) * 100)}%;background:${grad}` })),
+      h('b', { class: 'pk4-vval', style: at(745, y - 6, 805, y + 26) }, String(v)),
+    );
+  });
 
-  // --- estadísticas (radar) y entrenamiento ---
-  const radar = h('section', { class: 'pk3-card pk3-radar' }, h('h3', {}, 'Estadísticas'), radarChart(sp));
+  // --- estadísticas ---
+  els.push(h('section', { class: 'pk4-card', style: at(27, 920, 457, 1317) }),
+    h('h3', { class: 'pk4-title', style: at(58, 940, 430, 990) }, 'Estadísticas'),
+    radarChart(sp));
+
+  // --- entrenamiento ---
   const TRAIN: { id: PermanentUpgradeDef['id']; img: string; label: string }[] = [
     { id: 'hp', img: 'u-heart', label: 'Vida' }, { id: 'atk', img: 'u-sword', label: 'Ataque' },
     { id: 'def', img: 'u-shield', label: 'Defensa' }, { id: 'spd', img: 'u-boot', label: 'Velocidad' },
   ];
   const canTrain = PERMANENT_UPGRADES.some((u) => canBuy(store, sp.id, u.id) === 'ok');
-  const training = h('section', { class: 'pk3-card pk3-train' },
-    h('h3', {}, 'Entrenamiento'),
-    h('p', {}, 'Mejora sus atributos con oro. Se conservan entre partidas.'),
-    h('div', { class: 'pk3-train-row' }, ...TRAIN.map((t) => h('div', { class: 'pk3-train-slot', title: t.label },
-      uiImg(t.img), h('b', {}, String(upgradeLevel(store, sp.id, t.id)))))),
-    h('button', { class: `pk3-train-btn ${canTrain ? 'ready' : ''}`, 'data-testid': 'train', onclick: () => openSheet(menu, `Entrenar a ${sp.name}`, () => upgrades(menu, sp)) },
-      icon('up', 26), 'Entrenar'),
-  );
+  const SLOT_X = [494, 573, 653, 732];
+  els.push(h('section', { class: 'pk4-card', style: at(467, 920, 827, 1317) }),
+    h('h3', { class: 'pk4-title', style: at(497, 940, 820, 990) }, 'Entrenamiento'),
+    h('p', { class: 'pk4-desc', style: at(497, 996, 815, 1062) }, 'Mejora sus atributos con el oro de tus partidas.'),
+    ...TRAIN.map((t, i) => h('div', { class: 'pk4-slot', style: at(SLOT_X[i], 1081, SLOT_X[i] + 71, 1182), title: t.label },
+      uiImg(t.img), h('b', {}, String(upgradeLevel(store, sp.id, t.id))))),
+    h('button', {
+      class: `pk4-train ${canTrain ? 'ready' : ''}`, style: at(488, 1203, 806, 1288), 'data-testid': 'train',
+      onclick: () => openSheet(menu, `Entrenar a ${sp.name}`, () => upgrades(menu, sp)),
+    }, upArrow(), 'Entrenar'));
 
   // --- evolución ---
   const chain: PokemonSpecies[] = [sp];
   for (let s = sp; s.evolution; ) { s = getSpecies(s.evolution.to); chain.push(s); }
-  const evolution = h('section', { class: 'pk3-card pk3-evo' },
-    h('h3', {}, 'Evolución'),
+  els.push(h('section', { class: 'pk4-card', style: at(27, 1327, 827, 1562) }),
+    h('div', { class: 'pk4-ball', style: at(574, 1376, 718, 1520) }, icon('pokeball', 144)),
+    h('h3', { class: 'pk4-title big', style: at(60, 1345, 600, 1400) }, 'Evolución'),
     chain.length > 1
-      ? h('div', { class: 'pk3-evo-chain' }, ...chain.flatMap((p, i) => [
-        i ? h('span', { class: 'pk3-evo-arrow' }, h('small', {}, `Nv ${chain[i - 1].evolution!.level}`), '›') : null,
-        h('div', { class: 'pk3-evo-step' }, pokeImg(p.dex, 56), h('span', {}, p.name)),
+      ? h('div', { class: 'pk4-chain', style: at(56, 1405, 800, 1545) }, ...chain.flatMap((p, i) => [
+        i ? h('span', { class: 'pk4-chain-arrow' }, h('small', {}, `Nv ${chain[i - 1].evolution!.level}`), '›') : null,
+        h('div', { class: 'pk4-chain-step' }, pokeImg(p.dex, 64), h('span', {}, p.name)),
       ]).filter(Boolean) as HTMLElement[])
-      : h('p', {}, `${sp.name} no evoluciona.`),
-    chain.length > 1 ? h('p', { class: 'note' }, 'Evoluciona durante la partida al llegar a ese nivel.') : null,
-    h('div', { class: 'pk3-evo-ball' }, icon('pokeball', 120)),
-  );
+      : h('p', { class: 'pk4-desc big', style: at(60, 1410, 600, 1450) }, `${sp.name} no evoluciona.`));
 
-  // --- ataque, habilidad, objetos e información (detalle en hojas) ---
-  const sig = signatureFor(sp);
-  const passive = passiveOf(sp);
-  const more = h('section', { class: 'pk3-card pk3-more' },
-    h('div', { class: 'pk3-more-head' },
-      h('div', {}, h('h3', {}, sig.name), h('small', {}, `Ataque característico · ${sig.desc}`)),
-      h('span', { class: 'pk3-type big', style: `--t:${TYPE_COLORS[sig.primary]}` }, typeGlyph(sig.primary))),
-    h('p', { class: 'pk3-passive', 'data-testid': 'hero-passive' }, h('b', {}, `Habilidad: ${passive.name}. `), passive.description),
-    h('div', { class: 'pk3-more-btns' },
-      h('button', { 'data-sub': 'moves', onclick: () => openSheet(menu, 'Ataque', () => moves(sp)) }, icon('star', 22), 'Ataque'),
-      h('button', { 'data-sub': 'items', onclick: () => openSheet(menu, 'Objetos', () => items()) }, icon('bag', 22), 'Objetos'),
-      h('button', { 'data-sub': 'info', onclick: () => openSheet(menu, 'Información', () => info(sp)) }, icon('info', 22), 'Información'),
-    ),
+  return h('div', { class: 'tab pk4' },
+    h('div', { class: 'pk4-canvas', style: 'background-image:url(ui/pk-bg.webp)' },
+      h('nav', { class: 'pk4-picker', style: at(25, 235, 145, 672), 'aria-label': 'Elige tu Pokémon', 'data-testid': 'pokemon-selector' }),
+      ...faces, hero, ...els),
   );
+}
 
-  return h('div', { class: 'tab pk3', style: `--pk:${color}` },
-    h('div', { class: 'pk3-hero' }, picker, stage, h('div', { class: 'pk3-side' }, idCard, vitals)),
-    h('div', { class: 'pk3-grid' }, radar, training),
-    evolution,
-    more,
-  );
+/** Flecha gruesa del botón Entrenar (como en el diseño). */
+function upArrow(): HTMLElement {
+  const box = h('span', { class: 'pk4-arrow' });
+  box.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 12h6v10h6V12h6z" fill="currentColor"/></svg>';
+  return box;
 }
 
 /** Pokémon con ilustración 3D grande (recortada del diseño); el resto usa su sprite animado. */
@@ -133,37 +158,29 @@ const STAT_MAX = (() => {
   return { hp: max((p) => p.stats.hp), pa: max((p) => p.stats.pa), sa: max((p) => p.stats.sa), df: max((p) => p.stats.df), sd: max((p) => p.stats.sd), speed: max((p) => p.stats.speed) };
 })();
 
-function vital(img: string, label: string, value: number, max: number, color: string): HTMLElement {
-  return h('div', { class: 'pk3-vital' }, uiImg(img, 'pk3-vital-ic'),
-    h('div', { class: 'pk3-vital-body' }, h('span', {}, label), h('div', { class: 'pk3-bar' }, h('i', { style: `width:${Math.min(100, (value / max) * 100)}%;background:${color}` }))),
-    h('b', {}, String(value)));
-}
-
-/** Radar de 6 estadísticas (respecto al máximo de Kanto). */
+/** Radar de 6 estadísticas (respecto al máximo de Kanto), dibujado en las coordenadas del diseño. */
 function radarChart(sp: PokemonSpecies): HTMLElement {
   const st = sp.stats;
   const axes: [string, number][] = [
     ['PS', st.hp / STAT_MAX.hp], ['Ataque', st.pa / STAT_MAX.pa], ['Defensa', st.df / STAT_MAX.df],
     ['Velocidad', st.speed / STAT_MAX.speed], ['Def. Esp.', st.sd / STAT_MAX.sd], ['At. Esp.', st.sa / STAT_MAX.sa],
   ];
-  const C = 100;
-  const R = 62;
+  const CX = 236;
+  const CY = 1150;
+  const R = 112;
   const pt = (i: number, r: number) => {
     const a = -Math.PI / 2 + (i * Math.PI * 2) / 6;
-    return [C + Math.cos(a) * r, C + Math.sin(a) * r];
+    return [CX + Math.cos(a) * r, CY + Math.sin(a) * r];
   };
   const ring = (k: number) => axes.map((_, i) => pt(i, R * k).map((v) => v.toFixed(1)).join(',')).join(' ');
-  // Un mínimo para que ninguna punta quede pegada al centro.
   const shape = axes.map(([, v], i) => pt(i, R * (0.18 + 0.82 * Math.min(1, v))).map((x) => x.toFixed(1)).join(',')).join(' ');
-  const labels = axes.map(([name], i) => {
-    const [x, y] = pt(i, R + 22);
-    const anchor = Math.abs(x - C) < 4 ? 'middle' : x > C ? 'start' : 'end';
-    return `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="${anchor}">${name}</text>`;
-  }).join('');
-  const spokes = axes.map((_, i) => { const [x, y] = pt(i, R); return `<line x1="${C}" y1="${C}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
-  const dots = shape.split(' ').map((p) => { const [x, y] = p.split(','); return `<circle cx="${x}" cy="${y}" r="3"/>`; }).join('');
-  const box = h('div', { class: 'pk3-radar-svg' });
-  box.innerHTML = `<svg viewBox="-50 4 300 196" role="img" aria-label="Estadísticas de ${sp.name}">
+  const LBL: [number, number, string][] = [[237, 1022, 'middle'], [385, 1100, 'middle'], [385, 1231, 'middle'], [240, 1290, 'middle'], [92, 1231, 'middle'], [88, 1100, 'middle']];
+  const labels = axes.map(([name], i) => `<text x="${LBL[i][0]}" y="${LBL[i][1]}" text-anchor="${LBL[i][2]}">${name}</text>`).join('');
+  const spokes = axes.map((_, i) => { const [x, y] = pt(i, R); return `<line x1="${CX}" y1="${CY}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
+  const dots = shape.split(' ').map((p) => { const [x, y] = p.split(','); return `<circle cx="${x}" cy="${y}" r="4"/>`; }).join('');
+  const box = h('div', { class: 'pk4-radar', style: at(27, 990, 457, 1310) });
+  box.innerHTML = `<svg viewBox="27 990 430 320" role="img" aria-label="Estadísticas de ${sp.name}">
+    <circle class="halo" cx="${CX}" cy="${CY}" r="${R * 1.28}"/>
     <g class="grid">${[1, 0.66, 0.33].map((k) => `<polygon points="${ring(k)}"/>`).join('')}${spokes}</g>
     <polygon class="shape" points="${shape}"/><g class="dots">${dots}</g><g class="lbl">${labels}</g></svg>`;
   return box;

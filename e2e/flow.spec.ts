@@ -69,26 +69,25 @@ test('ciclo completo del prototipo', async ({ page }) => {
   // Navegación por las cuatro pestañas
   await page.click('[data-tab="pokemon"]');
   await expect(page.locator('.hero-name')).toContainText('Charmander');
+  // Al tocar tu Pokémon se abre su ficha completa (habilidad, ataque, objetos e información).
+  await page.getByTestId('pk-hero').click();
   await expect(page.getByTestId('hero-passive')).toContainText('Mar Llamas');
+  await expect(page.getByTestId('signature-attack')).toContainText('Ascuas');
+  await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
+  await shot(page, '02b-ataque');
+  await page.getByTestId('sheet-close').click();
   // Entrenar abre la hoja con las 10 mejoras permanentes.
   await page.getByTestId('train').click();
   await expect(page.locator('.upgrade-row')).toHaveCount(10);
   await page.getByTestId('sheet-close').click();
   await shot(page, '02-pokemon');
   // Selección: solo los 3 iniciales de Kanto y Pikachu, todos disponibles.
-  await expect(page.getByTestId('pokemon-selector').locator('.pk3-face')).toHaveCount(4);
+  await expect(page.locator('.pk4-face')).toHaveCount(4);
   await page.getByTestId('pick-pikachu').click();
   await expect(page.locator('.hero-name')).toContainText('Pikachu');
   await shot(page, '02a-seleccion');
   await page.getByTestId('pick-charmander').click();
   await expect(page.locator('.hero-name')).toContainText('Charmander');
-  // Ataque característico: uno por Pokémon, con su evolución y sus mejoras posibles.
-  await page.click('[data-sub="moves"]');
-  await expect(page.getByTestId('pk-sheet')).toBeVisible();
-  await expect(page.getByTestId('signature-attack')).toContainText('Ascuas');
-  await expect(page.getByTestId('signature-attack')).toContainText('Evoluciona a Llamarada');
-  await shot(page, '02b-ataque');
-  await page.getByTestId('sheet-close').click();
   await page.click('[data-tab="settings"]');
   await expect(page.locator('[data-setting="testMode"]')).toBeChecked();
   await shot(page, '03-ajustes');

@@ -6,7 +6,7 @@ Recortes de las pantallas de diseño que pasó el usuario (sin la interfaz dibuj
 |---|---|
 | `map-kanto.webp` | Mapa de Kanto con las etiquetas de las ciudades dibujadas (sin barra superior ni tarjeta). Encima van zonas táctiles y los puntos de progreso de Plateada (`mapTab.ts`, `LABELS`). `map-blur.webp`: el mismo, desenfocado, para los lados. |
 | `city-plateada.webp`, `medal-roca.webp` | Miniatura de la ciudad y medalla de la tarjeta del gimnasio. |
-| `pk-bg.webp` | Escenario de la pestaña Pokémon (bosque, lago y castillo, sin Pikachu ni interfaz). |
+| `pk-bg.webp` | Escenario de la pestaña Pokémon: la captura entera (853 × 1844) sin interfaz ni Pikachu; la parte de abajo, desenfocada (la tapan las tarjetas). |
 | `pk-3d-pikachu.webp` | Pikachu de la ilustración, recortado. Los demás usan su sprite animado hasta tener su ilustración. |
 | `pk-face-*.webp` | Retratos redondos del selector (Bulbasaur, Charmander, Squirtle, Pikachu). |
 | `gym-brock.webp` | Cabecera de la ficha del gimnasio de Brock (con su texto y la flecha de volver). |

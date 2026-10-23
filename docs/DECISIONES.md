@@ -159,16 +159,15 @@ Cada Pokémon tiene **un solo ataque**, generado a partir de sus tipos. Todas la
 
 ## Menús v2: Pokémon y Mapa (diseños del usuario)
 
-- **Pokémon:**
-  - El escenario ocupa toda la pantalla y la barra superior solo muestra el oro y los tickets.
-  - A la izquierda está el selector de los 4 elegibles (retratos redondos, con aro dorado en el elegido) y en el centro tu Pokémon.
-  - A la derecha, la ficha: nombre, número, tipo, nivel de entrenamiento y una descripción. Debajo, PS, Defensa y Velocidad con barras.
-  - Más abajo: radar de 6 estadísticas, Entrenamiento y Evolución.
-  - **Entrenamiento:** 4 atributos con su nivel. **Entrenar** abre una hoja con las 10 mejoras permanentes.
-  - **Evolución:** cadena con los niveles a los que evoluciona.
-  - Al final, una tarjeta con el ataque característico y la habilidad, con botones Ataque, Objetos e Información que abren hojas.
-  - El «Nv.» de la ficha es el **nivel de entrenamiento**: la suma de las mejoras compradas. Los Pokémon no tienen nivel permanente.
-  - Pikachu usa la ilustración 3D del diseño. Los otros tres usan su sprite animado hasta que haya ilustración suya.
+- **Pokémon (calcado del diseño):**
+  - La captura del usuario (853 × 1844) es un lienzo que se escala al ancho, y cada elemento va en sus coordenadas exactas.
+  - El fondo es su escenario, sin interfaz y sin Pikachu.
+  - Contenido: selector, tu Pokémon sobre la roca, ficha, PS/Defensa/Velocidad, radar, Entrenamiento y Evolución. La barra de navegación queda encima del escenario, como en el diseño.
+  - Lo que el diseño no muestra, pero sigue accesible:
+    - **Entrenar** abre las 10 mejoras de oro.
+    - **Al tocar tu Pokémon** se abre su ficha completa: habilidad, ataque característico, objetos e información.
+  - El «Nv.» es el **nivel de entrenamiento** (las mejoras compradas). Los Pokémon no tienen nivel permanente.
+  - **Ilustraciones 3D:** de momento solo hay la de Pikachu, recortada del diseño. Charmander, Bulbasaur y Squirtle usan su sprite animado hasta tener la suya: basta añadir `public/ui/pk-3d-<especie>.webp` y su id en `HERO_ART` (`pokemonTab.ts`).
 - **Mapa:**
   - La ilustración de Kanto, con las etiquetas de las ciudades dibujadas, ocupa la pantalla manteniendo su proporción; lo que sobra a los lados se rellena con el mapa desenfocado.
   - Al tocar una ciudad, la tarjeta de abajo muestra su gimnasio: miniatura, tipo, descripción y medalla con 5 puntos de progreso. **Entrar** lleva a la ficha del gimnasio.
