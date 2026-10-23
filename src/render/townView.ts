@@ -2,7 +2,7 @@ import type { Spot, TownDef } from '../data/adventure';
 import type { World } from '../game/world';
 import { drawShadow } from './animator';
 import { fallback } from './draw2d';
-import { buildTownArt, type TownArt } from './townArt';
+import { buildTownArt, drawSprite, type TownArt } from './townArt';
 import { preloadTrainer, Trainer, trainerShadow } from './trainer';
 
 // ============================================================================
@@ -113,8 +113,8 @@ export class TownView {
     const top = cy - 10;
     const bottom = cy + vh + 140;
     for (const s of this.art.sprites) {
-      if (s.base < top || s.base > bottom || s.x > cx + vw || s.x + s.img.width < cx) continue;
-      list.push({ base: s.base, fn: () => ctx.drawImage(s.img, s.x, s.y) });
+      if (s.base < top || s.base > bottom || s.x > cx + vw || s.x + s.w < cx) continue;
+      list.push({ base: s.base, fn: () => drawSprite(ctx, s) });
     }
     for (const n of w.npcs) {
       list.push({ base: n.y, fn: () => { drawShadow(ctx, n.dex, n.x, n.y, n.anim.scale); if (!n.anim.draw(ctx, n.x, n.y)) fallback(ctx, n.x, n.y, '#c0c0c0'); } });
@@ -129,7 +129,7 @@ export class TownView {
     list.sort((a, b) => a.base - b.base);
     for (const d of list) d.fn();
     // Tu silueta a través de tejados y copas, para no perderte de vista.
-    if (this.art.sprites.some((s) => s.base > p.y && s.base < p.y + 60 && p.x > s.x && p.x < s.x + s.img.width && p.y > s.y)) {
+    if (this.art.sprites.some((s) => s.h > 34 && s.base > p.y && s.base < p.y + 60 && p.x > s.x && p.x < s.x + s.w && p.y > s.y)) {
       this.trainer.draw(ctx, p.x, p.y, 0.4);
     }
   }

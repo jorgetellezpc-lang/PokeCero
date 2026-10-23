@@ -1,5 +1,6 @@
 import type { Decor, TownDef } from '../data/adventure';
 import type { Obstacle } from '../data/layouts';
+import { NATURE_ATLAS, NATURE_PX, type NatureSprite } from '../data/natureAtlas';
 
 // ============================================================================
 // Pixel art de los pueblos, generado a partir de los datos (data/adventure.ts).
@@ -63,66 +64,45 @@ const box = (ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: 
 
 // --- paleta --------------------------------------------------------------------
 
-const GRASS: RGB[] = ['#275a20', '#3b822b', '#4c9733', '#5fab3c', '#84c64e'].map(hex);
-const DIRT: RGB[] = ['#94653a', '#b98448', '#d29e58', '#e2b46c', '#efc985'].map(hex);
-const STONE: RGB[] = ['#6f6a62', '#97918a', '#b7b1a4', '#cdc7b8', '#e2ddcf'].map(hex);
+const GRASS: RGB[] = ['#3c7a1c', '#58992a', '#6aac2e', '#80bf36', '#a6d64e'].map(hex);
+const DIRT: RGB[] = ['#a2653a', '#c8864a', '#dea060', '#ecb472', '#f5c98c'].map(hex);
+const STONE: RGB[] = ['#6c635e', '#948983', '#ab9f98', '#c0b3aa', '#d8ccc2'].map(hex);
 const SAND: RGB[] = ['#d2b474', '#e4ca8c', '#efd9a2', '#f7e8bf'].map(hex);
 const WATER: RGB[] = ['#245fb0', '#2f74c6', '#3b89d8', '#69b2ec', '#d8f2ff'].map(hex);
 const BANK: RGB[] = ['#5b3f26', '#7a5634', '#93693f'].map(hex);
 const WOOD: RGB[] = ['#4a2e18', '#6e4526', '#8e5c32', '#ae7842', '#c9965a'].map(hex);
-const LEAF: RGB[] = ['#1e4a1e', '#2d6626', '#3f8530', '#57a33b', '#79c04a', '#a2d968'].map(hex);
 const OUTLINE: RGB = hex('#1f1b2a');
 const FLOWERS: RGB[] = ['#f6f4ee', '#f08ab0', '#ffd23a', '#a98ef0', '#ea5a4a'].map(hex);
 const GLASS: RGB[] = ['#f2b448', '#ffd97a', '#fff1bd'].map(hex);
 
 // --- objetos de pie --------------------------------------------------------------
 
-/** Algo que se dibuja de pie: imagen, dónde va y la línea de sus pies (para ordenar). */
-export interface Sprite { img: HTMLCanvasElement; x: number; y: number; base: number }
-
-const TREE_W = 44;
-const TREE_H = 58;
-
-/** Árbol frondoso con luz desde arriba a la izquierda. */
-function treeSprite(variant: number): HTMLCanvasElement {
-  const [c, ctx] = canvas(TREE_W, TREE_H);
-  const tint = [0, 0.06, -0.08][variant % 3];
-  const leaf = LEAF.map((l) => shade(l, tint));
-  // Tronco
-  box(ctx, 18, 38, 9, 18, WOOD[0]);
-  box(ctx, 19, 38, 7, 17, WOOD[2]);
-  box(ctx, 19, 38, 2, 17, WOOD[3]);
-  box(ctx, 24, 40, 2, 15, WOOD[1]);
-  box(ctx, 16, 54, 13, 3, WOOD[0]);
-  box(ctx, 17, 54, 11, 2, WOOD[1]);
-  // Copa: unión de círculos
-  const blobs = variant % 2 === 0
-    ? [[22, 21, 17], [11, 27, 10], [33, 27, 10], [22, 31, 12], [15, 14, 9], [29, 14, 9]]
-    : [[22, 19, 15], [12, 28, 11], [32, 28, 11], [22, 33, 11], [22, 9, 9]];
-  const inside = (x: number, y: number) => blobs.some(([bx, by, r]) => (x - bx) ** 2 + (y - by) ** 2 <= r * r);
-  const img = ctx.getImageData(0, 0, TREE_W, TREE_H);
-  for (let y = 0; y < 46; y++) {
-    for (let x = 0; x < TREE_W; x++) {
-      if (!inside(x + 0.5, y + 0.5)) continue;
-      const edge = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
-      let col: RGB;
-      if (edge) col = leaf[0];
-      else {
-        // Racimos de hojas: cada racimo con su propio brillo, y el conjunto más oscuro abajo a la derecha.
-        const d = Math.hypot(x - 15, y - 10) / 34;
-        const clump = vnoise(x, y, 5, variant + 7) - 0.5;
-        const s = d + clump * 0.45 + (hash(x, y, variant) - 0.5) * 0.12;
-        col = s < 0.28 ? leaf[5] : s < 0.45 ? leaf[4] : s < 0.62 ? leaf[3] : s < 0.8 ? leaf[2] : leaf[1];
-      }
-      const i = (y * TREE_W + x) * 4;
-      img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
+/** Algo que se dibuja de pie: imagen (o un trozo del atlas), dónde va y la línea de sus pies (para ordenar). */
+export interface Sprite {
+  img: CanvasImageSource;
+  /** Recorte de la imagen (si es un atlas). */
+  src?: readonly [number, number, number, number];
+  x: number; y: number; w: number; h: number;
+  base: number;
 }
 
-const TREES = [0, 1, 2, 3].map((v) => (typeof document === 'undefined' ? null : treeSprite(v)));
+const whole = (img: HTMLCanvasElement, x: number, y: number, base: number): Sprite => ({ img, x, y, w: img.width, h: img.height, base });
+
+// --- naturaleza del usuario (atlas) -----------------------------------------------
+
+const NATURE: HTMLImageElement | null = typeof Image === 'undefined' ? null : Object.assign(new Image(), { src: 'ui/nature.webp' });
+
+/** Árbol, arbusto, mata o roca del atlas con los pies en (x, y). */
+function nature(name: NatureSprite, x: number, y: number, scale = 1): Sprite {
+  const [sx, sy, sw, sh, foot] = NATURE_ATLAS[name];
+  const k = scale / NATURE_PX;
+  return { img: NATURE!, src: [sx, sy, sw, sh], x: Math.round(x - (sw * k) / 2), y: Math.round(y - foot * k), w: sw * k, h: sh * k, base: y };
+}
+
+/** Arbustos que quedan bien sueltos (sin setos, tocón ni la roca). */
+const BUSHES: NatureSprite[] = ['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'b10', 'b13', 'b14', 'b15', 'b16', 'b17', 'b18', 'b20', 'b21', 'b24', 'b25', 'b26', 'b27', 'b28'];
+const PLANTS: NatureSprite[] = ['b11', 'b12', 'b19', 'b29', 'b30'];
+const ROCKS: NatureSprite[] = ['rock0', 'rock1', 'rock2', 'rock3', 'rock4', 'rock5'];
 
 /** Edificio en 3/4: tejado de tejas, fachada con puerta y ventanas encendidas. */
 function buildingSprite(o: Obstacle): { img: HTMLCanvasElement; ox: number; oy: number } {
@@ -298,31 +278,6 @@ function buildingSprite(o: Obstacle): { img: HTMLCanvasElement; ox: number; oy: 
   return { img: c, ox: o.x - OX, oy: o.y + o.h - H };
 }
 
-/** Roca: pedrusco facetado que ocupa su hueco. */
-function rockSprite(o: Obstacle): HTMLCanvasElement {
-  const W = o.w + 4;
-  const H = o.h + 10;
-  const [c, ctx] = canvas(W, H);
-  const img = ctx.getImageData(0, 0, W, H);
-  const cx = W / 2;
-  const cy = H * 0.56;
-  const rx = W / 2 - 1;
-  const ry = H / 2 - 1;
-  const inside = (x: number, y: number) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + (vnoise(x, y, 6, o.x) - 0.5) * 0.5 <= 1;
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (!inside(x + 0.5, y + 0.5)) continue;
-      const edge = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
-      const s = Math.hypot(x - W * 0.35, y - H * 0.3) / Math.max(W, H) + (vnoise(x, y, 4, o.y) - 0.5) * 0.3;
-      const col = edge ? OUTLINE : s < 0.22 ? STONE[4] : s < 0.4 ? STONE[3] : s < 0.6 ? STONE[2] : s < 0.8 ? STONE[1] : STONE[0];
-      const i = (y * W + x) * 4;
-      img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
-
 /** Valla horizontal: postes cada 12 px y dos travesaños. */
 function fenceH(w: number): HTMLCanvasElement {
   const [c, ctx] = canvas(w, 18);
@@ -430,23 +385,6 @@ function propSprite(k: Decor['kind']): HTMLCanvasElement | null {
       box(ctx, 5, 24, 24, 3, WATER[0]);
       for (let x = 3; x < 31; x += 7) box(ctx, x, 30, 1, 9, STONE[1]);
       box(ctx, 3, 34, 28, 1, STONE[1]);
-      return c;
-    }
-    case 'bush': {
-      const [c, ctx] = canvas(26, 18);
-      const img = ctx.getImageData(0, 0, 26, 18);
-      for (let y = 0; y < 18; y++) {
-        for (let x = 0; x < 26; x++) {
-          const inside = (px: number, py: number) => ((px - 13) / 12.5) ** 2 + ((py - 10) / 8.5) ** 2 <= 1;
-          if (!inside(x + 0.5, y + 0.5)) continue;
-          const edge = !inside(x - 0.5, y + 0.5) || !inside(x + 1.5, y + 0.5) || !inside(x + 0.5, y - 0.5) || !inside(x + 0.5, y + 1.5);
-          const s = Math.hypot(x - 9, y - 5) / 20 + (vnoise(x, y, 3, 5) - 0.5) * 0.4;
-          const col = edge ? LEAF[0] : s < 0.3 ? LEAF[5] : s < 0.5 ? LEAF[4] : s < 0.7 ? LEAF[3] : LEAF[2];
-          const i = (y * 26 + x) * 4;
-          img.data[i] = col[0]; img.data[i + 1] = col[1]; img.data[i + 2] = col[2]; img.data[i + 3] = 255;
-        }
-      }
-      ctx.putImageData(img, 0, 0);
       return c;
     }
     default:
@@ -630,19 +568,14 @@ function paintDecorArea(ctx: CanvasRenderingContext2D, dc: Decor): void {
       box(ctx, x - 1, y + 3, 4, 1, 'rgba(20,40,10,0.35)');
     }
   } else if (dc.kind === 'tallgrass') {
-    // Filas de hojas altas, más oscuras abajo
-    box(ctx, dc.x, dc.y, w, h, GRASS[1]);
-    for (let y = dc.y + 6; y < dc.y + h; y += 5) {
-      for (let x = dc.x; x < dc.x + w; x += 3) {
-        const tall = 5 + Math.floor(hash(x, y, 41) * 4);
-        const off = Math.floor(hash(x, y, 42) * 2);
-        box(ctx, x + off, y - tall, 2, tall, GRASS[2]);
-        box(ctx, x + off, y - tall, 1, tall, GRASS[3]);
-        box(ctx, x + off, y - tall, 1, 1, GRASS[4]);
-        box(ctx, x + off + 1, y - 2, 1, 2, GRASS[0]);
+    // Suelo más oscuro bajo la hierba alta (las matas van de pie, ver buildTownArt).
+    for (let y = dc.y; y < dc.y + h; y++) {
+      for (let x = dc.x; x < dc.x + w; x++) {
+        const edge = Math.min(x - dc.x, dc.x + w - 1 - x, y - dc.y, dc.y + h - 1 - y);
+        if (edge + vnoise(x, y, 6, 19) * 6 < 3) continue;
+        box(ctx, x, y, 1, 1, hash(x, y, 43) < 0.5 ? GRASS[1] : GRASS[0]);
       }
     }
-    box(ctx, dc.x, dc.y + h - 2, w, 2, GRASS[0]);
   } else if (dc.kind === 'bridge') {
     box(ctx, dc.x, dc.y, w, h, OUTLINE);
     const vertical = h > w;
@@ -697,48 +630,86 @@ export function buildTownArt(t: TownDef): TownArt {
       g.fillStyle = 'rgba(16, 30, 12, 0.3)';
       g.fillRect(o.x + o.w + 6, o.y + 8, 8, o.h - 4);
       g.fillRect(o.x + 4, o.y + o.h, o.w + 10, 5);
-      sprites.push({ img: b.img, x: b.ox, y: b.oy, base: o.y + o.h });
+      sprites.push(whole(b.img, b.ox, b.oy, o.y + o.h));
     } else if (o.kind === 'tree') {
-      // Bosquecillo: árboles al tresbolillo que llenan el hueco.
-      const sx = 30;
-      const sy = 24;
+      // Bosquecillo de robles y pinos al tresbolillo que llena el hueco.
+      const sx = 40;
+      const sy = 30;
+      const border = o.x === 0 || o.x + o.w >= t.W || o.y === 0 || o.y + o.h >= t.H;
       let row = 0;
-      for (let y = o.y + o.h - 4; y >= o.y + 6; y -= sy, row++) {
-        for (let x = o.x + 14 + (row % 2 ? sx / 2 : 0); x <= o.x + o.w - 6; x += sx) {
-          const jx = x + Math.round((hash(x, y, 51) - 0.5) * 8);
-          const jy = y + Math.round((hash(x, y, 52) - 0.5) * 6);
-          const img = TREES[Math.floor(hash(x, y, 53) * 4)]!;
-          shadow(g, jx + 4, jy - 1, 15, 5);
-          sprites.push({ img, x: jx - TREE_W / 2, y: jy - TREE_H, base: jy });
-        }
-        if (o.w < sx) {
-          const img = TREES[row % 4]!;
-          sprites.push({ img, x: o.x + o.w / 2 - TREE_W / 2, y: y - TREE_H, base: y });
+      for (let y = o.y + o.h - 4; y >= o.y + 4; y -= sy, row++) {
+        const xs: number[] = [];
+        for (let x = o.x + 18 + (row % 2 ? sx / 2 : 0); x <= o.x + o.w - 8; x += sx) xs.push(x);
+        if (!xs.length) xs.push(o.x + o.w / 2);
+        for (const x of xs) {
+          const jx = x + Math.round((hash(x, y, 51) - 0.5) * 10);
+          const jy = y + Math.round((hash(x, y, 52) - 0.5) * 8);
+          const r = hash(x, y, 53);
+          const kind: NatureSprite = r < (border ? 0.55 : 0.3) ? (r < 0.15 ? 'pine2' : 'pine') : r < 0.8 ? 'oak' : 'oak2';
+          const sp = nature(kind, jx, jy, 0.9 + hash(x, y, 54) * 0.2);
+          shadow(g, jx + 5, jy - 1, Math.round(sp.w * 0.3), 6);
+          sprites.push(sp);
         }
       }
     } else if (o.kind === 'fence') {
       if (o.w >= o.h) {
-        sprites.push({ img: fenceH(o.w), x: o.x, y: o.y + o.h - 18, base: o.y + o.h });
+        sprites.push(whole(fenceH(o.w), o.x, o.y + o.h - 18, o.y + o.h));
       } else {
-        for (let y = o.y + 12; y <= o.y + o.h; y += 12) sprites.push({ img: POST!, x: o.x, y: y - 29, base: y });
+        for (let y = o.y + 12; y <= o.y + o.h; y += 12) sprites.push(whole(POST!, o.x, y - 29, y));
       }
     } else if (o.kind === 'rock') {
-      shadow(g, o.x + o.w / 2 + 3, o.y + o.h - 1, o.w / 2 + 2, 4);
-      sprites.push({ img: rockSprite(o), x: o.x - 2, y: o.y - 8, base: o.y + o.h });
+      // Montón de rocas del atlas, del ancho del hueco (algo más, para que lo cubra).
+      const name = ROCKS[Math.floor(hash(o.x, o.y, 55) * ROCKS.length)];
+      const scale = Math.max(0.6, (o.w * 1.45) / (NATURE_ATLAS[name][2] / NATURE_PX));
+      shadow(g, o.x + o.w / 2 + 3, o.y + o.h - 1, o.w / 2 + 4, 4);
+      sprites.push(nature(name, o.x + o.w / 2, o.y + o.h - 2, scale));
     }
   }
   for (const dc of t.decor) {
+    if (dc.kind === 'bush' || dc.kind === 'plant') {
+      const list = dc.kind === 'bush' ? BUSHES : PLANTS;
+      const name = dc.v ? (`b${dc.v}` as NatureSprite) : list[Math.floor(hash(dc.x, dc.y, 56) * list.length)];
+      shadow(g, dc.x + 3, dc.y - 1, 12, 4);
+      sprites.push(nature(name, dc.x, dc.y));
+      continue;
+    }
+    if (dc.kind === 'tallgrass') {
+      // Matas de hierba alta, de pie: tapan las piernas al cruzarlas.
+      const w = dc.w ?? 0;
+      const h = dc.h ?? 0;
+      let row = 0;
+      for (let y = dc.y + 14; y <= dc.y + h; y += 15, row++) {
+        for (let x = dc.x + 12 + (row % 2 ? 11 : 0); x <= dc.x + w - 10; x += 22) {
+          const jx = x + Math.round((hash(x, y, 57) - 0.5) * 6);
+          sprites.push(nature(hash(x, y, 58) < 0.5 ? 'tall0' : 'tall1', jx, y, 0.62 + hash(x, y, 59) * 0.12));
+        }
+      }
+      continue;
+    }
     const img = propSprite(dc.kind);
     if (!img) continue;
     shadow(g, dc.x + 3, dc.y - 1, Math.max(4, img.width / 2), 3);
-    sprites.push({ img, x: Math.round(dc.x - img.width / 2), y: dc.y - img.height + 1, base: dc.y });
+    sprites.push(whole(img, Math.round(dc.x - img.width / 2), dc.y - img.height + 1, dc.y));
   }
   sprites.sort((a, b) => a.base - b.base);
 
-  // Minimapa: suelo y lo que está de pie, en pequeño.
+  // Minimapa: suelo y lo que está de pie, en pequeño (se repinta cuando llega el atlas).
   const [mini, m] = canvas(t.W / 4, t.H / 4);
-  m.imageSmoothingEnabled = true;
-  m.drawImage(ground, 0, 0, t.W / 4, t.H / 4);
-  for (const s of sprites) m.drawImage(s.img, s.x / 4, s.y / 4, s.img.width / 4, s.img.height / 4);
+  const paintMini = () => {
+    m.imageSmoothingEnabled = true;
+    m.drawImage(ground, 0, 0, t.W / 4, t.H / 4);
+    for (const s of sprites) drawSprite(m, s, 0.25);
+  };
+  paintMini();
+  if (NATURE && !NATURE.complete) NATURE.addEventListener('load', paintMini, { once: true });
   return { ground, sprites, mini, water: t.obstacles.filter((o) => o.kind === 'water') };
+}
+
+/** Dibuja un objeto de pie (opcionalmente a escala, para el minimapa). */
+export function drawSprite(ctx: CanvasRenderingContext2D, s: Sprite, k = 1, alpha = 1): void {
+  if (s.src && !(NATURE?.complete && NATURE.naturalWidth)) return;
+  if (alpha < 1) ctx.globalAlpha = alpha;
+  if (s.src) ctx.drawImage(s.img, s.src[0], s.src[1], s.src[2], s.src[3], s.x * k, s.y * k, s.w * k, s.h * k);
+  else ctx.drawImage(s.img, s.x * k, s.y * k, s.w * k, s.h * k);
+  if (alpha < 1) ctx.globalAlpha = 1;
 }

@@ -46,8 +46,10 @@ export interface Ground { kind: 'path' | 'plaza' | 'sand'; x: number; y: number;
  * los objetos (farolas, carteles, buzones…) se dibujan de pie y no se atraviesan.
  */
 export interface Decor {
-  kind: 'flowers' | 'tallgrass' | 'bridge' | 'lamp' | 'sign' | 'signpost' | 'mailbox' | 'barrel' | 'crate' | 'well' | 'bush';
+  kind: 'flowers' | 'tallgrass' | 'bridge' | 'lamp' | 'sign' | 'signpost' | 'mailbox' | 'barrel' | 'crate' | 'well' | 'bush' | 'plant';
   x: number; y: number; w?: number; h?: number;
+  /** Variante concreta del atlas de naturaleza (p. ej. 22 = seto); si no, una al azar fija. */
+  v?: number;
 }
 
 export interface TownDef {
@@ -112,7 +114,7 @@ function forest(south: boolean, bottom = TH): Obstacle[] {
 
 /** Hueco que ocupa cada objeto del decorado (lo que no se atraviesa). */
 const PROP_BOX: Partial<Record<Decor['kind'], [number, number]>> = {
-  lamp: [8, 5], sign: [22, 6], signpost: [8, 6], mailbox: [10, 6], barrel: [14, 8], crate: [16, 8], well: [30, 14], bush: [22, 10],
+  lamp: [8, 5], sign: [22, 6], signpost: [8, 6], mailbox: [10, 6], barrel: [14, 8], crate: [16, 8], well: [30, 14], bush: [24, 10], plant: [20, 8],
 };
 
 /** Quita los puentes del agua (se cruzan andando). */
@@ -181,6 +183,9 @@ export const TOWNS: Record<string, TownDef> = {
       d('barrel', 630, 1300), d('crate', 96, 1300), d('well', 200, 1500), d('bush', 600, 1170), d('bush', 90, 1150),
       d('bush', 120, 620), d('bush', 150, 640), d('bush', 560, 420), d('bush', 590, 440), d('bush', 250, 1010), d('bush', 470, 980),
       d('bush', 620, 1650), d('bush', 250, 2110), d('bush', 560, 2160), d('bush', 280, 1640), d('bush', 460, 1600),
+      { kind: 'bush', x: 120, y: 1332, v: 2 }, { kind: 'bush', x: 600, y: 1332, v: 7 }, { kind: 'bush', x: 420, y: 1660, v: 16 },
+      { kind: 'bush', x: 650, y: 1890, v: 18 }, d('plant', 640, 980), d('plant', 90, 1260), d('plant', 150, 2180), d('plant', 600, 2220),
+      d('plant', 100, 560), d('plant', 620, 1080),
     ],
     npcs: [{ dex: 16, x: 230, y: 700, dir: 4 }, { dex: 1, x: 600, y: 1930, dir: 6 }],
     spots: [
@@ -219,8 +224,10 @@ export const TOWNS: Record<string, TownDef> = {
       d('flowers', 410, 1580, 120, 50), d('flowers', 280, 2120, 40, 200),
       d('lamp', 305, 1300), d('lamp', 415, 1600), d('lamp', 305, 2000), d('lamp', 415, 2300), d('lamp', 205, 700), d('lamp', 420, 300),
       d('mailbox', 300, 1458), d('mailbox', 424, 1458), d('bush', 90, 1290), d('bush', 630, 1290), d('barrel', 620, 1860), d('crate', 640, 1880),
-      d('signpost', 440, 2410), d('bush', 230, 560), d('bush', 230, 1040), d('bush', 480, 1040), d('bush', 250, 1250), d('bush', 470, 1250),
+      d('signpost', 440, 2410), d('bush', 230, 560), d('bush', 580, 1060), d('bush', 600, 1150), d('bush', 250, 1250), d('bush', 470, 1250),
       d('bush', 260, 2150), d('bush', 460, 2160), d('well', 220, 1620),
+      { kind: 'bush', x: 90, y: 1880, v: 6 }, { kind: 'bush', x: 300, y: 1880, v: 15 }, { kind: 'bush', x: 420, y: 1885, v: 16 },
+      { kind: 'bush', x: 630, y: 1900, v: 9 }, d('plant', 640, 1180), d('plant', 90, 1700), d('plant', 640, 2400), d('plant', 260, 300),
     ],
     npcs: [{ dex: 113, x: 310, y: 1800, dir: 0 }, { dex: 32, x: 560, y: 616, dir: 6 }],
     spots: [
@@ -257,9 +264,11 @@ export const TOWNS: Record<string, TownDef> = {
     decor: [
       d('flowers', 200, 1170, 80, 40), d('flowers', 440, 1170, 80, 40), d('flowers', 250, 1480, 100, 50), d('flowers', 400, 1500, 110, 50),
       d('lamp', 305, 1100), d('lamp', 415, 1400), d('lamp', 415, 1700), d('lamp', 415, 2000), d('lamp', 305, 2300), d('lamp', 200, 640),
-      d('mailbox', 290, 1356), d('mailbox', 430, 1356), d('barrel', 620, 1760), d('crate', 100, 1880), d('bush', 560, 960), d('bush', 160, 960),
+      d('mailbox', 290, 1356), d('mailbox', 430, 1356), d('barrel', 645, 1800), d('crate', 100, 1880), d('bush', 560, 960), d('bush', 160, 960),
       d('signpost', 440, 2410), d('bush', 250, 1150), d('bush', 470, 1150), d('bush', 250, 1560), d('bush', 470, 1560), d('bush', 270, 2120),
       d('bush', 450, 2120),
+      { kind: 'bush', x: 90, y: 1790, v: 18 }, { kind: 'bush', x: 300, y: 1790, v: 6 }, d('plant', 640, 1100), d('plant', 90, 1150),
+      d('plant', 420, 520), d('plant', 610, 760), d('plant', 640, 2400), d('plant', 90, 2400),
     ],
     npcs: [{ dex: 74, x: 590, y: 1000, dir: 6 }, { dex: 113, x: 300, y: 1700, dir: 0 }],
     spots: [

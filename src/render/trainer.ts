@@ -97,7 +97,7 @@ export const THROW = {
   flight: 0.5,
   open: 0.22,
   appear: 0.6,
-  linger: 0.55,
+  linger: 0.3,
   get total() { return this.windup + this.flight + this.open + this.appear + this.linger; },
 };
 
@@ -121,12 +121,11 @@ export function appearOf(s: ThrowState): number {
 export function drawThrow(ctx: CanvasRenderingContext2D, s: ThrowState): void {
   const { t } = s;
   const T = THROW;
-  const fade = Math.max(0, Math.min(1, (T.total - t) / T.linger));
-  // Entrenador
-  trainerShadow(ctx, s.tx, s.ty, fade);
+  // Entrenador (después se queda mirando: ver drawWatcher)
+  trainerShadow(ctx, s.tx, s.ty);
   const flip = s.px < s.tx;
   const fi = Math.min(12, Math.floor((t / (T.windup + 0.15)) * 13));
-  frame(ctx, `t${fi}` as TrainerFrame, s.tx, s.ty, { flip, alpha: fade });
+  frame(ctx, `t${fi}` as TrainerFrame, s.tx, s.ty, { flip });
 
   // Bola en arco
   const tf = (t - T.windup) / T.flight;
@@ -168,6 +167,13 @@ export function drawThrow(ctx: CanvasRenderingContext2D, s: ThrowState): void {
     const a = Math.sin(Math.min(1, ta) * Math.PI) * (ta > 1 ? 1 - (ta - 1) / 0.3 : 1);
     beam(ctx, s.px, s.py, s.color, a, t);
   }
+}
+
+/** El entrenador, de espaldas, mirando el combate desde la entrada de la sala. */
+export function drawWatcher(ctx: CanvasRenderingContext2D, x: number, y: number, time: number): void {
+  trainerShadow(ctx, x, y);
+  // Respira: sube y baja un píxel de vez en cuando.
+  frame(ctx, 'w3', x, y - (Math.floor(time * 1.6) % 2));
 }
 
 function ball(ctx: CanvasRenderingContext2D, x: number, y: number, spin: number): void {

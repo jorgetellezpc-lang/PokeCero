@@ -55,6 +55,12 @@ describe('aventura: pueblos', () => {
       // Ningún punto ni Pokémon queda dentro de un obstáculo.
       for (const s of t.spots) expect(isFree(s.x, s.y, 10, w.obstacles), `${id}: ${s.title} libre`).toBe(true);
       for (const n of t.npcs) expect(isFree(n.x, n.y, 10, w.obstacles), `${id}: Pokémon ${n.dex} libre`).toBe(true);
+      // Ningún objeto del decorado queda dentro de un edificio o del agua.
+      const big = t.obstacles.filter((o) => o.kind === 'house' || o.kind === 'water');
+      for (const o of t.obstacles.filter((o) => o.kind === 'prop')) {
+        const hit = big.find((b) => o.x < b.x + b.w && o.x + o.w > b.x && o.y < b.y + b.h && o.y + o.h > b.y);
+        expect(hit, `${id}: objeto en (${o.x}, ${o.y})`).toBeUndefined();
+      }
       for (const s of t.spots) expect(nav.reachable(t.start, s), `${id}: ${s.title}`).toBe(true);
     });
   }

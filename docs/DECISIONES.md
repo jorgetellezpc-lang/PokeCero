@@ -191,10 +191,19 @@ Decidido con el usuario:
 - **Partidas guardadas:** todas empiezan en Pueblo Paleta, aunque ya tengan la medalla de Brock (la conservan).
 - Datos en `src/data/adventure.ts`; progreso en `src/meta/adventure.ts`; pantalla del pueblo en `src/ui/screens/town.ts`.
 
+## Naturaleza de los pueblos (sprites del usuario)
+
+- Árboles (roble y pino, con una variante de cada uno), 30 arbustos, matas de hierba alta y montones de rocas, en un atlas (`public/ui/nature.webp`, recortes en `src/data/natureAtlas.ts`) a 2 píxeles por unidad del mundo.
+- Venían sobre una losa isométrica y los pueblos no son isométricos: se quitó el lateral de la losa y se fundió su cara de arriba con el suelo. Las hojas de bloques tenían el fondo de cuadros pintado y se recortó automáticamente.
+- Dónde se usan: los bosques mezclan robles y pinos (más pinos en los bordes); los arbustos y plantas del decorado eligen una variante fija por posición (o una concreta con `v`); la hierba alta son matas de pie que tapan las piernas al cruzarla; las rocas de Ciudad Plateada son montones de rocas.
+- Los colores del suelo (hierba, tierra y piedra) se reajustaron con los de las hojas de bloques para que todo case.
+- No se usaron los bloques enteros (suelos isométricos) ni los matorrales de las hojas de bloques, porque traen un rombo de hierba demasiado grande para la vista de los pueblos.
+
 ## Entrenador y lanzamiento de la Poké Ball
 
 - En los pueblos manejas al **entrenador**; tu Pokémon va en su Poké Ball. Corre **1,5 veces** más rápido que su Pokémon (`BALANCE.adventure.trainerSpeed`).
-- **Antes de cada sala de combate** (rutas y gimnasios) el entrenador lanza la Poké Ball: prepara, lanza, la bola vuela en arco, se abre con un destello, sale un haz de luz del color del tipo del Pokémon y este aparece en blanco y toma color. La sala espera hasta que ha salido (unos 1,9 s); luego el entrenador se desvanece.
+- **Al empezar cada ruta o gimnasio** (solo en la primera sala) el entrenador lanza la Poké Ball: prepara, lanza, la bola vuela en arco, se abre con un destello, sale un haz de luz del color del tipo del Pokémon y este aparece en blanco y toma color. La sala espera hasta que ha salido (unos 1,9 s).
+- Después el entrenador **se queda mirando** de espaldas, abajo junto a la entrada. En cada sala nueva entra contigo y se coloca igual, sin volver a lanzar. No le afecta nada: los enemigos no van a por él, no recibe daño y no estorba.
 - Sprites del entrenador y de la Poké Ball recortados de las hojas de concepto del usuario (`public/ui/trainer.webp`, recortes en `src/data/trainerAtlas.ts`). Esas hojas no son una hoja de sprites ordenada (las direcciones van mezcladas), así que:
   - de frente y de espaldas se usan los pocos fotogramas que hay, alternando y meciéndolos;
   - de lado se usa la carrera de la hoja, y a la izquierda se refleja;

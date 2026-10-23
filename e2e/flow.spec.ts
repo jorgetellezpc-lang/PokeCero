@@ -288,6 +288,8 @@ test('aventura: Pueblo Paleta → Ruta 1 → Ciudad Verde', async ({ page }) => 
       await page.waitForTimeout(250);
     }
   }
+  // Solo se lanza al empezar: en las demás salas el entrenador se queda mirando.
+  expect(await page.evaluate(() => { const r = (window as any).__pokecero.app.run; return r.intro === null && r.watcher !== null; })).toBe(true);
   await pickUntilResult(page);
   await expect(page.getByTestId('result')).toContainText('Ruta 1');
   await page.getByTestId('result-continue').click();

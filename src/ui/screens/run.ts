@@ -15,7 +15,7 @@ import { perksFor } from '../../meta/shop';
 import { preload } from '../../render/animator';
 import { Renderer, type Viewport } from '../../render/renderer';
 import { Scene3D } from '../../render/scene3d';
-import { appearOf, drawThrow, preloadTrainer, THROW, type ThrowState } from '../../render/trainer';
+import { appearOf, drawThrow, drawWatcher, preloadTrainer, THROW, type ThrowState } from '../../render/trainer';
 import { TYPE_COLORS as TYPE_HEX } from '../../data/typeColors';
 import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
@@ -42,6 +42,8 @@ function songForRoom(room: number, kind: string): SongName {
 export class RunScreen implements Screen {
   /** Lanzamiento de la Poké Ball al empezar cada sala (la partida espera a que salga el Pokémon). */
   intro: ThrowState | null = null;
+  /** Dónde se queda el entrenador mirando el combate (abajo, junto a la entrada). No le afecta nada. */
+  watcher: { x: number; y: number } | null = null;
   el: HTMLElement;
   world: World;
   private canvas: HTMLCanvasElement;
@@ -114,7 +116,10 @@ export class RunScreen implements Screen {
     }
 
     preloadTrainer();
-    const onTop = (ctx: CanvasRenderingContext2D) => { if (this.intro) drawThrow(ctx, this.intro); };
+    const onTop = (ctx: CanvasRenderingContext2D) => {
+      if (this.intro) drawThrow(ctx, this.intro);
+      else if (this.watcher) drawWatcher(ctx, this.watcher.x, this.watcher.y, this.world.time);
+    };
     if (this.scene3d) this.scene3d.onTop = onTop;
     else if (this.renderer) this.renderer.onTop = onTop;
 
@@ -260,12 +265,21 @@ export class RunScreen implements Screen {
     const p = w.player;
     p.appear = 0;
     this.acc = 0;
+    const spot = this.trainerSpot();
+    this.watcher = spot;
     this.intro = {
       t: 0,
-      tx: Math.max(26, p.x - 66), ty: Math.min(w.H - 10, p.y + 34),
+      tx: spot.x, ty: spot.y,
       px: p.x, py: p.y,
       color: TYPE_HEX[p.species.types[0]] ?? '#ffffff',
     };
+  }
+
+  /** Abajo a la izquierda de donde empieza tu Pokémon. */
+  private trainerSpot(): { x: number; y: number } {
+    const w = this.world;
+    const p = w.player;
+    return { x: Math.max(26, p.x - 66), y: Math.min(w.H - 10, p.y + 34) };
   }
 
   private handleEvents(): void {
@@ -276,7 +290,9 @@ export class RunScreen implements Screen {
     for (const ev of events) {
       switch (ev.type) {
         case 'roomStart':
-          this.startThrow();
+          // La Poké Ball solo se lanza al empezar; en las demás salas el entrenador entra contigo y se queda mirando.
+          if (ev.index === 0) this.startThrow();
+          else this.watcher = this.trainerSpot();
           if (!this.route) recordBestRoom(store, this.gymId, ev.room);
           audio.music(songForRoom(ev.room, ev.kind));
           this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!'
