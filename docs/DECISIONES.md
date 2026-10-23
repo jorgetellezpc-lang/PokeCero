@@ -190,7 +190,7 @@ Decidido con el usuario:
 
 ## Modo admin (Ajustes)
 
-- En Ajustes → **Modo admin**, con contraseña. Da oro y tickets ilimitados (se muestran como ∞), abre todos los pueblos y los gimnasios jugables y permite entrenar desde la pestaña Pokémon.
+- En Ajustes → **Modo admin**, con contraseña (sin distinguir mayúsculas). Da oro y tickets ilimitados (se muestran como ∞), abre todos los pueblos y los gimnasios jugables y permite entrenar desde la pestaña Pokémon.
 - Al desactivarlo vuelven el oro y los tickets que tenías; lo comprado se queda.
 - El código solo guarda la huella SHA-256 de la contraseña, pero es una barrera de juego, no seguridad real: todo vive en el navegador.
 

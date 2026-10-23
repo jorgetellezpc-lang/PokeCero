@@ -7,12 +7,14 @@ import { MemoryStorage, SaveStore } from '../src/meta/save';
 import { buyUpgrade } from '../src/meta/shop';
 
 describe('modo admin', () => {
-  it('solo se activa con la contraseña correcta', async () => {
-    expect(await checkAdminPassword('josejosejose')).toBe(true);
-    expect(await checkAdminPassword(':josejosejose')).toBe(true);
-    expect(await checkAdminPassword(' josejosejose ')).toBe(true);
-    expect(await checkAdminPassword('jose')).toBe(false);
-    expect(await checkAdminPassword('')).toBe(false);
+  it('solo se activa con la contraseña correcta', () => {
+    expect(checkAdminPassword('josejosejose')).toBe(true);
+    expect(checkAdminPassword(':josejosejose')).toBe(true);
+    expect(checkAdminPassword(' josejosejose ')).toBe(true);
+    expect(checkAdminPassword('Josejosejose')).toBe(true);
+    expect(checkAdminPassword(': JOSEJOSEJOSE')).toBe(true);
+    expect(checkAdminPassword('jose')).toBe(false);
+    expect(checkAdminPassword('')).toBe(false);
   });
 
   it('da oro y tickets ilimitados, abre todo y al desactivarlo devuelve lo de antes', () => {

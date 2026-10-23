@@ -302,7 +302,7 @@ test('modo admin en Ajustes: contraseña, oro ilimitado y todo abierto', async (
   await page.getByTestId('admin-pass').fill('otra');
   await page.getByTestId('admin-ok').click();
   await expect(page.getByTestId('admin-msg')).toContainText('incorrecta');
-  await page.getByTestId('admin-pass').fill('josejosejose');
+  await page.getByTestId('admin-pass').fill('Josejosejose');
   await shot(page, '30-admin');
   await page.getByTestId('admin-ok').click();
   await expect(page.getByTestId('gold')).toHaveText('∞');

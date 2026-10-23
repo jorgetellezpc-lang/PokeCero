@@ -126,11 +126,11 @@ const CREDITS = [
 /** Pide la contraseña del modo admin. */
 function openAdminLogin(store: SaveStore): void {
   const close = () => overlay.remove();
-  const input = h('input', { type: 'password', class: 'admin-pass', 'data-testid': 'admin-pass', placeholder: 'Contraseña', autocomplete: 'off' });
+  const input = h('input', { type: 'password', class: 'admin-pass', 'data-testid': 'admin-pass', placeholder: 'Contraseña', autocomplete: 'off', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
   const msg = h('p', { class: 'modal-text admin-msg', 'data-testid': 'admin-msg' }, `Oro y tickets ilimitados (${ADMIN_FUNDS.toLocaleString('es-ES')}), todos los pueblos y gimnasios abiertos y entrenamiento desde la pestaña Pokémon.`);
-  const submit = async (e?: Event) => {
+  const submit = (e?: Event) => {
     e?.preventDefault();
-    if (await checkAdminPassword(input.value)) {
+    if (checkAdminPassword(input.value)) {
       close();
       enableAdmin(store);
       toast('Modo admin activado');
