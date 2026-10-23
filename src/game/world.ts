@@ -95,7 +95,8 @@ export function guard(def: number): number {
 }
 
 export class World {
-  readonly W = BALANCE.arena.width;
+  /** Ancho de la sala (los pueblos son más anchos). */
+  W: number = BALANCE.arena.width;
   /** Alto de la sala actual (las arenas ilustradas tienen el suyo). */
   H: number = BALANCE.arena.height;
   /** Arena ilustrada de la sala actual, si la hay. */
@@ -259,7 +260,8 @@ export class World {
     const layoutRng = new Rng((this.layoutSeed * 7919 + room * 104729) >>> 0);
     const arts = this.gym.arenas;
     this.arena = arts ? ARENAS[this.plan.kind === 'normal' ? normalArenaFor(arts.normal, index, this.layoutSeed) : arts.boss] ?? null : null;
-    this.H = this.arena ? this.arena.H : BALANCE.arena.height;
+    this.W = this.town ? this.town.W : BALANCE.arena.width;
+    this.H = this.town ? this.town.H : this.arena ? this.arena.H : BALANCE.arena.height;
     this.obstacles = this.town ? this.town.obstacles.map((o) => ({ ...o }))
       : this.arena ? arenaObstacles(this.arena) : layoutFor(room, this.plan.kind, () => layoutRng.next(), this.W, this.H);
     this.nav = new NavGrid(this.W, this.H, this.obstacles, this.arena ? 8 : 10);

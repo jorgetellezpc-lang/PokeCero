@@ -50,7 +50,11 @@ describe('aventura: pueblos', () => {
       expect(w.phase).toBe('playing');
       const t = TOWNS[id];
       expect(isFree(t.start.x, t.start.y, 12, w.obstacles)).toBe(true);
+      expect([w.W, w.H]).toEqual([720, 2520]);
       const nav = new NavGrid(w.W, w.H, w.obstacles);
+      // Ningún punto ni Pokémon queda dentro de un obstáculo.
+      for (const s of t.spots) expect(isFree(s.x, s.y, 10, w.obstacles), `${id}: ${s.title} libre`).toBe(true);
+      for (const n of t.npcs) expect(isFree(n.x, n.y, 10, w.obstacles), `${id}: Pokémon ${n.dex} libre`).toBe(true);
       for (const s of t.spots) expect(nav.reachable(t.start, s), `${id}: ${s.title}`).toBe(true);
     });
   }
@@ -58,16 +62,20 @@ describe('aventura: pueblos', () => {
   it('las casas y los Pokémon del pueblo no se atraviesan, y la puerta norte no cambia de sala', () => {
     const w = townWorld('paleta');
     const p = w.player;
-    // Hacia la casa de la izquierda (360..450 en y): se queda fuera.
-    p.x = 95; p.y = 480;
+    // Hacia la casa de tu familia (1170..1310 en y): se queda fuera.
+    p.x = 195; p.y = 1345;
     for (let i = 0; i < 120; i++) w.update(1 / 60, { x: 0, y: -1 });
-    expect(p.y).toBeGreaterThan(450);
+    expect(p.y).toBeGreaterThan(1310);
     // Contra el Bulbasaur del laboratorio.
-    p.x = 300; p.y = 660;
+    p.x = 600; p.y = 2000;
     for (let i = 0; i < 90; i++) w.update(1 / 60, { x: 0, y: -1 });
-    expect(Math.hypot(p.x - 300, p.y - 590)).toBeGreaterThan(14);
+    expect(Math.hypot(p.x - 600, p.y - 1930)).toBeGreaterThan(14);
+    // Contra los árboles del borde.
+    p.x = 100; p.y = 1000;
+    for (let i = 0; i < 90; i++) w.update(1 / 60, { x: -1, y: 0 });
+    expect(p.x).toBeGreaterThan(60);
     // Hasta la salida del norte: sigues en el pueblo.
-    p.x = 180; p.y = 120;
+    p.x = 360; p.y = 140;
     for (let i = 0; i < 120; i++) w.update(1 / 60, { x: 0, y: -1 });
     expect(w.roomIndex).toBe(0);
     expect(w.phase).toBe('playing');

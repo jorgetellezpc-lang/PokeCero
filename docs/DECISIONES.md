@@ -181,7 +181,10 @@ Decidido con el usuario:
 
 - **Recorrido:** Pueblo Paleta → Ruta 1 → Ciudad Verde → Ruta 2 → Ciudad Plateada. Los pueblos se desbloquean en orden, al llegar por su ruta.
 - **Pueblos:** se recorren a pie con el joystick, sin combate, en el mismo escenario 3D. Edificios, carteles y Pokémon con los que hablar; al acercarse aparece un botón para interactuar. La salida norte lleva a la siguiente ruta.
-  - Diseño **generado** (casas de colores, caminos, agua); se sustituirá por ilustraciones de cada pueblo.
+  - **Pixel art en vista 3/4** (como la imagen de referencia del usuario), generado por código a partir de los datos (`render/townArt.ts`, `render/townView.ts`): hierba con matas, caminos de tierra irregulares, plazas empedradas, agua con orilla, árboles, casas con tejado a dos aguas y ventanas encendidas, Centro Pokémon, tienda, laboratorio, gimnasio de piedra, vallas, farolas, carteles…
+  - Los pueblos miden **720 × 2520** (el doble de ancho y el triple de largo que una sala) y la cámara sigue a tu Pokémon con un aumento entero de píxeles, para que se vea nítido.
+  - Minimapa redondo con el nombre del pueblo, cartel con el nombre al llegar y diálogos de estilo pixel. Tu Pokémon se ve en silueta detrás de tejados y árboles.
+  - Coste medido (Chromium de escritorio): unos 0,4 s para generar un pueblo al entrar y 0,3 ms por fotograma. En un móvil la generación tardará más.
   - El gimnasio es un edificio dentro de la ciudad (Plateada → Brock). El de Ciudad Verde está cerrado.
 - **Rutas:** 5 salas de combate estilo Archero con los salvajes de la ruta; el más fuerte aparece en la última sala. Cada ruta empieza de cero (nivel y cartas). Si caes, vuelves al pueblo anterior; el oro ganado se queda.
 - **Tienda:** las mejoras permanentes (el entrenamiento) se compran en la tienda de los pueblos (Verde y Plateada). En la pestaña Pokémon solo se ve el nivel.

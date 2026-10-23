@@ -591,7 +591,7 @@ export class Scene3D {
     g.add(forest(W, H, w.gym.order));
 
     // Obstáculos.
-    for (const o of w.obstacles) g.add(o.kind === 'rock' ? rockMesh(o, theme.rock) : o.kind === 'house' ? houseMesh(o) : this.waterMesh(o));
+    for (const o of w.obstacles) g.add(o.kind === 'water' ? this.waterMesh(o) : o.kind === 'house' ? houseMesh(o) : rockMesh(o, theme.rock));
 
     // Capa de suelo para avisos, sombras y zonas.
     this.decal.width = Math.ceil(W * DECAL_RES);

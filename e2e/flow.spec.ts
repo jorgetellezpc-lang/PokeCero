@@ -204,7 +204,7 @@ test('ciclo completo del prototipo', async ({ page }) => {
   await expect(page.getByTestId('town-name')).toContainText('Ciudad Verde');
   const gold = () => page.evaluate(() => (window as any).__pokecero.app.store.data.gold as number);
   const goldBefore = await gold();
-  await actAt(page, 270, 418);
+  await actAt(page, 515, 1872);
   await page.getByTestId('buy-spd').click();
   const goldAfter = await gold();
   expect(goldAfter).toBeLessThan(goldBefore);
@@ -261,12 +261,12 @@ test('aventura: Pueblo Paleta → Ruta 1 → Ciudad Verde', async ({ page }) => 
   await page.waitForTimeout(800);
   await shot(page, '20-paleta');
   // Cartel
-  await actAt(page, 180, 316);
+  await actAt(page, 420, 2184);
   await expect(page.getByTestId('town-line')).toContainText('PUEBLO PALETA');
   await page.getByTestId('town-next').click();
   await page.getByTestId('town-close').click();
   // Salida norte → Ruta 1
-  await actAt(page, 180, 60);
+  await actAt(page, 360, 80);
   await page.getByTestId('town-next').click();
   await shot(page, '20b-salida');
   await page.getByTestId('town-go').click();

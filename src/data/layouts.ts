@@ -8,15 +8,19 @@ import type { RoomKind } from '../game/rooms';
 // - rock: no se puede pasar y para todos los proyectiles.
 // - water: no se puede pasar, pero los proyectiles cruzan por encima. Los
 //   voladores y fantasmas (Levitación) lo cruzan.
-// - house: edificio de un pueblo (bloquea como una roca; se dibuja como casa).
+// - house, tree, fence, prop: cosas de los pueblos (bloquean como una roca).
 // ============================================================================
 
-export type ObstacleKind = 'rock' | 'water' | 'house';
+export type ObstacleKind = 'rock' | 'water' | 'house' | 'tree' | 'fence' | 'prop';
+
+/** Tipo de edificio de un pueblo (cambia su dibujo). */
+export type BuildingStyle = 'house' | 'center' | 'mart' | 'lab' | 'gym';
 
 export interface Obstacle {
   kind: ObstacleKind; x: number; y: number; w: number; h: number;
   /** Solo casas: color de las paredes y del tejado. */
   wall?: string; roof?: string;
+  style?: BuildingStyle;
 }
 
 export interface LayoutDef {

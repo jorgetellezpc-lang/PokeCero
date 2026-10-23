@@ -5,16 +5,15 @@ import { InputController } from '../../input/input';
 import { arriveAt } from '../../meta/adventure';
 import { perksFor } from '../../meta/shop';
 import { preload } from '../../render/animator';
-import { Renderer, type Viewport } from '../../render/renderer';
-import { Scene3D } from '../../render/scene3d';
+import { TownView } from '../../render/townView';
 import type { App, Screen } from '../app';
 import { h, pokeImg } from '../dom';
 import { openSheet, upgrades } from './pokemonTab';
 
 // ============================================================================
-// Pueblo de la aventura: se recorre a pie con el joystick (sin combate), con
-// el mismo escenario 3D que las salas. Al acercarte a un cartel, una puerta o
-// un Pokémon aparece un botón para interactuar: diálogo, tienda de
+// Pueblo de la aventura: se recorre a pie con el joystick (sin combate), en
+// pixel art (render/townView.ts) con minimapa. Al acercarte a un cartel, una
+// puerta o un Pokémon aparece un botón para interactuar: diálogo, tienda de
 // entrenamiento, gimnasio o la salida hacia la siguiente ruta.
 // ============================================================================
 
@@ -31,12 +30,10 @@ export class TownScreen implements Screen {
   readonly world: World;
   private readonly town: TownDef;
   private canvas: HTMLCanvasElement;
-  private overlayCanvas: HTMLCanvasElement;
-  private scene3d: Scene3D | null;
-  private renderer: Renderer | null = null;
-  private vp: Viewport = { dpr: 1, scale: 1, ox: 0, oy: 0 };
+  readonly view: TownView;
+  private mini: HTMLCanvasElement;
+  private miniCtx: CanvasRenderingContext2D;
   private cssW = 0;
-  private cssH = 0;
   private input: InputController;
   private raf = 0;
   private last = 0;
@@ -58,24 +55,25 @@ export class TownScreen implements Screen {
     this.world.player.invuln = 0;
     preload([getSpecies(speciesId).dex, ...town.npcs.map((n) => n.dex)]);
 
-    this.canvas = h('canvas', { class: 'game-canvas' });
-    this.overlayCanvas = h('canvas', { class: 'game-canvas game-overlay' });
-    this.scene3d = Scene3D.create(this.canvas, this.overlayCanvas, store.data.settings.graphics);
-    if (this.scene3d) {
-      this.scene3d.showDamageNumbers = false;
-      this.scene3d.zoom = store.data.settings.zoom;
-    } else {
-      this.renderer = new Renderer(this.canvas.getContext('2d')!);
-    }
+    this.canvas = h('canvas', { class: 'game-canvas town-canvas' });
+    this.view = new TownView(this.canvas, town);
+    this.mini = h('canvas', { class: 'town-mini-map' });
+    this.miniCtx = this.mini.getContext('2d')!;
 
     this.actBtn = h('button', { class: 'town-act hidden', 'data-testid': 'town-act', onclick: () => this.act() });
     this.overlay = h('div', { class: 'overlay hidden' });
-    const top = h('div', { class: 'town-top' },
-      h('div', { class: 'town-name', 'data-testid': 'town-name' }, h('b', {}, town.name), h('small', {}, town.blurb)),
-      h('button', { class: 'town-map', 'data-testid': 'town-map', onclick: () => this.app.showMenu('map') }, 'Mapa'),
+    const sp = getSpecies(speciesId);
+    const hud = h('div', { class: 'town-hud' },
+      h('div', { class: 'town-me' },
+        h('span', { class: 'town-face' }, pokeImg(sp.dex, 40)),
+        h('button', { class: 'town-map', 'data-testid': 'town-map', onclick: () => this.app.showMenu('map') }, 'Mapa'),
+      ),
+      h('div', { class: 'town-mini' }, this.mini, h('b', { class: 'town-name', 'data-testid': 'town-name' }, town.name)),
     );
-    this.el = h('div', { class: `screen run town ${this.scene3d ? 'run-3d' : ''}`, 'data-view': this.scene3d ? '3d' : '2d', 'data-town': town.id },
-      this.canvas, ...(this.scene3d ? [this.overlayCanvas, h('div', { class: 'vignette' })] : []), top, this.actBtn, this.overlay);
+    // Cartel con el nombre al llegar, como en los juegos clásicos.
+    const banner = h('div', { class: 'town-banner' }, h('b', {}, town.name), h('small', {}, town.blurb));
+    this.el = h('div', { class: 'screen run town', 'data-view': 'pixel', 'data-town': town.id },
+      this.canvas, hud, banner, this.actBtn, this.overlay);
     this.input = new InputController(this.el, () => this.app.showMenu('map'));
     this.resizeObs = new ResizeObserver(() => this.resize());
     this.resizeObs.observe(this.el);
@@ -85,7 +83,6 @@ export class TownScreen implements Screen {
 
   destroy(): void {
     cancelAnimationFrame(this.raf);
-    this.scene3d?.dispose();
     this.input.destroy();
     this.resizeObs.disconnect();
     for (const s of document.querySelectorAll('.pk3-sheet-bg')) s.remove();
@@ -95,15 +92,9 @@ export class TownScreen implements Screen {
     const rect = this.el.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
     this.cssW = rect.width;
-    this.cssH = rect.height;
-    if (this.scene3d) {
-      this.scene3d.resize(rect.width, rect.height, dpr);
-      return;
-    }
-    this.canvas.width = Math.round(rect.width * dpr);
-    this.canvas.height = Math.round(rect.height * dpr);
-    const scale = Math.min(rect.width / this.world.W, rect.height / this.world.H);
-    this.vp = { dpr, scale, ox: (rect.width - this.world.W * scale) / 2, oy: (rect.height - this.world.H * scale) / 2 };
+    this.view.resize(rect.width, rect.height, dpr);
+    const ms = Math.round(this.mini.getBoundingClientRect().width * dpr) || 200;
+    this.mini.width = this.mini.height = ms;
   }
 
   private frame = (t: number): void => {
@@ -123,8 +114,8 @@ export class TownScreen implements Screen {
     this.world.events.length = 0;
     this.updateNear();
     if (this.cssW) {
-      if (this.scene3d) this.scene3d.draw(this.world);
-      else this.renderer?.draw(this.world, this.vp, this.cssW, this.cssH);
+      this.view.draw(this.world, this.busy ? null : this.near);
+      this.view.drawMini(this.miniCtx, this.mini.width, this.world);
     }
   };
 
@@ -140,7 +131,7 @@ export class TownScreen implements Screen {
     if (best === this.near) return;
     this.near = best;
     this.actBtn.classList.toggle('hidden', !best || this.busy);
-    if (best) this.actBtn.replaceChildren(h('span', { class: 'town-act-ic' }, ICON[best.kind]), h('span', {}, best.label), h('small', {}, best.title));
+    if (best) this.actBtn.replaceChildren(h('span', { class: 'town-act-ic' }, 'A'), h('span', {}, best.label), h('small', {}, best.title));
   }
 
   /** Interactuar con el sitio cercano. */
@@ -198,7 +189,7 @@ export class TownScreen implements Screen {
       buttons.replaceChildren(...btns.filter((b): b is HTMLButtonElement => !!b));
     };
     show();
-    this.overlay.replaceChildren(h('div', { class: 'panel town-dlg', 'data-testid': 'town-dialog' },
+    this.overlay.replaceChildren(h('div', { class: 'town-dlg', 'data-testid': 'town-dialog' },
       h('div', { class: 'town-dlg-head' }, s.dex ? pokeImg(s.dex, 48) : h('span', { class: 'town-dlg-ic' }, ICON[s.kind]), h('b', {}, s.title)),
       text, buttons));
     this.overlay.classList.remove('hidden');
