@@ -38,6 +38,9 @@ export const BALANCE = {
   /** Sala: más alta que la pantalla; la cámara sigue al jugador (estilo Archero). */
   arena: { width: 360, height: 840, margin: 14 },
 
+  /** Aventura: en los pueblos anda el entrenador, 1,5 veces más rápido que su Pokémon. */
+  adventure: { trainerSpeed: 1.5 },
+
   player: {
     /** Radio de colisión máximo (los Pokémon grandes chocan como uno normal). */
     maxRadius: 13,

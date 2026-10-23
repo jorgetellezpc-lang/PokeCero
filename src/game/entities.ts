@@ -58,6 +58,8 @@ export interface Player extends Vec {
   crit: number;
   buffs: Record<BuffStat, Buff>;
   invuln: number;
+  /** Cuánto se ve (0 = aún dentro de la Poké Ball, 1 = del todo). Lo marca el lanzamiento antes de cada sala. */
+  appear: number;
   level: number;
   xp: number;
   /** Movimientos activos. Con el ataque característico, solo uno: el de `attack`. */

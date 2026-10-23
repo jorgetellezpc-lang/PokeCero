@@ -656,7 +656,7 @@ export class Scene3D {
     // Pueblo: un aro dorado que late en cada sitio con el que se puede interactuar.
     for (const sp of w.town?.spots ?? []) { drawSpotHint(ctx, sp.x, sp.y, w.time); n++; }
     const p = w.player;
-    drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale, true);
+    if (p.appear > 0) drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale, true);
     for (const n of w.npcs) drawShadow(ctx, n.dex, n.x, n.y, n.anim.scale, true);
     for (const e of w.enemies) {
       const lift = jumpHeight(e);
@@ -684,7 +684,8 @@ export class Scene3D {
       if (models && id && this.model(key, id, anim, x, z, lift, o, dt)) usedModels.add(key);
       else this.sprite(key, anim, x, z, lift, o);
     };
-    draw(p, p.species.id, p.anim, p.x, p.y, 0, { flash: p.hitFlash > 0 ? 0.55 : 0, alpha: blink ? 0.45 : 1 });
+    // Al salir de la Poké Ball aparece en blanco y va tomando color.
+    if (p.appear > 0) draw(p, p.species.id, p.anim, p.x, p.y, 0, { flash: p.appear < 1 ? 1 - p.appear * 0.9 : p.hitFlash > 0 ? 0.55 : 0, alpha: p.appear < 1 ? Math.min(1, p.appear * 2.5) : blink ? 0.45 : 1 });
     for (const e of w.enemies) {
       if (e.hidden) continue;
       const shake = e.phase === 'aim' || e.phase === 'fuse' ? Math.sin(w.time * 60) * 1.2 : 0;
@@ -860,7 +861,7 @@ export class Scene3D {
     for (const g of w.pickups) if (this.place(g.x, g.y, 0)) drawPickup(ctx, g, w.time);
     for (const f of w.fields) if (this.place(f.x, f.y, 0)) drawAirField(ctx, f, w);
     const p = w.player;
-    if (this.place(p.x, p.y, 0)) drawPlayerAura(ctx, p);
+    if (p.appear >= 1 && this.place(p.x, p.y, 0)) drawPlayerAura(ctx, p);
     for (const g of guardianPositions(w)) if (this.place(g.x, g.y, 10)) drawGuardian(ctx, g);
     for (const m of p.moves) if (m.def.kind === 'orbit') for (const o of orbitPositions(w, m)) if (this.place(o.x, o.y, 8)) drawOrb(ctx, m, o, w.time);
     for (const pr of w.projectiles) if (this.place(pr.x, pr.y, 12)) drawProjectile(ctx, pr, w.time);
@@ -873,8 +874,13 @@ export class Scene3D {
     }
     if (this.showDamageNumbers) for (const t of w.texts) if (this.place(t.x, t.y, 20)) drawText(ctx, t);
     if (w.exitOpen && this.place(w.exit.x, w.exit.y + 30, 0)) drawExitArrow(ctx, w);
+    // Lo que añada la pantalla (el lanzamiento de la Poké Ball), en coordenadas del mundo.
+    if (this.onTop && this.place(w.W / 2, w.H / 2, 0)) this.onTop(ctx);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
+
+  /** Dibujo extra por encima de todo, en coordenadas del mundo. */
+  onTop: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 
   /** Rayo del jugador: franja proyectada de punta a punta (a 12 de altura). */
   private drawBeam3d(b: World['beams'][number]): void {

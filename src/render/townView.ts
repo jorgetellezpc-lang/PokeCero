@@ -3,6 +3,7 @@ import type { World } from '../game/world';
 import { drawShadow } from './animator';
 import { fallback } from './draw2d';
 import { buildTownArt, type TownArt } from './townArt';
+import { preloadTrainer, Trainer, trainerShadow } from './trainer';
 
 // ============================================================================
 // Pueblo en pixel art (lienzo 2D): la cámara sigue a tu Pokémon y amplía el
@@ -21,10 +22,14 @@ export class TownView {
   private px = 1;
   camX = 0;
   camY = 0;
+  /** En el pueblo vas tú, el entrenador (tu Pokémon va en su Poké Ball). */
+  readonly trainer = new Trainer();
+  private lastT = -1;
 
   constructor(private readonly canvas: HTMLCanvasElement, readonly town: TownDef) {
     this.ctx = canvas.getContext('2d')!;
     this.art = buildTownArt(town);
+    preloadTrainer();
   }
 
   resize(cssW: number, cssH: number, dpr: number): void {
@@ -45,6 +50,9 @@ export class TownView {
     const ctx = this.ctx;
     const { w: vw, h: vh } = this.view;
     const p = w.player;
+    const dt = this.lastT < 0 ? 0 : Math.max(0, w.time - this.lastT);
+    this.lastT = w.time;
+    this.trainer.update(dt, p.moving, p.moveAngle, w.playerSpeed());
     // Cámara centrada en el Pokémon (un poco por debajo del centro), sin salirse del pueblo.
     const tx = Math.max(0, Math.min(this.town.W - vw, p.x - vw / 2));
     const ty = Math.max(0, Math.min(this.town.H - vh, p.y - vh * 0.55));
@@ -114,15 +122,15 @@ export class TownView {
     list.push({
       base: p.y,
       fn: () => {
-        drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale);
-        if (!p.anim.draw(ctx, p.x, p.y)) fallback(ctx, p.x, p.y, '#f08030');
+        trainerShadow(ctx, p.x, p.y);
+        this.trainer.draw(ctx, p.x, p.y);
       },
     });
     list.sort((a, b) => a.base - b.base);
     for (const d of list) d.fn();
-    // Silueta de tu Pokémon a través de tejados y copas, para no perderlo de vista.
+    // Tu silueta a través de tejados y copas, para no perderte de vista.
     if (this.art.sprites.some((s) => s.base > p.y && s.base < p.y + 60 && p.x > s.x && p.x < s.x + s.img.width && p.y > s.y)) {
-      p.anim.draw(ctx, p.x, p.y, { alpha: 0.4 });
+      this.trainer.draw(ctx, p.x, p.y, 0.4);
     }
   }
 

@@ -13,6 +13,8 @@ const shot = async (page: Page, name: string) => {
 async function startGym(page: Page) {
   await page.evaluate(() => (window as any).__pokecero.app.showGym('brock'));
   await page.getByTestId('play').click();
+  // Antes de cada sala el entrenador lanza la Poké Ball: se espera a que salga el Pokémon.
+  await page.waitForFunction(() => { const r = (window as any).__pokecero.app.run; return r && !r.intro; });
 }
 
 /** Lleva al Pokémon junto a un punto del pueblo y pulsa el botón de interactuar. */
@@ -271,6 +273,10 @@ test('aventura: Pueblo Paleta → Ruta 1 → Ciudad Verde', async ({ page }) => 
   await shot(page, '20b-salida');
   await page.getByTestId('town-go').click();
   await expect(page.getByTestId('room')).toContainText('1/5');
+  // El entrenador lanza la Poké Ball: mientras, tu Pokémon no está y la sala espera.
+  expect(await world(page, 'return window.__pokecero.app.run.intro !== null && w.player.appear < 1;')).toBe(true);
+  await page.waitForFunction(() => !(window as any).__pokecero.app.run.intro);
+  expect(await world(page, 'return w.player.appear;')).toBe(1);
   for (let room = 0; room < 5; room++) {
     await world(page, 'w.player.hp = w.player.maxHp = 1e6;');
     for (let i = 0; i < 40; i++) {

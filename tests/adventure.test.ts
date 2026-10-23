@@ -82,6 +82,20 @@ describe('aventura: pueblos', () => {
   });
 });
 
+describe('aventura: entrenador', () => {
+  it('en el pueblo anda el entrenador, 1,5 veces más rápido que su Pokémon', () => {
+    const t = townWorld('paleta');
+    const r = routeWorld('ruta1');
+    const tw = new World({ speciesId: 'squirtle', gym: placeGym(TOWNS.paleta), rooms: [1], town: TOWNS.paleta, seed: 3 });
+    expect(tw.playerSpeed()).toBeCloseTo(r.playerSpeed() * 1.5);
+    // Y se nota al andar: misma especie, mismo tiempo.
+    const a = { x: tw.player.x, y: tw.player.y };
+    for (let i = 0; i < 30; i++) tw.update(1 / 60, { x: -1, y: 0 });
+    expect(Math.abs(tw.player.x - a.x)).toBeCloseTo((r.playerSpeed() * 1.5 * 30) / 60, 0);
+    expect(t.player.appear).toBe(1);
+  });
+});
+
 describe('aventura: rutas', () => {
   it('la Ruta 1 tiene 5 salas con sus salvajes y el más fuerte en la última', () => {
     const w = routeWorld('ruta1');

@@ -191,6 +191,16 @@ Decidido con el usuario:
 - **Partidas guardadas:** todas empiezan en Pueblo Paleta, aunque ya tengan la medalla de Brock (la conservan).
 - Datos en `src/data/adventure.ts`; progreso en `src/meta/adventure.ts`; pantalla del pueblo en `src/ui/screens/town.ts`.
 
+## Entrenador y lanzamiento de la Poké Ball
+
+- En los pueblos manejas al **entrenador**; tu Pokémon va en su Poké Ball. Corre **1,5 veces** más rápido que su Pokémon (`BALANCE.adventure.trainerSpeed`).
+- **Antes de cada sala de combate** (rutas y gimnasios) el entrenador lanza la Poké Ball: prepara, lanza, la bola vuela en arco, se abre con un destello, sale un haz de luz del color del tipo del Pokémon y este aparece en blanco y toma color. La sala espera hasta que ha salido (unos 1,9 s); luego el entrenador se desvanece.
+- Sprites del entrenador y de la Poké Ball recortados de las hojas de concepto del usuario (`public/ui/trainer.webp`, recortes en `src/data/trainerAtlas.ts`). Esas hojas no son una hoja de sprites ordenada (las direcciones van mezcladas), así que:
+  - de frente y de espaldas se usan los pocos fotogramas que hay, alternando y meciéndolos;
+  - de lado se usa la carrera de la hoja, y a la izquierda se refleja;
+  - la apertura de la bola, el haz y las chispas se dibujan por código; la aparición del Pokémon usa su sprite de siempre (no hay fotogramas de aparición salvo los de Pikachu).
+- Para que quede perfecto haría falta una hoja de sprites limpia: fondo transparente, una fila por dirección (abajo, arriba, izquierda, derecha) y el mismo tamaño en todos los fotogramas.
+
 ## Modo admin (Ajustes)
 
 - En Ajustes → **Modo admin**, con contraseña (sin distinguir mayúsculas). Da oro y tickets ilimitados (se muestran como ∞), abre todos los pueblos y los gimnasios jugables y permite entrenar desde la pestaña Pokémon.

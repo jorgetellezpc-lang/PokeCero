@@ -16,6 +16,8 @@ const run = (page: Page, fn: string) =>
 async function startGym(page: Page) {
   await page.evaluate(() => (window as any).__pokecero.app.showGym('brock'));
   await page.getByTestId('play').click();
+  // Antes de cada sala el entrenador lanza la Poké Ball: se espera a que salga el Pokémon.
+  await page.waitForFunction(() => { const r = (window as any).__pokecero.app.run; return r && !r.intro; });
   await expect(page.locator('.run')).toHaveAttribute('data-view', '3d');
 }
 

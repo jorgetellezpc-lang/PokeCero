@@ -8,6 +8,7 @@ import { preload } from '../../render/animator';
 import { TownView } from '../../render/townView';
 import type { App, Screen } from '../app';
 import { h, pokeImg } from '../dom';
+import { uiImg } from './menu';
 import { openSheet, upgrades } from './pokemonTab';
 
 // ============================================================================
@@ -65,7 +66,7 @@ export class TownScreen implements Screen {
     const sp = getSpecies(speciesId);
     const hud = h('div', { class: 'town-hud' },
       h('div', { class: 'town-me' },
-        h('span', { class: 'town-face' }, pokeImg(sp.dex, 40)),
+        h('span', { class: 'town-face', title: `Llevas a ${sp.name} en su Poké Ball` }, uiImg('avatar')),
         h('button', { class: 'town-map', 'data-testid': 'town-map', onclick: () => this.app.showMenu('map') }, 'Mapa'),
       ),
       h('div', { class: 'town-mini' }, this.mini, h('b', { class: 'town-name', 'data-testid': 'town-name' }, town.name)),

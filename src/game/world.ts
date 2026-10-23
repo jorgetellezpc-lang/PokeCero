@@ -192,7 +192,7 @@ export class World {
       regenFlat: perk.regen, magnet: BALANCE.player.magnet * perk.magnetMul, xpMul: perk.xpMul,
       coinMul: perk.coinMul, crit: perk.crit,
       buffs: { patk: buff(), satk: buff(), spd: buff(), def: buff(), regen: buff() },
-      invuln: 0, level: 1, xp: 0, moves: [], attack: { sig: signatureFor(species), ups: [], evolved: false },
+      invuln: 0, appear: 1, level: 1, xp: 0, moves: [], attack: { sig: signatureFor(species), ups: [], evolved: false },
       statsTaken: {}, item: null, focusCd: 0,
       aim: -Math.PI / 2, moveAngle: -Math.PI / 2, moving: false, hitFlash: 0, lastPatch: null,
       abilities: {}, mods: { ...BASE_MODS }, synergies: [], sturdyLeft: 0, guardAngle: 0,
@@ -505,7 +505,9 @@ export class World {
   playerSpeed(): number {
     const p = this.player;
     const item = p.item ? ITEMS[p.item].mods?.spd ?? 1 : 1;
-    return p.baseSpeed * BALANCE.ps.playerSpeed * p.spdMul * item * (1 + p.buffs.spd.n * p.buffs.spd.amount);
+    // En los pueblos anda el entrenador, más rápido que su Pokémon.
+    const trainer = this.town ? BALANCE.adventure.trainerSpeed : 1;
+    return p.baseSpeed * BALANCE.ps.playerSpeed * p.spdMul * item * (1 + p.buffs.spd.n * p.buffs.spd.amount) * trainer;
   }
 
   /** Blanco del jugador: el jefe si está a tiro; si no, el enemigo más cercano. */

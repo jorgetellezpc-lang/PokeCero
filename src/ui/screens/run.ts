@@ -15,6 +15,8 @@ import { perksFor } from '../../meta/shop';
 import { preload } from '../../render/animator';
 import { Renderer, type Viewport } from '../../render/renderer';
 import { Scene3D } from '../../render/scene3d';
+import { appearOf, drawThrow, preloadTrainer, THROW, type ThrowState } from '../../render/trainer';
+import { TYPE_COLORS as TYPE_HEX } from '../../data/typeColors';
 import { iconDataUrl } from '../../render/sprites';
 import type { App, Screen } from '../app';
 import { h, img, pokeImg, toast, TYPE_COLORS } from '../dom';
@@ -38,6 +40,8 @@ function songForRoom(room: number, kind: string): SongName {
 }
 
 export class RunScreen implements Screen {
+  /** Lanzamiento de la Poké Ball al empezar cada sala (la partida espera a que salga el Pokémon). */
+  intro: ThrowState | null = null;
   el: HTMLElement;
   world: World;
   private canvas: HTMLCanvasElement;
@@ -108,6 +112,11 @@ export class RunScreen implements Screen {
       this.renderer = new Renderer(this.canvas.getContext('2d')!);
       this.renderer.showDamageNumbers = store.data.settings.damageNumbers;
     }
+
+    preloadTrainer();
+    const onTop = (ctx: CanvasRenderingContext2D) => { if (this.intro) drawThrow(ctx, this.intro); };
+    if (this.scene3d) this.scene3d.onTop = onTop;
+    else if (this.renderer) this.renderer.onTop = onTop;
 
     const hud = this.buildHud();
     this.banner = h('div', { class: 'banner' });
@@ -218,7 +227,13 @@ export class RunScreen implements Screen {
     if (!this.last) this.last = t;
     const dt = Math.min(0.1, (t - this.last) / 1000);
     this.last = t;
-    if (!this.paused && !this.ended) {
+    const intro = this.intro;
+    if (intro && !this.paused && !this.ended) {
+      intro.t += dt;
+      this.world.player.appear = appearOf(intro);
+      if (intro.t >= THROW.total) this.intro = null;
+    }
+    if (!this.paused && !this.ended && this.world.player.appear >= 1) {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= STEP && steps < 6) {
@@ -239,6 +254,20 @@ export class RunScreen implements Screen {
     this.updateHud();
   };
 
+  /** El entrenador lanza la Poké Ball desde abajo a la izquierda y sale tu Pokémon. */
+  private startThrow(): void {
+    const w = this.world;
+    const p = w.player;
+    p.appear = 0;
+    this.acc = 0;
+    this.intro = {
+      t: 0,
+      tx: Math.max(26, p.x - 66), ty: Math.min(w.H - 10, p.y + 34),
+      px: p.x, py: p.y,
+      color: TYPE_HEX[p.species.types[0]] ?? '#ffffff',
+    };
+  }
+
   private handleEvents(): void {
     const w = this.world;
     const store = this.app.store;
@@ -247,6 +276,7 @@ export class RunScreen implements Screen {
     for (const ev of events) {
       switch (ev.type) {
         case 'roomStart':
+          this.startThrow();
           if (!this.route) recordBestRoom(store, this.gymId, ev.room);
           audio.music(songForRoom(ev.room, ev.kind));
           this.showBanner(ev.kind === 'boss' ? '¡JEFE DE GIMNASIO!' : ev.kind === 'miniboss' ? '¡MINIBOSS!'

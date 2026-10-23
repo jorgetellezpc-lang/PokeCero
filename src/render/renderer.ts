@@ -90,10 +90,12 @@ export class Renderer {
       y: w.player.y,
       fn: () => {
         const p = w.player;
-        drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale);
+        if (p.appear > 0) drawShadow(ctx, p.species.dex, p.x, p.y, p.anim.scale);
+        if (p.appear <= 0) return;
         const blink = p.invuln > 0 && w.phase === 'playing' && Math.floor(w.time * 20) % 2 === 0;
-        if (!p.anim.draw(ctx, p.x, p.y, { flash: p.hitFlash > 0, softFlash: true, alpha: blink ? 0.45 : 1 })) fallback(ctx, p.x, p.y, '#f08030');
-        drawPlayerAura(ctx, p);
+        const appearing = p.appear < 1;
+        if (!p.anim.draw(ctx, p.x, p.y, { flash: appearing ? p.appear < 0.7 : p.hitFlash > 0, softFlash: !appearing, alpha: appearing ? Math.min(1, p.appear * 2.5) : blink ? 0.45 : 1 })) fallback(ctx, p.x, p.y, '#f08030');
+        if (!appearing) drawPlayerAura(ctx, p);
       },
     });
     if (!w.arena) for (const o of w.obstacles) if (o.kind === 'rock') list.push({ y: o.y + o.h, fn: () => drawRock(ctx, o) });
@@ -113,7 +115,11 @@ export class Renderer {
     for (const p of w.particles) drawParticle(ctx, p);
     for (const e of w.enemies) drawEnemyBar(ctx, e);
     if (this.showDamageNumbers) for (const t of w.texts) drawText(ctx, t);
+    this.onTop?.(ctx);
   }
+
+  /** Dibujo extra por encima de todo, en coordenadas del mundo (el lanzamiento de la Poké Ball). */
+  onTop: ((ctx: CanvasRenderingContext2D) => void) | null = null;
 }
 
 /** Casa de pueblo vista desde arriba (dibujo 2D de respaldo). */
