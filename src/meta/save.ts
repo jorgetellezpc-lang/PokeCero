@@ -1,5 +1,6 @@
 import { BALANCE, PERMANENT_UPGRADES, type PermanentUpgradeDef } from '../config/balance';
 import { ADVENTURE, TOWNS } from '../data/adventure';
+import { ADMIN_FUNDS } from './admin';
 import { isPlayable, PLAYABLE_POKEMON, STARTER_POKEMON } from '../data/pokemon';
 
 // Persistencia del progreso PERMANENTE. Nunca guarda el estado de una partida
@@ -46,6 +47,10 @@ export interface SaveData {
   stats: { runs: number; wins: number; kills: number; pulls: number };
   /** Aventura: lugares a los que ya has llegado y dónde estás (data/adventure.ts). */
   adventure: { visited: string[]; at: string };
+  /** Modo admin (meta/admin.ts): oro y tickets ilimitados y todo abierto. */
+  admin?: boolean;
+  /** Oro y tickets reales de antes de activar el modo admin. */
+  adminBackup?: { gold: number; tickets: number };
 }
 
 export function defaultSave(): SaveData {
@@ -108,12 +113,22 @@ export function migrate(raw: unknown): SaveData {
   data.gold = Math.max(0, Math.floor(Number(data.gold) || 0));
   data.tickets = Math.max(0, Math.floor(Number(data.tickets) || 0));
   data.pity = Math.max(0, Math.floor(Number(data.pity) || 0));
+  data.admin = data.admin === true;
+  if (!data.admin) delete data.adminBackup;
+  refillAdmin(data);
   for (const ups of Object.values(data.upgrades)) {
     for (const def of PERMANENT_UPGRADES) {
       if (ups[def.id] != null) ups[def.id] = Math.max(0, Math.min(def.maxLevel, Math.floor(Number(ups[def.id]) || 0)));
     }
   }
   return data;
+}
+
+/** En modo admin el oro y los tickets nunca se acaban. */
+function refillAdmin(d: SaveData): void {
+  if (!d.admin) return;
+  d.gold = Math.max(d.gold, ADMIN_FUNDS);
+  d.tickets = Math.max(d.tickets, ADMIN_FUNDS);
 }
 
 export interface StorageLike {
@@ -142,6 +157,7 @@ export class SaveStore {
 
   update(fn: (d: SaveData) => void): void {
     fn(this.data);
+    refillAdmin(this.data);
     this.persist();
     for (const l of this.listeners) l();
   }

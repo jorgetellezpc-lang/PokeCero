@@ -188,6 +188,12 @@ Decidido con el usuario:
 - **Partidas guardadas:** todas empiezan en Pueblo Paleta, aunque ya tengan la medalla de Brock (la conservan).
 - Datos en `src/data/adventure.ts`; progreso en `src/meta/adventure.ts`; pantalla del pueblo en `src/ui/screens/town.ts`.
 
+## Modo admin (Ajustes)
+
+- En Ajustes → **Modo admin**, con contraseña. Da oro y tickets ilimitados (se muestran como ∞), abre todos los pueblos y los gimnasios jugables y permite entrenar desde la pestaña Pokémon.
+- Al desactivarlo vuelven el oro y los tickets que tenías; lo comprado se queda.
+- El código solo guarda la huella SHA-256 de la contraseña, pero es una barrera de juego, no seguridad real: todo vive en el navegador.
+
 ## Menús (v0.3)
 
 Estética de juego móvil a partir del ejemplo del usuario: paneles azules con brillo, botones amarillos gruesos y tipografías Lilita One y Nunito (con fuentes de respaldo si no cargan).

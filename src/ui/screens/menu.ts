@@ -79,8 +79,8 @@ export class MenuScreen implements Screen {
           h('span', { class: 'tb-dots' }, ...Array.from({ length: 8 }, (_, i) => h('i', { class: i < medals ? 'on' : '' }))),
         ),
       ),
-      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, uiImg('i-coin'), compact(d.gold)),
-      h('div', { class: 'pill', 'data-testid': 'tickets' }, uiImg('i-ticket'), String(d.tickets)),
+      h('div', { class: 'pill', 'data-testid': 'gold', title: `${d.gold} de oro` }, uiImg('i-coin'), d.admin ? '∞' : compact(d.gold)),
+      h('div', { class: 'pill', 'data-testid': 'tickets' }, uiImg('i-ticket'), d.admin ? '∞' : String(d.tickets)),
       h('button', { class: 'tb-gear', 'aria-label': 'Ajustes', onclick: () => this.setTab('settings') }, uiImg('i-gear')),
     );
 

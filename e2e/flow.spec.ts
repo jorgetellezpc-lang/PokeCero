@@ -294,3 +294,30 @@ test('aventura: Pueblo Paleta → Ruta 1 → Ciudad Verde', async ({ page }) => 
   await expect(page.getByTestId('enter')).toContainText('Entrar');
   expect(errors).toEqual([]);
 });
+
+test('modo admin en Ajustes: contraseña, oro ilimitado y todo abierto', async ({ page }) => {
+  await page.goto('/?debug');
+  await page.click('[data-tab="settings"]');
+  await page.getByTestId('admin-toggle').click();
+  await page.getByTestId('admin-pass').fill('otra');
+  await page.getByTestId('admin-ok').click();
+  await expect(page.getByTestId('admin-msg')).toContainText('incorrecta');
+  await page.getByTestId('admin-pass').fill('josejosejose');
+  await shot(page, '30-admin');
+  await page.getByTestId('admin-ok').click();
+  await expect(page.getByTestId('gold')).toHaveText('∞');
+  await expect(page.getByTestId('admin-toggle')).toContainText('Desactivar');
+  await page.click('[data-tab="map"]');
+  await page.click('.map3-hot[data-place="plateada"]');
+  await expect(page.getByTestId('enter')).toContainText('Entrar');
+  await page.click('[data-tab="pokemon"]');
+  await page.getByTestId('train').click();
+  await page.getByTestId('buy-atk').click();
+  await expect(page.getByTestId('gold')).toHaveText('∞');
+  await page.getByTestId('sheet-close').click();
+  await page.reload();
+  await expect(page.getByTestId('gold')).toHaveText('∞');
+  await page.click('[data-tab="settings"]');
+  await page.getByTestId('admin-toggle').click();
+  await expect(page.getByTestId('gold')).toHaveText('500');
+});

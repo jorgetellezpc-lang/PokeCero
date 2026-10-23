@@ -45,7 +45,7 @@ export type GymStatus = 'completed' | 'available' | 'locked' | 'soon';
 export function gymStatus(store: SaveStore, region: RegionDef, gym: GymDef): GymStatus {
   if (hasMedal(store, region.id, gym.id)) return 'completed';
   const prev = region.gyms.find((g) => g.order === gym.order - 1);
-  const unlocked = !prev || hasMedal(store, region.id, prev.id);
+  const unlocked = !prev || hasMedal(store, region.id, prev.id) || !!store.data.admin;
   if (!unlocked) return 'locked';
   return gym.playable ? 'available' : 'soon';
 }

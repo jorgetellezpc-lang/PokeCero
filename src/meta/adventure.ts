@@ -4,7 +4,8 @@ import type { SaveStore } from './save';
 // Progreso de la aventura: a qué pueblos has llegado y dónde estás. Los
 // pueblos se abren al llegar a ellos por su ruta (en el orden de ADVENTURE).
 
-export const isVisited = (store: SaveStore, townId: string) => store.data.adventure.visited.includes(townId);
+/** Visitado (en modo admin, todos los pueblos cuentan como visitados). */
+export const isVisited = (store: SaveStore, townId: string) => !!store.data.admin || store.data.adventure.visited.includes(townId);
 
 /** Se puede entrar a un pueblo si ya has llegado a él. */
 export const canEnterTown = (store: SaveStore, townId: string) => !!TOWNS[townId] && isVisited(store, townId);

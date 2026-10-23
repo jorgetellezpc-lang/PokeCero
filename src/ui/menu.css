@@ -656,3 +656,14 @@
 .map3-enter-arrow { position: absolute; right: 16px; font-size: 15px; }
 .map3-enter.off { background: linear-gradient(#5a6488, #3c4466); color: #d8def5; box-shadow: 0 4px 0 #23283f; }
 .map3-enter.off svg { width: 18px; height: 18px; }
+
+/* Modo admin (Ajustes) */
+.admin-pass {
+  width: 100%; box-sizing: border-box; margin: 6px 0 12px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid rgba(150, 180, 255, 0.35); background: rgba(8, 14, 34, 0.8); color: #fff; font: 700 16px var(--m-body);
+}
+.admin-msg.bad { color: #ff7a7a; }
+.admin-btns { display: flex; gap: 8px; }
+.admin-btns .cta { flex: 1; }
+.admin-btns .cta.ghost { background: rgba(255, 255, 255, 0.08); color: #dfe6ff; box-shadow: none; }
+.set-row[data-admin="on"] .set-text small { color: #ffd34a; }

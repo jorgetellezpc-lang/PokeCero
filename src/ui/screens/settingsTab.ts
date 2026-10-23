@@ -1,5 +1,6 @@
 import { BALANCE } from '../../config/balance';
-import type { GraphicsQuality, Settings } from '../../meta/save';
+import { ADMIN_FUNDS, checkAdminPassword, disableAdmin, enableAdmin } from '../../meta/admin';
+import type { GraphicsQuality, SaveStore, Settings } from '../../meta/save';
 import { h, toast } from '../dom';
 import { icon, type IconName } from '../icons';
 import type { MenuScreen } from './menu';
@@ -84,6 +85,14 @@ export function renderSettingsTab(menu: MenuScreen): HTMLElement {
       row('flag', 'Modo prueba', toggle('testMode'), `Gimnasio corto de ${BALANCE.rooms.testModeRooms.length} salas con más experiencia`),
     ),
     h('section', { class: 'set-list' },
+      row('lock', 'Modo admin', h('button', {
+        class: 'set-value', 'data-testid': 'admin-toggle',
+        onclick: (e: Event) => { e.preventDefault(); if (store.data.admin) { disableAdmin(store); toast('Modo admin desactivado'); } else openAdminLogin(store); },
+      }, store.data.admin ? 'Desactivar' : 'Activar', h('span', { class: 'chev' }, '›')),
+      store.data.admin ? 'Activo: oro y tickets ilimitados, todos los pueblos y gimnasios abiertos' : 'Acceso a todo, con contraseña',
+      { 'data-admin': store.data.admin ? 'on' : 'off' }),
+    ),
+    h('section', { class: 'set-list' },
       linkRow('guide', 'Guía del juego', () => openInfo('Guía del juego', GUIDE)),
       linkRow('info', 'Créditos', () => openInfo('Créditos', CREDITS)),
     ),
@@ -113,6 +122,38 @@ const CREDITS = [
   'Sprites de PMD SpriteCollab (CC BY-NC 4.0); artistas en sprites/CREDITS.md. Datos de PokeAPI. Escenario 3D con Three.js (MIT).',
   'Pokémon es propiedad de Nintendo, Creatures Inc. y GAME FREAK. Proyecto de fan sin ánimo de lucro.',
 ];
+
+/** Pide la contraseña del modo admin. */
+function openAdminLogin(store: SaveStore): void {
+  const close = () => overlay.remove();
+  const input = h('input', { type: 'password', class: 'admin-pass', 'data-testid': 'admin-pass', placeholder: 'Contraseña', autocomplete: 'off' });
+  const msg = h('p', { class: 'modal-text admin-msg', 'data-testid': 'admin-msg' }, `Oro y tickets ilimitados (${ADMIN_FUNDS.toLocaleString('es-ES')}), todos los pueblos y gimnasios abiertos y entrenamiento desde la pestaña Pokémon.`);
+  const submit = async (e?: Event) => {
+    e?.preventDefault();
+    if (await checkAdminPassword(input.value)) {
+      close();
+      enableAdmin(store);
+      toast('Modo admin activado');
+    } else {
+      msg.textContent = 'Contraseña incorrecta.';
+      msg.classList.add('bad');
+      input.value = '';
+      input.focus();
+    }
+  };
+  const overlay = h('div', { class: 'modal-backdrop', onclick: (ev: Event) => { if (ev.target === overlay) close(); } },
+    h('form', { class: 'modal', onsubmit: submit },
+      h('h2', { class: 'modal-title' }, 'Modo admin'),
+      msg, input,
+      h('div', { class: 'admin-btns' },
+        h('button', { type: 'button', class: 'cta small ghost', onclick: close }, h('span', { class: 'cta-main' }, 'Cancelar')),
+        h('button', { type: 'submit', class: 'cta small', 'data-testid': 'admin-ok' }, h('span', { class: 'cta-main' }, 'Activar')),
+      ),
+    ),
+  );
+  document.body.appendChild(overlay);
+  input.focus();
+}
 
 function openInfo(title: string, lines: string[]): void {
   const close = () => overlay.remove();

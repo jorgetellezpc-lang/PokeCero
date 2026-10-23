@@ -4,7 +4,7 @@ import { REGIONS } from '../../data/regions';
 import type { GymDef, RegionDef } from '../../data/types';
 import { roomSequence } from '../../game/rooms';
 import { TOWNS } from '../../data/adventure';
-import { howToReach } from '../../meta/adventure';
+import { howToReach, isVisited } from '../../meta/adventure';
 import { gymStatus, isClaimed, type GymStatus } from '../../meta/rewards';
 import { caveArt } from '../../render/art';
 import { animatedPokemon } from '../anim';
@@ -105,7 +105,7 @@ function renderHome(menu: MenuScreen, region: RegionDef): HTMLElement {
   if (!PLACES.some((p) => p.id === selectedPlace)) selectedPlace = adv.at;
   const place = PLACES.find((p) => p.id === selectedPlace) ?? PLACES[PLACES.length - 1];
   const gymOf = (p: MapPlace) => (p.gym ? region.gyms.find((g) => g.id === p.gym) : undefined);
-  const visited = (p: MapPlace) => !!p.town && adv.visited.includes(p.town);
+  const visited = (p: MapPlace) => !!p.town && isVisited(store, p.town);
 
   // Estado bajo cada nombre: medallas solo donde hay gimnasio.
   const rows = PLACES.map((p) => {

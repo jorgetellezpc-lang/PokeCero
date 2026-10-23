@@ -1,5 +1,6 @@
 import { BALANCE, PERMANENT_UPGRADES, permanentUpgradeCost, type PermanentUpgradeDef } from '../../config/balance';
 import { TOWNS } from '../../data/adventure';
+import { isVisited } from '../../meta/adventure';
 import { ITEMS, ITEM_IDS } from '../../data/items';
 import { ATTACK_UPGRADE, ATTACK_UPGRADES, EVO_KEY, attackStats, rawAttackNums, signatureFor } from '../../data/signatures';
 import { getSpecies, obtainablePokemon, PLAYABLE_BLURB, sideOf, type PokemonSpecies } from '../../data/pokemon';
@@ -112,7 +113,7 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     { id: 'def', img: 'u-shield', label: 'Defensa' }, { id: 'spd', img: 'u-boot', label: 'Velocidad' },
   ];
   const canTrain = PERMANENT_UPGRADES.some((u) => canBuy(store, sp.id, u.id) === 'ok');
-  const shopOpen = d.adventure.visited.some((id) => TOWNS[id]?.spots.some((x) => x.kind === 'shop'));
+  const shopOpen = Object.values(TOWNS).some((t) => isVisited(store, t.id) && t.spots.some((x) => x.kind === 'shop'));
   const SLOT_X = [494, 573, 653, 732];
   els.push(h('section', { class: 'pk4-card', style: at(467, 920, 827, 1317) }),
     h('h3', { class: 'pk4-title', style: at(497, 940, 820, 990) }, 'Entrenamiento'),
@@ -122,10 +123,11 @@ export function renderPokemonTab(menu: MenuScreen): HTMLElement {
     // El entrenamiento se compra en la tienda de los pueblos (Ciudad Verde, Ciudad Plateada).
     h('button', {
       class: `pk4-train ${canTrain && shopOpen ? 'ready' : ''}`, style: at(488, 1203, 806, 1288), 'data-testid': 'train',
-      onclick: () => toast(shopOpen
+      // En modo admin se entrena desde aquí mismo.
+      onclick: () => store.data.admin ? openSheet(menu, `Entrenar a ${sp.name}`, () => upgrades(menu, sp)) : toast(shopOpen
         ? 'Entrena en la tienda de un pueblo: Ciudad Verde o Ciudad Plateada.'
         : 'La primera tienda está en Ciudad Verde: llega por la Ruta 1 desde Pueblo Paleta.'),
-    }, upArrow(), 'Ir a la tienda'));
+    }, upArrow(), store.data.admin ? 'Entrenar' : 'Ir a la tienda'));
 
   // --- evolución ---
   const chain: PokemonSpecies[] = [sp];
